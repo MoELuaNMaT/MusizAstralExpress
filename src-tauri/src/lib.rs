@@ -5,9 +5,492 @@ use regex::Regex;
 use reqwest::header::{COOKIE, REFERER, USER_AGENT};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::io::{BufRead, BufReader};
+use std::net::{SocketAddr, TcpStream};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::Emitter;
 use tauri_plugin_store::{Error as StoreError, StoreBuilder};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 const AUTH_STORE_FILE: &str = "auth_store.json";
+const NETEASE_API_PORT: u16 = 3000;
+const QQ_API_PORT: u16 = 3001;
+const LOCAL_API_EVENT_NAME: &str = "local-api-progress";
+
+#[derive(Serialize, Clone)]
+struct LocalApiProgressPayload {
+    stage: String,
+    service: Option<String>,
+    message: String,
+    percent: u8,
+    level: String,
+    timestamp: u64,
+}
+
+fn now_timestamp_ms() -> u64 {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_millis().min(u64::MAX as u128) as u64,
+        Err(_) => 0,
+    }
+}
+
+fn emit_local_api_progress(
+    app: &tauri::AppHandle,
+    stage: &str,
+    service: Option<&str>,
+    message: impl Into<String>,
+    percent: u8,
+    level: &str,
+) {
+    let payload = LocalApiProgressPayload {
+        stage: stage.to_string(),
+        service: service.map(|value| value.to_string()),
+        message: message.into(),
+        percent,
+        level: level.to_string(),
+        timestamp: now_timestamp_ms(),
+    };
+
+    let _ = app.emit(LOCAL_API_EVENT_NAME, payload);
+}
+
+#[derive(Default)]
+struct LocalServiceManager {
+    project_root: Option<PathBuf>,
+    netease_child: Option<Child>,
+    qq_child: Option<Child>,
+}
+
+static LOCAL_SERVICE_MANAGER: OnceLock<Mutex<LocalServiceManager>> = OnceLock::new();
+
+fn local_service_manager() -> &'static Mutex<LocalServiceManager> {
+    LOCAL_SERVICE_MANAGER.get_or_init(|| Mutex::new(LocalServiceManager::default()))
+}
+
+fn can_connect_to_port(port: u16) -> bool {
+    let loopback = SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&loopback, Duration::from_millis(250)).is_ok()
+}
+
+fn service_is_ready(service: &str) -> bool {
+    match service {
+        "netease" => can_connect_to_port(NETEASE_API_PORT),
+        "qq" => can_connect_to_port(QQ_API_PORT),
+        _ => false,
+    }
+}
+
+fn is_process_running(process: &mut Child) -> bool {
+    match process.try_wait() {
+        Ok(Some(_)) => false,
+        Ok(None) => true,
+        Err(_) => false,
+    }
+}
+
+fn clean_exited_processes(manager: &mut LocalServiceManager) {
+    if let Some(child) = manager.netease_child.as_mut() {
+        if !is_process_running(child) {
+            manager.netease_child = None;
+        }
+    }
+    if let Some(child) = manager.qq_child.as_mut() {
+        if !is_process_running(child) {
+            manager.qq_child = None;
+        }
+    }
+}
+
+fn looks_like_project_root(path: &Path) -> bool {
+    path.join("scripts").join("start-netease-api.cjs").exists()
+        && path.join("scripts").join("start-qmusic-adapter.cjs").exists()
+}
+
+fn find_project_root() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let mut cursor = Some(exe_dir.to_path_buf());
+            for _ in 0..6 {
+                if let Some(path) = cursor {
+                    candidates.push(path.clone());
+                    cursor = path.parent().map(|parent| parent.to_path_buf());
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(current_dir.clone());
+        if let Some(parent) = current_dir.parent() {
+            candidates.push(parent.to_path_buf());
+        }
+    }
+
+    let mut seen = HashSet::new();
+    for candidate in candidates {
+        let normalized = candidate.to_string_lossy().to_string();
+        if !seen.insert(normalized) {
+            continue;
+        }
+
+        if looks_like_project_root(&candidate) {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn spawn_node_script(project_root: &Path, script_name: &str) -> Result<Child, String> {
+    let script_path = project_root.join("scripts").join(script_name);
+    if !script_path.exists() {
+        return Err(format!("script not found: {}", script_path.display()));
+    }
+
+    let mut command = Command::new("node");
+    command
+        .arg(script_path)
+        .current_dir(project_root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    command
+        .spawn()
+        .map_err(|error| format!("failed to spawn node script: {}", error))
+}
+
+fn ensure_node_modules(project_root: &Path) -> Result<(), String> {
+    let netease_entry = project_root
+        .join("node_modules")
+        .join("NeteaseCloudMusicApi")
+        .join("app.js");
+
+    if !netease_entry.exists() {
+        return Err(
+            "local API dependencies are missing (node_modules). Please run `npm install` in project root."
+                .to_string(),
+        );
+    }
+
+    Ok(())
+}
+
+fn qq_log_stage(line: &str) -> &'static str {
+    let normalized = line.to_ascii_lowercase();
+    if normalized.contains("creating python virtualenv") {
+        return "qq_creating_venv";
+    }
+    if normalized.contains("installing python dependencies")
+        || normalized.contains("collecting ")
+        || normalized.contains("downloading ")
+        || normalized.contains("building wheel")
+        || normalized.contains("installing collected packages")
+    {
+        return "qq_installing";
+    }
+    if normalized.contains("dependencies already up-to-date")
+        || normalized.contains("starting at http://")
+    {
+        return "qq_starting";
+    }
+    "qq_log"
+}
+
+fn netease_log_stage(line: &str) -> &'static str {
+    let normalized = line.to_ascii_lowercase();
+    if normalized.contains("starting neteasecloudmusicapi")
+        || normalized.contains("listening")
+        || normalized.contains("server run")
+    {
+        return "netease_starting";
+    }
+    "netease_log"
+}
+
+fn stage_percent(stage: &str, default: u8) -> u8 {
+    match stage {
+        "prepare" => 5,
+        "checking_deps" => 10,
+        "netease_starting" => 25,
+        "qq_creating_venv" => 40,
+        "qq_installing" => 48,
+        "qq_starting" => 60,
+        "netease_ready" => 70,
+        "qq_ready" => 90,
+        "ready" => 100,
+        "error" => 100,
+        _ => default,
+    }
+}
+
+fn attach_process_log_forwarders(app: &tauri::AppHandle, service: &'static str, child: &mut Child) {
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    if let Some(reader) = stdout {
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            let buffered = BufReader::new(reader);
+            for line_result in buffered.lines() {
+                let Ok(raw_line) = line_result else {
+                    continue;
+                };
+                let line = raw_line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                let stage = if service == "qq" {
+                    qq_log_stage(line)
+                } else {
+                    netease_log_stage(line)
+                };
+                let percent = stage_percent(stage, 55);
+                emit_local_api_progress(
+                    &app_handle,
+                    stage,
+                    Some(service),
+                    line.to_string(),
+                    percent,
+                    "info",
+                );
+            }
+        });
+    }
+
+    if let Some(reader) = stderr {
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            let buffered = BufReader::new(reader);
+            for line_result in buffered.lines() {
+                let Ok(raw_line) = line_result else {
+                    continue;
+                };
+                let line = raw_line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                emit_local_api_progress(
+                    &app_handle,
+                    "log_warning",
+                    Some(service),
+                    line.to_string(),
+                    60,
+                    "warn",
+                );
+            }
+        });
+    }
+}
+
+fn shutdown_local_services_inner(manager: &mut LocalServiceManager) {
+    if let Some(mut child) = manager.netease_child.take() {
+        let _ = child.kill();
+    }
+    if let Some(mut child) = manager.qq_child.take() {
+        let _ = child.kill();
+    }
+}
+
+#[tauri::command]
+fn ensure_local_api_services(app: tauri::AppHandle) -> Result<String, String> {
+    emit_local_api_progress(
+        &app,
+        "prepare",
+        None,
+        "准备检查本地 API 服务...",
+        5,
+        "info",
+    );
+
+    let manager_mutex = local_service_manager();
+    let mut manager = manager_mutex
+        .lock()
+        .map_err(|_| "failed to lock local service manager".to_string())?;
+
+    clean_exited_processes(&mut manager);
+
+    let root = match manager.project_root.clone() {
+        Some(path) if looks_like_project_root(&path) => path,
+        _ => {
+            let found = find_project_root().ok_or_else(|| {
+                "project root not found. Make sure ALLMusic is started from project workspace."
+                    .to_string()
+            })?;
+            manager.project_root = Some(found.clone());
+            found
+        }
+    };
+
+    emit_local_api_progress(
+        &app,
+        "checking_deps",
+        None,
+        "正在检查 Node / Python 相关依赖...",
+        10,
+        "info",
+    );
+
+    if let Err(error) = ensure_node_modules(&root) {
+        emit_local_api_progress(&app, "error", None, error.clone(), 100, "error");
+        return Err(error);
+    }
+
+    let mut started_services = Vec::new();
+    let netease_was_ready = service_is_ready("netease");
+    let qq_was_ready = service_is_ready("qq");
+
+    if netease_was_ready {
+        emit_local_api_progress(
+            &app,
+            "netease_ready",
+            Some("netease"),
+            "网易本地 API 已在运行。",
+            70,
+            "info",
+        );
+    }
+
+    if !netease_was_ready {
+        let should_spawn = match manager.netease_child.as_mut() {
+            Some(child) => !is_process_running(child),
+            None => true,
+        };
+
+        if should_spawn {
+            emit_local_api_progress(
+                &app,
+                "netease_starting",
+                Some("netease"),
+                "正在启动网易本地 API（3000）...",
+                25,
+                "info",
+            );
+            let mut child = spawn_node_script(&root, "start-netease-api.cjs").map_err(|error| {
+                emit_local_api_progress(&app, "error", Some("netease"), error.clone(), 100, "error");
+                error
+            })?;
+            attach_process_log_forwarders(&app, "netease", &mut child);
+            manager.netease_child = Some(child);
+            started_services.push("netease");
+        }
+    }
+
+    if qq_was_ready {
+        emit_local_api_progress(
+            &app,
+            "qq_ready",
+            Some("qq"),
+            "QQ 本地 API 已在运行。",
+            90,
+            "info",
+        );
+    }
+
+    if !qq_was_ready {
+        let should_spawn = match manager.qq_child.as_mut() {
+            Some(child) => !is_process_running(child),
+            None => true,
+        };
+
+        if should_spawn {
+            emit_local_api_progress(
+                &app,
+                "qq_starting",
+                Some("qq"),
+                "正在启动 QQ 本地 API（3001）...",
+                35,
+                "info",
+            );
+            let mut child = spawn_node_script(&root, "start-qmusic-adapter.cjs").map_err(|error| {
+                emit_local_api_progress(&app, "error", Some("qq"), error.clone(), 100, "error");
+                error
+            })?;
+            attach_process_log_forwarders(&app, "qq", &mut child);
+            manager.qq_child = Some(child);
+            started_services.push("qq");
+        }
+    }
+
+    drop(manager);
+
+    let mut netease_ready_notified = netease_was_ready;
+    let mut qq_ready_notified = qq_was_ready;
+
+    for _ in 0..960 {
+        let netease_ready = can_connect_to_port(NETEASE_API_PORT);
+        let qq_ready = can_connect_to_port(QQ_API_PORT);
+
+        if netease_ready && !netease_ready_notified {
+            emit_local_api_progress(
+                &app,
+                "netease_ready",
+                Some("netease"),
+                "网易本地 API 已就绪。",
+                70,
+                "info",
+            );
+            netease_ready_notified = true;
+        }
+
+        if qq_ready && !qq_ready_notified {
+            emit_local_api_progress(
+                &app,
+                "qq_ready",
+                Some("qq"),
+                "QQ 本地 API 已就绪。",
+                90,
+                "info",
+            );
+            qq_ready_notified = true;
+        }
+
+        if netease_ready && qq_ready {
+            let result = if started_services.is_empty() {
+                "local APIs already running".to_string()
+            } else {
+                format!("started local APIs: {}", started_services.join(", "))
+            };
+            emit_local_api_progress(&app, "ready", None, result.clone(), 100, "info");
+            return Ok(result);
+        }
+
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    let timeout_error =
+        "local APIs failed to become ready in time. Check Node/Python environment and script logs."
+            .to_string();
+    emit_local_api_progress(&app, "error", None, timeout_error.clone(), 100, "error");
+    Err(timeout_error)
+}
+
+#[tauri::command]
+fn shutdown_local_api_services() -> Result<(), String> {
+    let manager_mutex = local_service_manager();
+    let mut manager = manager_mutex
+        .lock()
+        .map_err(|_| "failed to lock local service manager".to_string())?;
+
+    shutdown_local_services_inner(&mut manager);
+    Ok(())
+}
 
 /// User data structure
 #[derive(Debug, Serialize, Deserialize)]
@@ -355,6 +838,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if let Ok(mut manager) = local_service_manager().lock() {
+                    shutdown_local_services_inner(&mut manager);
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             store_auth,
@@ -363,6 +853,8 @@ pub fn run() {
             get_all_auth,
             clear_all_auth,
             fetch_netease_playlist_order,
+            ensure_local_api_services,
+            shutdown_local_api_services,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

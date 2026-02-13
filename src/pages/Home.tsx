@@ -15,6 +15,7 @@ const DEFAULT_AVATAR = 'https://p.qlogo.cn/gh/0/0/100';
 const NETEASE_LIKED_ORDER_STORAGE_KEY = 'allmusic_netease_liked_order_v1';
 const THEME_MODE_STORAGE_KEY = 'allmusic_theme_mode_v1';
 const UI_VERSION_STORAGE_KEY = 'allmusic_ui_version_v1';
+const LOCAL_API_READY_EVENT = 'allmusic:local-api-ready';
 const INITIAL_PLAYLIST_VISIBLE_COUNT = 18;
 const PLAYLIST_APPEND_CHUNK_SIZE = 60;
 
@@ -411,6 +412,7 @@ export function HomePage() {
   const searchDropdownRef = useRef<HTMLDivElement | null>(null);
   const searchDebounceTimerRef = useRef<number | null>(null);
   const doublePlayCueTimerRef = useRef<number | null>(null);
+  const localApiReadyRefreshAtRef = useRef(0);
 
   useEffect(() => {
     setMounted(true);
@@ -781,6 +783,26 @@ export function HomePage() {
     },
     [executeSearch, keyword, loadDailyRecommendations, loadPlaylistDetail, loadPlaylists],
   );
+
+  useEffect(() => {
+    if (!mounted || !isAuthenticated) {
+      return;
+    }
+
+    const onLocalApiReady = () => {
+      const now = Date.now();
+      if (now - localApiReadyRefreshAtRef.current < 1500) {
+        return;
+      }
+      localApiReadyRefreshAtRef.current = now;
+      void refreshCurrentView({ includeSearch: false, includeDaily: true });
+    };
+
+    window.addEventListener(LOCAL_API_READY_EVENT, onLocalApiReady);
+    return () => {
+      window.removeEventListener(LOCAL_API_READY_EVENT, onLocalApiReady);
+    };
+  }, [isAuthenticated, mounted, refreshCurrentView]);
 
   const handleLikeSong = useCallback(
     async (song: UnifiedSong) => {

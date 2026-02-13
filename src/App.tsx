@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useAuthStore, usePlayerStore } from '@/stores';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { authService } from '@/services/auth.service';
@@ -9,6 +11,7 @@ import type { LoginResult, UnifiedPlaylist, UnifiedSong } from '@/types';
 
 const THEME_MODE_STORAGE_KEY = 'allmusic_theme_mode_v1';
 const UI_VERSION_STORAGE_KEY = 'allmusic_ui_version_v1';
+const LOCAL_API_READY_EVENT = 'allmusic:local-api-ready';
 
 type UiVersion = 'current' | 'v4-glam';
 type AuthSnapshot = ReturnType<typeof useAuthStore.getState>;
@@ -41,6 +44,17 @@ PlayerSnapshot,
 | 'isLoading'
 | 'error'
 >;
+
+type LocalApiServiceState = 'pending' | 'starting' | 'installing' | 'ready' | 'error';
+
+type LocalApiProgressPayload = {
+  stage: string;
+  service?: 'netease' | 'qq';
+  message: string;
+  percent: number;
+  level?: 'info' | 'warn' | 'error';
+  timestamp?: number;
+};
 
 type BridgeApi = {
   getAuthState: () => Promise<BridgeAuthState>;
@@ -93,6 +107,15 @@ function buildLibraryContext() {
   };
 }
 
+function canUseTauriInvoke(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const tauriInternals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__;
+  return typeof tauriInternals?.invoke === 'function';
+}
+
 function V4AudioEngine({
   onSeekReady,
   onRetryReady,
@@ -127,6 +150,26 @@ function App() {
 
   const seekRef = useRef<(ms: number) => void>(() => undefined);
   const retryRef = useRef<() => void>(() => undefined);
+  const localApiBootstrappedRef = useRef(false);
+  const v4FrameRef = useRef<HTMLIFrameElement | null>(null);
+  const [localApiProgress, setLocalApiProgress] = useState<{
+    visible: boolean;
+    percent: number;
+    message: string;
+    logs: string[];
+    failed: boolean;
+    serviceState: Record<'netease' | 'qq', LocalApiServiceState>;
+  }>({
+    visible: false,
+    percent: 0,
+    message: '准备启动本地 API...',
+    logs: [],
+    failed: false,
+    serviceState: {
+      netease: 'pending',
+      qq: 'pending',
+    },
+  });
 
   const handleSeekReady = useCallback((fn: (ms: number) => void) => {
     seekRef.current = fn;
@@ -143,6 +186,131 @@ function App() {
     return result;
   }, []);
 
+  const notifyLocalApiReady = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent(LOCAL_API_READY_EVENT));
+    if (v4FrameRef.current?.contentWindow) {
+      v4FrameRef.current.contentWindow.postMessage({ type: LOCAL_API_READY_EVENT }, '*');
+    }
+  }, []);
+
+  const bootstrapLocalApis = useCallback(async () => {
+    if (!canUseTauriInvoke() || localApiBootstrappedRef.current) {
+      return;
+    }
+
+    localApiBootstrappedRef.current = true;
+    setLocalApiProgress({
+      visible: true,
+      percent: 5,
+      message: '正在检查并启动本地 API...',
+      logs: [],
+      failed: false,
+      serviceState: {
+        netease: 'pending',
+        qq: 'pending',
+      },
+    });
+
+    try {
+      const status = await invoke<string>('ensure_local_api_services');
+      console.info(`[ALLMusic] ${status}`);
+      setLocalApiProgress((prev) => ({
+        ...prev,
+        visible: true,
+        percent: 100,
+        failed: false,
+        message: '本地 API 已就绪',
+        serviceState: {
+          netease: 'ready',
+          qq: 'ready',
+        },
+        logs: [...prev.logs, status].slice(-10),
+      }));
+      notifyLocalApiReady();
+
+      window.setTimeout(() => {
+        setLocalApiProgress((prev) => ({ ...prev, visible: false }));
+      }, 650);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[ALLMusic] 本地 API 启动失败:', message);
+      setLocalApiProgress((prev) => ({
+        ...prev,
+        visible: true,
+        failed: true,
+        percent: Math.max(prev.percent, 100),
+        message: `本地 API 启动失败：${message}`,
+        logs: [...prev.logs, message].slice(-10),
+        serviceState: {
+          netease: prev.serviceState.netease === 'ready' ? 'ready' : 'error',
+          qq: prev.serviceState.qq === 'ready' ? 'ready' : 'error',
+        },
+      }));
+      localApiBootstrappedRef.current = false;
+    }
+  }, [notifyLocalApiReady]);
+
+  const handleRetryBootstrap = useCallback(() => {
+    localApiBootstrappedRef.current = false;
+    void bootstrapLocalApis();
+  }, [bootstrapLocalApis]);
+
+  useEffect(() => {
+    if (!canUseTauriInvoke()) {
+      return;
+    }
+
+    let unlisten: (() => void) | null = null;
+    void listen<LocalApiProgressPayload>('local-api-progress', (event) => {
+      const payload = event.payload;
+      const stage = payload.stage || '';
+      const nextPercent = Number.isFinite(payload.percent) ? payload.percent : 0;
+      const nextMessage = payload.message || '正在启动本地 API...';
+      const isError = payload.level === 'error' || stage.endsWith('_error') || stage === 'error';
+      const nextLog = payload.service ? `[${payload.service}] ${nextMessage}` : nextMessage;
+
+      setLocalApiProgress((prev) => {
+        const nextServiceState = { ...prev.serviceState };
+        if (payload.service) {
+          if (stage.endsWith('_ready')) {
+            nextServiceState[payload.service] = 'ready';
+          } else if (isError) {
+            nextServiceState[payload.service] = 'error';
+          } else if (stage.includes('install')) {
+            nextServiceState[payload.service] = 'installing';
+          } else if (stage.includes('start') || stage.includes('wait') || stage.includes('log')) {
+            nextServiceState[payload.service] = 'starting';
+          }
+        }
+
+        return {
+          ...prev,
+          visible: true,
+          failed: prev.failed || isError,
+          percent: Math.max(prev.percent, Math.min(100, Math.max(0, nextPercent))),
+          message: nextMessage,
+          serviceState: nextServiceState,
+          logs: [...prev.logs, nextLog].slice(-10),
+        };
+      });
+
+      if (stage === 'ready' && !isError) {
+        notifyLocalApiReady();
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [notifyLocalApiReady]);
+
   useEffect(() => {
     const init = async () => {
       await loadStoredCredentials();
@@ -156,6 +324,14 @@ function App() {
 
     void init();
   }, [loadStoredCredentials]);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    void bootstrapLocalApis();
+  }, [bootstrapLocalApis, mounted]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -274,12 +450,77 @@ function App() {
         <>
           <V4AudioEngine onSeekReady={handleSeekReady} onRetryReady={handleRetryReady} />
           <iframe
+            ref={v4FrameRef}
             title="ALLMusic V4 Gemini Fusion UX Glam"
             src="/v4-glam/index.html"
             className="h-screen w-screen border-0 bg-transparent"
           />
         </>
       ) : appView}
+      {localApiProgress.visible && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-4">
+          <div className="w-full max-w-xl rounded-2xl border border-white/20 bg-slate-900/95 p-5 text-slate-100 shadow-2xl backdrop-blur">
+            <div className="mb-3 flex items-center justify-between text-sm">
+              <span className="font-medium">本地 API 启动中</span>
+              <span className="text-xs text-slate-300">{localApiProgress.percent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-700/80">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  localApiProgress.failed ? 'bg-rose-500' : 'bg-cyan-400'
+                }`}
+                style={{ width: `${localApiProgress.percent}%` }}
+              />
+            </div>
+            <p className={`mt-3 text-sm ${localApiProgress.failed ? 'text-rose-300' : 'text-slate-200'}`}>
+              {localApiProgress.message}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              {(['netease', 'qq'] as const).map((service) => {
+                const state = localApiProgress.serviceState[service];
+                const labelMap: Record<LocalApiServiceState, string> = {
+                  pending: '等待中',
+                  starting: '启动中',
+                  installing: '安装依赖中',
+                  ready: '已就绪',
+                  error: '异常',
+                };
+                const colorMap: Record<LocalApiServiceState, string> = {
+                  pending: 'text-slate-300',
+                  starting: 'text-cyan-300',
+                  installing: 'text-amber-300',
+                  ready: 'text-emerald-300',
+                  error: 'text-rose-300',
+                };
+                return (
+                  <div key={service} className="rounded-lg border border-white/10 bg-slate-800/70 px-3 py-2">
+                    <div className="font-medium uppercase tracking-wide text-slate-200">{service}</div>
+                    <div className={`mt-1 ${colorMap[state]}`}>{labelMap[state]}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 max-h-28 overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
+              {localApiProgress.logs.length === 0 ? (
+                <div>等待日志输出...</div>
+              ) : (
+                localApiProgress.logs.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)
+              )}
+            </div>
+            {localApiProgress.failed && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleRetryBootstrap}
+                  className="rounded-lg bg-cyan-500 px-3 py-1.5 text-sm font-medium text-slate-950 transition hover:bg-cyan-400"
+                >
+                  重试启动
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

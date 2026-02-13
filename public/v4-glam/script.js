@@ -97,6 +97,7 @@
     lyricCache: Object.create(null),
     lyricPending: Object.create(null),
     currentPlayerSong: null,
+    lastLocalApiReadyAt: 0,
   };
 
   let toastTimer = null;
@@ -1420,6 +1421,30 @@
           void bridge.togglePlay().then(syncPlayerState);
         }
       }
+    });
+
+    window.addEventListener('message', (event) => {
+      if (window.parent && event.source !== window.parent) {
+        return;
+      }
+      const payload = event.data;
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
+      if (payload.type !== 'allmusic:local-api-ready') {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - state.lastLocalApiReadyAt < 1500) {
+        return;
+      }
+      state.lastLocalApiReadyAt = now;
+
+      setStatus('Local APIs ready, refreshing playlists');
+      showToast('Local APIs ready, refreshing');
+      void loadPlaylists();
+      void syncPlayerState();
     });
   }
 
