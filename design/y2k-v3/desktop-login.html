@@ -1,0 +1,74 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K V3 - 桌面登录</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 1 0-.7-7.9A5.5 5.5 0 0 0 5 12.2 3.8 3.8 0 0 0 7 18z"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="headline">
+      <a class="back-pill focusable" href="./desktop-login.html"><span class="ball"></span><span>Y2K V3 / Desktop Login</span></a>
+      <div class="muted">页面：<a href="./desktop-home.html">主界面</a> · <a href="./desktop-player.html">播放页</a> · <a href="./mobile-login.html">移动端</a></div>
+    </div>
+
+    <div class="desktop-area">
+      <span class="glitter top"></span><span class="glitter bottom"></span>
+      <section class="window90">
+        <div class="titlebar90">
+          <div class="title"><svg class="icon"><use href="#i-star"/></svg><span>ALLMusic 千禧登录器 · Win2000 Skin</span></div>
+          <div class="sys-btns"><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="win-body" style="padding:16px">
+          <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:10px">
+            <section class="pane90">
+              <h3><svg class="icon"><use href="#i-user"/></svg>账号桥接</h3>
+              <div class="menu90" role="tablist" aria-label="平台切换">
+                <button class="btn90 hot"><svg class="icon"><use href="#i-cloud"/></svg>网易云</button>
+                <button class="btn90"><svg class="icon"><use href="#i-cloud"/></svg>QQ 音乐</button>
+                <button class="btn90"><svg class="icon"><use href="#i-qr"/></svg>二维码</button>
+              </div>
+              <div style="display:grid;gap:8px">
+                <label class="input90"><svg class="icon"><use href="#i-user"/></svg><input value="138****6666" aria-label="手机号"/></label>
+                <label class="input90"><svg class="icon"><use href="#i-lock"/></svg><input type="password" value="********" aria-label="密码"/></label>
+              </div>
+              <div class="menu90" style="margin-top:9px">
+                <button class="btn90 hot"><svg class="icon"><use href="#i-user"/></svg>登录并同步</button>
+                <button class="btn90"><svg class="icon"><use href="#i-star"/></svg>保存皮肤</button>
+              </div>
+              <div class="stickers"><span class="sticker">QQ空间挂件感</span><span class="sticker">Candy UI</span><span class="sticker">PVC Gloss</span></div>
+            </section>
+
+            <section class="pane90">
+              <h3><svg class="icon"><use href="#i-qr"/></svg>扫码通道</h3>
+              <div style="border:1px solid var(--line-soft);border-radius:10px;padding:10px;background:var(--glass-soft)">
+                <div style="width:188px;height:188px;margin:0 auto;border:1px solid var(--line);border-radius:12px;background:repeating-linear-gradient(90deg,#fff,#fff 8px,#111 8px,#111 16px)"></div>
+                <p class="muted" style="text-align:center;margin:8px 0 0">请用网易云 / QQ 音乐 App 扫码</p>
+                <div class="marquee90" style="margin-top:7px"><span>登录状态：等待授权中 · 如果二维码过期请刷新 · 登录状态：等待授权中 ·</span></div>
+              </div>
+              <div style="margin-top:8px"><span class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>乐观科技乌托邦</span></div>
+            </section>
+          </div>
+
+          <div class="taskbar90" style="margin-top:12px">
+            <div class="task-list"><span class="task-item">Y2K-V3-LOGIN.EXE</span><span class="task-item">VISUAL_SKIN.DAT</span></div>
+            <span class="chip warn">09:41 PM</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

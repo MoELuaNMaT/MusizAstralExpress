@@ -1,0 +1,62 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K - 移动登录页</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M17 17h4v4h-4z"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.8 12 4l9 6.8"/><path d="M6.5 9.8V20h11V9.8"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-header">
+      <a class="brand-link" href="./mobile-login.html"><span class="brand-dot"></span><span>ALLMusic Y2K / Mobile Login</span></a>
+      <div class="scene-meta">相关页面：<a href="./mobile-home.html">主界面</a> · <a href="./mobile-player.html">播放页</a> · <a href="./desktop-login.html">桌面端</a></div>
+    </div>
+
+    <section class="mobile-grid" style="grid-template-columns:minmax(280px,420px)">
+      <article class="phone">
+        <div class="phone-screen">
+          <div class="notch"></div>
+          <div class="m-head"><span>9:41</span><span>5G · 88%</span></div>
+
+          <div class="m-window">
+            <div class="titlebar" style="height:36px"><div class="titlebar-left"><svg class="icon"><use href="#i-star"/></svg><span>登录中心</span></div><div class="titlebar-actions"><span class="win-btn"></span><span class="win-btn"></span></div></div>
+            <div class="m-body" style="display:grid;gap:9px">
+              <button class="bevel primary"><svg class="icon"><use href="#i-user"/></svg>账号密码登录</button>
+              <label class="m-input"><svg class="icon"><use href="#i-user"/></svg><input value="138****6666" /></label>
+              <label class="m-input"><svg class="icon"><use href="#i-lock"/></svg><input type="password" value="********" /></label>
+              <button class="bevel"><svg class="icon"><use href="#i-qr"/></svg>扫码登录</button>
+              <div class="chip warn" style="justify-content:center"><svg class="icon" style="width:13px;height:13px"><use href="#i-star"/></svg>Y2K：玻璃感 + 彩色边缘</div>
+            </div>
+          </div>
+
+          <div class="m-window">
+            <div class="titlebar" style="height:34px"><div class="titlebar-left"><svg class="icon"><use href="#i-qr"/></svg><span>扫码面板</span></div></div>
+            <div class="m-body">
+              <div style="width:170px;height:170px;margin:0 auto;border-radius:12px;border:1px solid var(--line);background:repeating-linear-gradient(90deg,#fff,#fff 8px,#111 8px,#111 16px)"></div>
+              <p class="scene-meta" style="text-align:center;margin:8px 0 0">请用网易云/QQ音乐 App 扫码</p>
+            </div>
+          </div>
+
+          <nav class="m-nav" aria-label="底部导航">
+            <button><svg class="icon"><use href="#i-home"/></svg></button>
+            <button class="active"><svg class="icon"><use href="#i-user"/></svg></button>
+            <button><svg class="icon"><use href="#i-disc"/></svg></button>
+          </nav>
+        </div>
+      </article>
+    </section>
+  </div>
+</body>
+</html>

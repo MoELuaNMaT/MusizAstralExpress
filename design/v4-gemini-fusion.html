@@ -1,0 +1,663 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ALLMusic V4 - Gemini Retro Fusion</title>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-desktop: #b8c0c8;
+      --win-gray: #e0e0e0;
+      --win-light: #ffffff;
+      --win-dark: #808080;
+      --win-black: #000000;
+      --accent-pink: #ff85c0;
+      --accent-dark-pink: #b60056;
+      --accent-blue: #85c0ff;
+      --accent-cyan: #9af0ff;
+      --text-main: #3f2340;
+      --font-pixel: 'DotGothic16', sans-serif;
+    }
+
+    * { box-sizing: border-box; user-select: none; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      font-family: var(--font-pixel);
+      color: var(--text-main);
+      background-color: var(--bg-desktop);
+      background-image:
+        radial-gradient(var(--win-dark) 1px, transparent 1px),
+        radial-gradient(var(--accent-pink) 1px, transparent 1px);
+      background-size: 18px 18px, 36px 36px;
+      background-position: 0 0, 9px 9px;
+    }
+
+    .desktop-bg {
+      position: absolute;
+      inset: 0;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 0;
+    }
+
+    .desktop-icon {
+      width: 88px;
+      text-align: center;
+      color: #fff;
+      text-shadow: 1px 1px 0 #000;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .desktop-icon .icon {
+      font-size: 30px;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .window-frame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(1100px, calc(100vw - 28px));
+      height: min(740px, calc(100vh - 76px));
+      background: var(--win-gray);
+      border: 2px solid var(--win-gray);
+      box-shadow:
+        inset 1px 1px var(--win-light),
+        inset -1px -1px var(--win-dark),
+        0 0 0 2px rgba(0, 0, 0, 0.15),
+        8px 8px 0 rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .window-header {
+      height: 34px;
+      background: linear-gradient(90deg, #000080, #1084d0 52%, #7bc8ff);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6px;
+      letter-spacing: 0.4px;
+      font-size: 13px;
+    }
+
+    .title-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+    }
+
+    .window-controls { display: flex; gap: 2px; }
+
+    .win-btn {
+      border: 1px solid var(--win-black);
+      background: var(--win-gray);
+      box-shadow: inset 1px 1px var(--win-light), inset -1px -1px var(--win-dark);
+      font-family: var(--font-pixel);
+      cursor: pointer;
+      font-size: 12px;
+      color: #111;
+      height: 22px;
+      min-width: 24px;
+      padding: 0 8px;
+    }
+
+    .win-btn:active {
+      box-shadow: inset 1px 1px var(--win-dark), inset -1px -1px var(--win-light);
+      transform: translate(1px, 1px);
+    }
+
+    .close-btn { background: #f7d7e9; color: #b60056; }
+
+    .window-body {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      padding: 8px;
+      background: #f6f6f6;
+    }
+
+    .top-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .top-tabs .win-btn {
+      height: 28px;
+      min-width: 120px;
+    }
+
+    .top-tabs .active-tab {
+      background: linear-gradient(180deg, #ffd7ec, #ffc2e3);
+      color: var(--accent-dark-pink);
+      font-weight: bold;
+    }
+
+    .view-page {
+      position: absolute;
+      top: 46px;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border: 2px inset var(--win-gray);
+      background: #fffafa;
+      padding: 10px;
+      opacity: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: opacity 0.22s ease;
+    }
+
+    .view-page.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .status-strip {
+      border: 1px inset var(--win-gray);
+      background: #fff;
+      padding: 4px 8px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #444;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 250px 1fr 280px;
+      gap: 10px;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .pane {
+      border: 2px inset var(--win-gray);
+      background: #fff;
+      padding: 8px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pane-title {
+      font-size: 13px;
+      color: var(--accent-dark-pink);
+      border-bottom: 1px dotted #c9c9c9;
+      padding-bottom: 4px;
+    }
+
+    .list-box {
+      border: 1px inset var(--win-gray);
+      background: #fff;
+      overflow: auto;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px;
+      border-bottom: 1px dashed #e2d1db;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .item:hover { background: #eaf5ff; }
+    .item.active { background: #d7ebff; color: #0c4d87; }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 6px;
+    }
+
+    .input95 {
+      height: 30px;
+      border: 2px inset var(--win-gray);
+      background: #fff;
+      padding: 0 8px;
+      font-family: var(--font-pixel);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .song-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .song-table th,
+    .song-table td {
+      border: 1px solid #dadada;
+      padding: 6px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .song-table thead {
+      background: linear-gradient(180deg, #f2f2f2, #dddddd);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .badge {
+      display: inline-block;
+      border: 1px solid #b5b5b5;
+      background: #f4f4f4;
+      padding: 1px 6px;
+      font-size: 11px;
+    }
+
+    .badge.qq { color: #005d23; background: #d9ffe9; }
+    .badge.netease { color: #8e003f; background: #ffe1ef; }
+
+    .login-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .qr-box {
+      width: 152px;
+      height: 152px;
+      margin: 6px auto;
+      border: 2px solid #f6a3ca;
+      background:
+        linear-gradient(45deg, #f57bb7 25%, transparent 25% 50%, #f57bb7 50% 75%, transparent 75%),
+        linear-gradient(-45deg, #9ac7ff 25%, transparent 25% 50%, #9ac7ff 50% 75%, transparent 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 10px 10px;
+    }
+
+    .player-main {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .visualizer {
+      border: 2px inset var(--win-gray);
+      background: #000;
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+
+    .visualizer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 145, 0.2) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 145, 0.2) 1px, transparent 1px);
+      background-size: 16px 16px;
+      pointer-events: none;
+    }
+
+    .cd {
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      border: 4px solid var(--accent-pink);
+      background: conic-gradient(#2f2f2f, #666, #2f2f2f, #777, #2f2f2f);
+      display: grid;
+      place-items: center;
+      z-index: 1;
+      box-shadow: 0 0 18px rgba(255, 133, 192, 0.8);
+    }
+
+    .cd::before {
+      content: 'ALLMUSIC';
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 4px solid #fff;
+      background: linear-gradient(135deg, #ff9fd1, #8bc7ff);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      color: #fff;
+      text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .spinning { animation: spin 3.8s linear infinite; }
+
+    .marquee-box {
+      border: 2px inset var(--win-gray);
+      background: #111;
+      color: #ff85c0;
+      padding: 6px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .controls .win-btn {
+      min-width: 46px;
+      height: 36px;
+      font-size: 16px;
+    }
+
+    .window-footer {
+      border-top: 1px solid #9b9b9b;
+      background: var(--win-gray);
+      padding: 4px 6px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .status-field {
+      border: 2px inset var(--win-gray);
+      background: #fff;
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+    }
+
+    .taskbar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 40px;
+      background: var(--win-gray);
+      border-top: 2px solid var(--win-light);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 6px;
+      z-index: 30;
+    }
+
+    .start-btn {
+      height: 32px;
+      padding: 0 12px;
+      border: 2px outset var(--win-gray);
+      background: var(--win-gray);
+      font-family: var(--font-pixel);
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .task-item {
+      height: 30px;
+      border: 2px inset var(--win-gray);
+      background: #d7d7d7;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 12px;
+    }
+
+    .task-item.active { background: #c4e7ff; }
+
+    .tray {
+      margin-left: auto;
+      border: 2px inset var(--win-gray);
+      background: #fff;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 960px) {
+      .window-frame {
+        width: 100%;
+        height: calc(100vh - 40px);
+        top: 0;
+        left: 0;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .grid-3 { grid-template-columns: 1fr; }
+      .player-main { grid-template-columns: 1fr; }
+      .desktop-bg { display: none; }
+      .taskbar { height: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="desktop-bg">
+    <div class="desktop-icon"><span class="icon">🗑️</span><span>Recycle Bin</span></div>
+    <div class="desktop-icon"><span class="icon">🎵</span><span>ALLMusic.lnk</span></div>
+    <div class="desktop-icon"><span class="icon">💌</span><span>LoveList.txt</span></div>
+  </div>
+
+  <main id="app-window" class="window-frame">
+    <header class="window-header">
+      <div class="title-left"><span>✨</span><span>ALLMUSIC_RETRO_FUSION_V4.exe</span></div>
+      <div class="window-controls">
+        <button class="win-btn">_</button>
+        <button class="win-btn">□</button>
+        <button class="win-btn close-btn">×</button>
+      </div>
+    </header>
+
+    <section class="window-body">
+      <nav class="top-tabs">
+        <button class="win-btn active-tab" data-page="login">登录桥接</button>
+        <button class="win-btn" data-page="home">聚合主页</button>
+        <button class="win-btn" data-page="player">播放详情</button>
+      </nav>
+
+      <section id="page-login" class="view-page active">
+        <div class="status-strip">
+          <span>MODE: CONNECT DOUBLE PLATFORM</span>
+          <span>SECURE CHANNEL READY</span>
+        </div>
+
+        <div class="login-grid">
+          <article class="pane">
+            <div class="pane-title">网易云音乐 / QR 快速登录</div>
+            <div class="qr-box" aria-label="网易云二维码占位"></div>
+            <input class="input95" value="手机号: 138****6666" />
+            <input class="input95" value="密码: ********" />
+            <button class="win-btn" style="height:32px;color:#b60056;">登录并同步网易云</button>
+          </article>
+
+          <article class="pane">
+            <div class="pane-title">QQ 音乐 / Cookie 或扫码</div>
+            <div class="qr-box" aria-label="QQ二维码占位"></div>
+            <input class="input95" value="QQ 昵称: Binaryify" />
+            <input class="input95" value="Cookie: p_skey=***; qqmusic_key=***" />
+            <button class="win-btn" style="height:32px;color:#0c4d87;">登录并同步 QQ</button>
+          </article>
+        </div>
+      </section>
+
+      <section id="page-home" class="view-page">
+        <div class="status-strip">
+          <span>CONNECTED: NetEase + QQ Music</span>
+          <span>TODAY: 32 RECOMMENDATIONS</span>
+        </div>
+
+        <div class="search-row">
+          <input class="input95" value="搜索歌曲 / 歌手，例如：晴天" />
+          <button class="win-btn">统一搜索</button>
+          <button class="win-btn">刷新</button>
+        </div>
+
+        <div class="grid-3">
+          <aside class="pane">
+            <div class="pane-title">歌单树（仅我喜欢 + 混合）</div>
+            <div class="list-box">
+              <div class="item active"><span>双平台我喜欢</span><span>1028 首</span></div>
+              <div class="item"><span>网易云我喜欢</span><span>620 首</span></div>
+              <div class="item"><span>QQ 我喜欢</span><span>408 首</span></div>
+              <div class="item"><span>每日推荐（混合）</span><span>32 首</span></div>
+            </div>
+          </aside>
+
+          <section class="pane">
+            <div class="pane-title">歌曲列表（聚合结果）</div>
+            <div class="list-box">
+              <table class="song-table">
+                <thead>
+                  <tr><th>歌曲</th><th>歌手</th><th>平台</th><th>时长</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>晴天</td><td>周杰伦</td><td><span class="badge netease">网易云</span></td><td>4:29</td><td><button class="win-btn play-now" data-track="晴天 - 周杰伦">▶</button></td></tr>
+                  <tr><td>稻香</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>3:43</td><td><button class="win-btn play-now" data-track="稻香 - 周杰伦">▶</button></td></tr>
+                  <tr><td>夜曲</td><td>周杰伦</td><td><span class="badge netease">网易云</span></td><td>3:47</td><td><button class="win-btn play-now" data-track="夜曲 - 周杰伦">▶</button></td></tr>
+                  <tr><td>一路向北</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>4:55</td><td><button class="win-btn play-now" data-track="一路向北 - 周杰伦">▶</button></td></tr>
+                  <tr><td>告白气球</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>3:35</td><td><button class="win-btn play-now" data-track="告白气球 - 周杰伦">▶</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside class="pane">
+            <div class="pane-title">歌词 / 每日推荐</div>
+            <div class="list-box" style="padding:8px;font-size:12px;line-height:1.6;">
+              <div style="margin-bottom:8px;color:#b60056;">歌词预览：</div>
+              <div>故事的小黄花 从出生那年就飘着</div>
+              <div>童年的荡秋千 随记忆一直晃到现在</div>
+              <hr style="border:none;border-top:1px dashed #d7c7d2;margin:8px 0;" />
+              <div style="margin-bottom:6px;color:#0c4d87;">今日推荐：</div>
+              <div>• 青花瓷</div>
+              <div>• 七里香</div>
+              <div>• 说好不哭</div>
+              <div>• 花海</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="page-player" class="view-page">
+        <div class="status-strip">
+          <span>NOW PLAYING: <strong id="now-title">晴天 - 周杰伦</strong></span>
+          <span>QUALITY: 320K</span>
+        </div>
+
+        <div class="player-main">
+          <article class="pane" style="padding:0;">
+            <div class="visualizer">
+              <div id="cd-disc" class="cd spinning"></div>
+            </div>
+          </article>
+
+          <article class="pane">
+            <div class="pane-title">播放控制 / 队列</div>
+            <div class="marquee-box"><marquee id="marq" scrollamount="4">ALLMusic V4 Retro Fusion  -  双平台聚合播放中 ...</marquee></div>
+            <div class="controls">
+              <button class="win-btn">⏮</button>
+              <button id="toggle-play" class="win-btn">⏸</button>
+              <button class="win-btn">⏭</button>
+            </div>
+            <div class="list-box" style="margin-top:8px;">
+              <div class="item"><span>1. 晴天 - 周杰伦</span><span>播放中</span></div>
+              <div class="item"><span>2. 稻香 - 周杰伦</span><span>下一首</span></div>
+              <div class="item"><span>3. 夜曲 - 周杰伦</span><span>队列中</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <footer class="window-footer">
+      <span class="status-field">STATUS: Ready</span>
+      <span class="status-field">SYNC: NetEase + QQ</span>
+      <span class="status-field" id="clock">00:00</span>
+    </footer>
+  </main>
+
+  <div class="taskbar">
+    <button class="start-btn"><span style="color:#0c4d87">❖</span> Start</button>
+    <div class="task-item active">ALLMUSIC_V4</div>
+    <div class="task-item">PLAYLIST.M3U</div>
+    <div class="tray"><span>🔊</span><span>ONLINE</span><span id="tray-time">00:00</span></div>
+  </div>
+
+  <script>
+    const tabs = [...document.querySelectorAll('.top-tabs .win-btn')];
+    const pages = {
+      login: document.getElementById('page-login'),
+      home: document.getElementById('page-home'),
+      player: document.getElementById('page-player')
+    };
+
+    function go(pageKey) {
+      tabs.forEach((btn) => btn.classList.toggle('active-tab', btn.dataset.page === pageKey));
+      Object.entries(pages).forEach(([key, el]) => el.classList.toggle('active', key === pageKey));
+    }
+
+    tabs.forEach((btn) => btn.addEventListener('click', () => go(btn.dataset.page)));
+
+    const nowTitle = document.getElementById('now-title');
+    const marq = document.getElementById('marq');
+    const playButtons = [...document.querySelectorAll('.play-now')];
+
+    playButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const track = btn.dataset.track || '未知歌曲';
+        nowTitle.textContent = track;
+        marq.textContent = `NOW PLAYING: ${track}  -  ALLMusic V4 Retro Fusion`;
+        go('player');
+      });
+    });
+
+    const togglePlay = document.getElementById('toggle-play');
+    const cd = document.getElementById('cd-disc');
+    let isPlaying = true;
+
+    togglePlay.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      togglePlay.textContent = isPlaying ? '⏸' : '▶';
+      cd.classList.toggle('spinning', isPlaying);
+    });
+
+    function updateClock() {
+      const now = new Date();
+      const text = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('clock').textContent = text;
+      document.getElementById('tray-time').textContent = text;
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>

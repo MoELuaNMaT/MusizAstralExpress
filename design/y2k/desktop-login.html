@@ -1,0 +1,81 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K - 桌面登录页</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M17 17h4v4h-4z"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 1 0-.7-7.9A5.5 5.5 0 0 0 5 12.2 3.8 3.8 0 0 0 7 18z"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-header">
+      <a class="brand-link" href="./desktop-home.html"><span class="brand-dot"></span><span>ALLMusic Y2K / Desktop Login</span></a>
+      <div class="scene-meta">相关页面：<a href="./desktop-home.html">主界面</a> · <a href="./desktop-player.html">播放页</a> · <a href="./mobile-login.html">移动端</a></div>
+    </div>
+
+    <section class="window" aria-label="登录窗口">
+      <div class="titlebar">
+        <div class="titlebar-left"><svg class="icon"><use href="#i-star"/></svg><span>ALLMusic 2006 登录中心</span></div>
+        <div class="titlebar-actions"><span class="win-btn"></span><span class="win-btn"></span><span class="win-btn"></span></div>
+      </div>
+
+      <div class="workspace" style="padding:18px">
+        <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px">
+          <section class="pane">
+            <h3><svg class="icon"><use href="#i-user"/></svg>账号连接</h3>
+            <div class="menu-strip" role="tablist" aria-label="登录平台切换">
+              <button class="bevel primary"><svg class="icon"><use href="#i-cloud"/></svg>网易云</button>
+              <button class="bevel"><svg class="icon"><use href="#i-cloud"/></svg>QQ 音乐</button>
+              <button class="bevel"><svg class="icon"><use href="#i-phone"/></svg>短信</button>
+            </div>
+
+            <div style="display:grid;gap:10px">
+              <label class="m-input" style="min-height:44px"><svg class="icon"><use href="#i-user"/></svg><input value="138****6666" aria-label="账号"/></label>
+              <label class="m-input" style="min-height:44px"><svg class="icon"><use href="#i-lock"/></svg><input type="password" value="********" aria-label="密码"/></label>
+              <div class="menu-strip">
+                <button class="bevel primary"><svg class="icon"><use href="#i-user"/></svg>登录并同步</button>
+                <button class="bevel"><svg class="icon"><use href="#i-qr"/></svg>切换二维码</button>
+              </div>
+            </div>
+
+            <div class="decor-row">
+              <span class="sticker">QQ Zone Vibes</span>
+              <span class="sticker">WinXP Glass</span>
+              <span class="sticker">TTPlayer Mood</span>
+            </div>
+          </section>
+
+          <section class="pane">
+            <h3><svg class="icon"><use href="#i-qr"/></svg>扫码快速登录</h3>
+            <div style="border:1px solid var(--line-soft);border-radius:12px;padding:14px;background:var(--win-soft)">
+              <div style="width:180px;height:180px;margin:0 auto;border-radius:12px;border:1px solid var(--line);background:repeating-linear-gradient(90deg,#fff,#fff 8px,#111 8px,#111 16px);box-shadow:0 0 16px rgba(255,255,255,.2) inset"></div>
+              <p class="scene-meta" style="text-align:center;margin:10px 0 0">请使用网易云 / QQ 音乐 App 扫码</p>
+              <p class="scene-meta" style="text-align:center;margin:6px 0 0">状态：等待确认中...</p>
+            </div>
+
+            <div class="pane" style="margin-top:10px;background:rgba(86,215,255,.08)">
+              <h3><svg class="icon"><use href="#i-star"/></svg>Y2K 装饰清单</h3>
+              <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:.84rem">
+                <li>高饱和炫彩渐变 + 玻璃窗口边框</li>
+                <li>胶囊贴纸（类似 QQ 空间挂件）</li>
+                <li>Windows 风格标题栏与按钮浮雕</li>
+              </ul>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

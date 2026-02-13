@@ -1,0 +1,747 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic UI 概念稿 · Y2K</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-a: #080912;
+      --bg-b: #12072a;
+      --bg-c: #0a1c2e;
+      --panel: rgba(13, 16, 33, 0.78);
+      --panel-strong: rgba(8, 12, 26, 0.92);
+      --border: rgba(167, 197, 255, 0.38);
+      --text: #ecf2ff;
+      --muted: #a7b6da;
+      --cyan: #49d7ff;
+      --blue: #6ea6ff;
+      --purple: #ad84ff;
+      --pink: #ff7ad9;
+      --lime: #91ff90;
+      --warning: #ffd36f;
+      --radius: 16px;
+      --ring: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 12px 34px rgba(0, 0, 0, 0.55);
+      --glow: 0 0 24px rgba(73, 215, 255, 0.25), 0 0 40px rgba(173, 132, 255, 0.24);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      line-height: 1.5;
+      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      background:
+        radial-gradient(900px 700px at 4% -18%, rgba(73, 215, 255, 0.26), transparent 54%),
+        radial-gradient(760px 620px at 94% -22%, rgba(255, 122, 217, 0.22), transparent 56%),
+        radial-gradient(800px 600px at 50% 110%, rgba(110, 166, 255, 0.22), transparent 58%),
+        linear-gradient(150deg, var(--bg-a), var(--bg-b) 45%, var(--bg-c));
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 4px);
+      opacity: 0.25;
+      mix-blend-mode: soft-light;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .app {
+      max-width: 1700px;
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: 112px;
+      display: grid;
+      grid-template-columns: 256px 1fr 350px;
+      gap: 14px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 24%), var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--ring), var(--glow);
+      backdrop-filter: blur(12px) saturate(125%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.09) 48%, transparent 66%);
+      transform: translateX(-120%);
+      animation: sweep 10s linear infinite;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    @keyframes sweep {
+      to { transform: translateX(130%); }
+    }
+
+    .sidebar {
+      min-height: calc(100vh - 132px);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: conic-gradient(from 210deg, var(--cyan), var(--purple), var(--pink), var(--cyan));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 0 20px rgba(73, 215, 255, 0.45);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.06rem;
+      letter-spacing: 0.3px;
+      text-shadow: 0 0 10px rgba(173, 132, 255, 0.42);
+    }
+
+    .tiny { color: var(--muted); font-size: 0.8rem; }
+
+    .nav-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .nav-item {
+      min-height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(167, 197, 255, 0.28);
+      background: linear-gradient(180deg, rgba(110, 166, 255, 0.15), rgba(110, 166, 255, 0.03));
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .nav-item:hover,
+    .nav-item:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      border-color: rgba(167, 197, 255, 0.6);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 0 14px rgba(73, 215, 255, 0.33);
+    }
+
+    .nav-item.active {
+      border-color: rgba(73, 215, 255, 0.76);
+      background: linear-gradient(180deg, rgba(73, 215, 255, 0.35), rgba(173, 132, 255, 0.2));
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+      flex: none;
+    }
+
+    .icon.solid { fill: currentColor; stroke: none; }
+
+    .account {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(167, 197, 255, 0.32);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+      border-radius: 12px;
+      padding: 11px;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 24%, #c7f1ff, #7ea2ff 38%, #5f2ab0 78%);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 0 16px rgba(167, 197, 255, 0.48);
+    }
+
+    .main {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .search {
+      flex: 1;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(167, 197, 255, 0.4);
+      background: var(--panel-strong);
+    }
+
+    .search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 0.93rem;
+    }
+
+    .btn,
+    .icon-btn {
+      min-height: 44px;
+      min-width: 44px;
+      border: 1px solid rgba(167, 197, 255, 0.5);
+      border-radius: 11px;
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(110, 166, 255, 0.25), rgba(110, 166, 255, 0.08));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 12px;
+      transition: .18s ease;
+    }
+
+    .btn:hover,
+    .icon-btn:hover,
+    .btn:focus-visible,
+    .icon-btn:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      border-color: rgba(73, 215, 255, 0.9);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.15) inset, 0 0 14px rgba(73, 215, 255, 0.35);
+    }
+
+    .btn-primary {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: linear-gradient(140deg, var(--cyan), var(--purple));
+      color: #061124;
+      font-weight: 700;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .status-card {
+      padding: 12px;
+      border-radius: 13px;
+      border: 1px solid rgba(167, 197, 255, 0.34);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255,255,255,0.02));
+      min-height: 126px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .status-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.78rem;
+      border: 1px solid;
+    }
+
+    .chip.ok {
+      color: #d5ffe0;
+      border-color: rgba(145, 255, 144, 0.56);
+      background: rgba(145, 255, 144, 0.14);
+    }
+
+    .chip.sync {
+      color: #ffedc6;
+      border-color: rgba(255, 211, 111, 0.56);
+      background: rgba(255, 211, 111, 0.14);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.34fr);
+      gap: 10px;
+    }
+
+    .card {
+      padding: 12px;
+      border-radius: 13px;
+      border: 1px solid rgba(167, 197, 255, 0.34);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255,255,255,0.01));
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-title {
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.97rem;
+    }
+
+    .playlist-item {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: 9px;
+      cursor: pointer;
+      transition: .18s;
+    }
+
+    .playlist-item:hover,
+    .playlist-item.active {
+      border-color: rgba(73, 215, 255, 0.46);
+      background: rgba(110, 166, 255, 0.1);
+      box-shadow: 0 0 16px rgba(73, 215, 255, 0.2);
+    }
+
+    .cover {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      background: linear-gradient(140deg, #5f2ab0, #3696ff 55%, #55e5ff);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
+      flex: none;
+    }
+
+    .meta {
+      min-width: 0;
+    }
+
+    .meta b,
+    .meta p {
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta p { font-size: 0.81rem; color: var(--muted); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+    }
+
+    th, td {
+      padding: 9px 8px;
+      border-bottom: 1px solid rgba(167, 197, 255, 0.2);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th { color: var(--muted); font-weight: 500; }
+
+    .th-ic {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+    }
+
+    .song-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .orb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #f4fbff, var(--pink));
+      box-shadow: 0 0 10px rgba(255, 122, 217, 0.75);
+      flex: none;
+    }
+
+    tr:hover td {
+      background: rgba(73, 215, 255, 0.09);
+    }
+
+    .right {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .lyric {
+      background: var(--panel-strong);
+      border: 1px solid rgba(167, 197, 255, 0.28);
+      border-radius: 11px;
+      padding: 11px;
+      color: var(--muted);
+      font-size: 0.87rem;
+      max-height: 216px;
+      overflow: auto;
+    }
+
+    .daily-list { display: grid; gap: 8px; }
+
+    .daily-item {
+      min-height: 44px;
+      border: 1px solid rgba(167, 197, 255, 0.3);
+      border-radius: 10px;
+      background: rgba(110, 166, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 10px;
+    }
+
+    .player {
+      position: fixed;
+      left: 14px;
+      right: 14px;
+      bottom: 12px;
+      z-index: 60;
+      border: 1px solid rgba(167, 197, 255, 0.42);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(8, 14, 30, 0.94), rgba(11, 9, 28, 0.95));
+      backdrop-filter: blur(14px);
+      box-shadow: var(--ring), 0 0 36px rgba(173, 132, 255, 0.23);
+      padding: 11px 13px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .progress {
+      margin-top: 8px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(167, 197, 255, 0.22);
+      overflow: hidden;
+    }
+
+    .progress > span {
+      display: block;
+      width: 38%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--pink));
+      box-shadow: 0 0 16px rgba(73, 215, 255, 0.7);
+    }
+
+    .control {
+      min-height: 44px;
+      min-width: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(167, 197, 255, 0.55);
+      background: linear-gradient(180deg, rgba(110, 166, 255, 0.23), rgba(110, 166, 255, 0.06));
+      color: var(--text);
+      cursor: pointer;
+      margin: 0 2px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .control.play {
+      color: #0b1630;
+      background: linear-gradient(140deg, var(--cyan), var(--purple));
+      border-color: rgba(255, 255, 255, 0.4);
+      font-weight: 700;
+    }
+
+    @media (max-width: 1380px) {
+      .app { grid-template-columns: 240px 1fr; }
+      .right-column { grid-column: span 2; }
+    }
+
+    @media (max-width: 1060px) {
+      .app { grid-template-columns: 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      .status-grid { grid-template-columns: 1fr; }
+      .sidebar { min-height: auto; }
+      .right-column { grid-column: auto; }
+      .player { grid-template-columns: 1fr; left: 10px; right: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.8 12 4l9 6.8"/><path d="M6.5 9.8V20h11V9.8"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.3A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Z"/><path d="m19 12 2-1.1-1-2-2.3.3a6.9 6.9 0 0 0-1.2-1.2l.3-2.3-2-1L12 5l-1.1-2-2 1 .3 2.3a6.9 6.9 0 0 0-1.2 1.2L5.7 9l-1 2L6.8 12l-2.1 1.1 1 2 2.3-.3a6.9 6.9 0 0 0 1.2 1.2l-.3 2.3 2 1L12 19l1.1 2 2-1-.3-2.3a6.9 6.9 0 0 0 1.2-1.2l2.3.3 1-2z"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.5 10A6.5 6.5 0 0 1 18 8"/><path d="M17.5 14A6.5 6.5 0 0 1 6 16"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 6v12l10-6z"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M7 6v12"/><path d="m18 6-8 6 8 6z"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M17 6v12"/><path d="m6 6 8 6-8 6z"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 1 0-.7-7.9A5.5 5.5 0 0 0 5 12.2 3.8 3.8 0 0 0 7 18z"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="m10.5 13.5 3-3"/><path d="M8 15.9 5.6 18.3a3 3 0 1 1-4.2-4.2L3.8 11.7"/><path d="m16 8.1 2.4-2.4a3 3 0 1 1 4.2 4.2L20.2 12.3"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-lyric" viewBox="0 0 24 24"><path d="M5 6h14"/><path d="M5 11h10"/><path d="M5 16h14"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 4v3"/><path d="M17 4v3"/><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M4 10h16"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 13c1.5 0 1.5-2 3-2s1.5 2 3 2 1.5-2 3-2 1.5 2 3 2 1.5-2 3-2 1.5 2 3 2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app" aria-label="ALLMusic Y2K 概念稿">
+    <aside class="sidebar panel" aria-label="侧边导航">
+      <div class="brand">
+        <div class="brand-mark">AM</div>
+        <div>
+          <h1>ALLMusic Y2K</h1>
+          <div class="tiny">双平台聚合播放器</div>
+        </div>
+      </div>
+
+      <div class="nav-group" role="tablist" aria-label="主导航">
+        <button class="nav-item active" role="tab" aria-selected="true"><svg class="icon"><use href="#i-home"/></svg><span>总览</span></button>
+        <button class="nav-item" role="tab" aria-selected="false"><svg class="icon"><use href="#i-search"/></svg><span>搜索</span></button>
+        <button class="nav-item" role="tab" aria-selected="false"><svg class="icon"><use href="#i-heart"/></svg><span>我喜欢</span></button>
+        <button class="nav-item" role="tab" aria-selected="false"><svg class="icon"><use href="#i-spark"/></svg><span>推荐</span></button>
+        <button class="nav-item" role="tab" aria-selected="false"><svg class="icon"><use href="#i-settings"/></svg><span>设置</span></button>
+      </div>
+
+      <div class="account">
+        <div class="avatar" aria-hidden="true"></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px"><svg class="icon" style="width:14px;height:14px"><use href="#i-user"/></svg><strong>测试用户</strong></div>
+          <div class="tiny">网易云 + QQ 在线</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="topbar panel" aria-label="顶部工具">
+        <label class="search" aria-label="输入搜索关键词">
+          <svg class="icon"><use href="#i-search"/></svg>
+          <input type="text" value="晴天 周杰伦" />
+        </label>
+        <button class="icon-btn" aria-label="刷新"><svg class="icon"><use href="#i-refresh"/></svg></button>
+        <button class="btn btn-primary"><svg class="icon"><use href="#i-search"/></svg>搜索</button>
+      </section>
+
+      <section class="status-grid" aria-label="平台状态">
+        <article class="status-card panel">
+          <div class="status-head">
+            <strong style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-cloud"/></svg>网易云</strong>
+            <span class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-link"/></svg>已连接</span>
+          </div>
+          <div class="tiny">Cookie 有效 · 歌单已同步</div>
+        </article>
+
+        <article class="status-card panel">
+          <div class="status-head">
+            <strong style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-cloud"/></svg>QQ 音乐</strong>
+            <span class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-link"/></svg>已连接</span>
+          </div>
+          <div class="tiny">Adapter 3001 在线 · 可搜索可播放</div>
+        </article>
+
+        <article class="status-card panel">
+          <div class="status-head">
+            <strong style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>混合歌单</strong>
+            <span class="chip sync"><svg class="icon" style="width:12px;height:12px"><use href="#i-wave"/></svg>交错播放</span>
+          </div>
+          <div class="tiny">支持跨平台收藏与排序切换</div>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <article class="card panel" aria-label="歌单区">
+          <div class="card-head">
+            <h2 class="card-title"><svg class="icon"><use href="#i-disc"/></svg>整合歌单</h2>
+            <button class="icon-btn" aria-label="切换排序"><svg class="icon"><use href="#i-refresh"/></svg></button>
+          </div>
+
+          <div class="playlist-item active">
+            <div class="cover"></div>
+            <div class="meta"><b>双平台我喜欢</b><p>1,028 首 · 智能混排</p></div>
+            <svg class="icon" style="margin-left:auto"><use href="#i-star"/></svg>
+          </div>
+          <div class="playlist-item">
+            <div class="cover"></div>
+            <div class="meta"><b>网易云我喜欢</b><p>620 首 · 最新优先</p></div>
+            <svg class="icon" style="margin-left:auto"><use href="#i-heart"/></svg>
+          </div>
+          <div class="playlist-item">
+            <div class="cover"></div>
+            <div class="meta"><b>QQ 我喜欢</b><p>408 首 · API 原序</p></div>
+            <svg class="icon" style="margin-left:auto"><use href="#i-heart"/></svg>
+          </div>
+          <div class="playlist-item">
+            <div class="cover"></div>
+            <div class="meta"><b>每日推荐</b><p>40 首 · 今日更新</p></div>
+            <svg class="icon" style="margin-left:auto"><use href="#i-calendar"/></svg>
+          </div>
+        </article>
+
+        <article class="card panel" aria-label="歌曲表格">
+          <div class="card-head">
+            <h2 class="card-title"><svg class="icon"><use href="#i-wave"/></svg>歌曲详情</h2>
+            <span class="tiny">双平台我喜欢 · 1028</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width:42%"><svg class="th-ic"><use href="#i-disc"/></svg><span class="sr-only">歌曲</span></th>
+                <th><svg class="th-ic"><use href="#i-user"/></svg><span class="sr-only">歌手</span></th>
+                <th><svg class="th-ic"><use href="#i-lyric"/></svg><span class="sr-only">专辑</span></th>
+                <th style="width:90px"><svg class="th-ic"><use href="#i-calendar"/></svg><span class="sr-only">时长</span></th>
+                <th style="width:118px"><svg class="th-ic"><use href="#i-play"/></svg><span class="sr-only">操作</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="song-title"><span class="orb"></span><span>晴天</span></div></td>
+                <td>周杰伦</td>
+                <td>叶惠美</td>
+                <td>4:29</td>
+                <td><button class="btn" style="min-height:34px"><svg class="icon"><use href="#i-play"/></svg></button></td>
+              </tr>
+              <tr>
+                <td><div class="song-title"><span class="orb"></span><span>稻香</span></div></td>
+                <td>周杰伦</td>
+                <td>魔杰座</td>
+                <td>3:43</td>
+                <td><button class="btn" style="min-height:34px"><svg class="icon"><use href="#i-heart"/></svg></button></td>
+              </tr>
+              <tr>
+                <td><div class="song-title"><span class="orb"></span><span>夜曲</span></div></td>
+                <td>周杰伦</td>
+                <td>十一月的肖邦</td>
+                <td>3:47</td>
+                <td><button class="btn" style="min-height:34px"><svg class="icon"><use href="#i-lyric"/></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+    </main>
+
+    <aside class="right panel right-column" aria-label="右侧信息">
+      <article class="card panel">
+        <div class="card-head">
+          <h2 class="card-title"><svg class="icon"><use href="#i-lyric"/></svg>歌词详情</h2>
+          <span class="chip sync"><svg class="icon" style="width:12px;height:12px"><use href="#i-spark"/></svg>同步</span>
+        </div>
+        <div class="tiny" style="margin-bottom:8px">当前播放：晴天 · 周杰伦</div>
+        <div class="lyric">故事的小黄花 从出生那年就飘着<br>童年的荡秋千 随记忆一直晃到现在<br><br>你说你会哭 不是因为在乎<br>只是因为太久没下雨...</div>
+      </article>
+
+      <article class="card panel">
+        <div class="card-head">
+          <h2 class="card-title"><svg class="icon"><use href="#i-calendar"/></svg>每日推荐</h2>
+          <button class="icon-btn" aria-label="刷新推荐"><svg class="icon"><use href="#i-refresh"/></svg></button>
+        </div>
+        <div class="daily-list">
+          <div class="daily-item"><span style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>告白气球</span><span class="tiny">网易云</span></div>
+          <div class="daily-item"><span style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>青花瓷</span><span class="tiny">QQ</span></div>
+          <div class="daily-item"><span style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>七里香</span><span class="tiny">网易云</span></div>
+          <div class="daily-item"><span style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>珊瑚海</span><span class="tiny">QQ</span></div>
+        </div>
+      </article>
+
+      <article class="card panel">
+        <h2 class="card-title"><svg class="icon"><use href="#i-spark"/></svg>Y2K 视觉特征</h2>
+        <p class="tiny" style="margin:8px 0 0">采用炫彩渐变、玻璃拟态、扫描线纹理与高亮边缘，营造更强“千禧年科技流行”风格；交互按钮和导航都改为图标驱动。</p>
+      </article>
+    </aside>
+  </div>
+
+  <footer class="player" aria-label="底部播放器">
+    <div>
+      <strong style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>晴天 - 周杰伦</strong>
+      <div class="tiny">来源：双平台我喜欢</div>
+      <div class="progress"><span></span></div>
+    </div>
+
+    <div>
+      <button class="control" aria-label="上一首"><svg class="icon"><use href="#i-prev"/></svg></button>
+      <button class="control play" aria-label="播放或暂停"><svg class="icon" style="stroke:none;fill:currentColor"><use href="#i-play"/></svg></button>
+      <button class="control" aria-label="下一首"><svg class="icon"><use href="#i-next"/></svg></button>
+    </div>
+
+    <div style="text-align:right">
+      <div class="tiny">01:36 / 04:29</div>
+      <div class="tiny" style="display:flex;justify-content:flex-end;align-items:center;gap:6px"><svg class="icon" style="width:14px;height:14px"><use href="#i-wave"/></svg>音量 72% · 标准音质</div>
+    </div>
+  </footer>
+</body>
+</html>

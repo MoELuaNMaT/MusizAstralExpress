@@ -1,0 +1,113 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K - 桌面主界面</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.8 12 4l9 6.8"/><path d="M6.5 9.8V20h11V9.8"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.3A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 13c1.5 0 1.5-2 3-2s1.5 2 3 2 1.5-2 3-2 1.5 2 3 2 1.5-2 3-2 1.5 2 3 2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.5 10A6.5 6.5 0 0 1 18 8"/><path d="M17.5 14A6.5 6.5 0 0 1 6 16"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 6v12l10-6z"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M7 6v12"/><path d="m18 6-8 6 8 6z"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M17 6v12"/><path d="m6 6 8 6-8 6z"/></symbol>
+      <symbol id="i-lyric" viewBox="0 0 24 24"><path d="M5 6h14"/><path d="M5 11h10"/><path d="M5 16h14"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-header">
+      <a class="brand-link" href="./desktop-home.html"><span class="brand-dot"></span><span>ALLMusic Y2K / Desktop Home</span></a>
+      <div class="scene-meta">相关页面：<a href="./desktop-login.html">登录页</a> · <a href="./desktop-player.html">播放页</a> · <a href="./mobile-home.html">移动端</a></div>
+    </div>
+
+    <section class="window">
+      <div class="titlebar">
+        <div class="titlebar-left"><svg class="icon"><use href="#i-home"/></svg><span>ALLMusic 千禧播放器 · 主界面</span></div>
+        <div class="titlebar-actions"><span class="win-btn"></span><span class="win-btn"></span><span class="win-btn"></span></div>
+      </div>
+
+      <div class="workspace">
+        <div class="menu-strip">
+          <button class="bevel primary"><svg class="icon"><use href="#i-search"/></svg>统一搜索</button>
+          <button class="bevel"><svg class="icon"><use href="#i-heart"/></svg>我的喜欢</button>
+          <button class="bevel"><svg class="icon"><use href="#i-star"/></svg>每日推荐</button>
+          <button class="bevel"><svg class="icon"><use href="#i-refresh"/></svg>刷新数据</button>
+        </div>
+
+        <div class="layout-3">
+          <aside class="pane">
+            <h3><svg class="icon"><use href="#i-disc"/></svg>歌单栏</h3>
+            <div class="side-list">
+              <div class="side-item active"><div class="cover"></div><div class="meta"><b>双平台我喜欢</b><p>1028 首</p></div></div>
+              <div class="side-item"><div class="cover"></div><div class="meta"><b>网易云我喜欢</b><p>620 首 · 最新</p></div></div>
+              <div class="side-item"><div class="cover"></div><div class="meta"><b>QQ 我喜欢</b><p>408 首 · 原序</p></div></div>
+              <div class="side-item"><div class="cover"></div><div class="meta"><b>每日推荐</b><p>40 首 · 今日</p></div></div>
+            </div>
+            <div class="decor-row">
+              <span class="sticker">qq-zone star</span>
+              <span class="sticker">2000s skin</span>
+            </div>
+          </aside>
+
+          <main class="pane">
+            <h3><svg class="icon"><use href="#i-wave"/></svg>歌曲列表</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>歌曲</th>
+                    <th>歌手</th>
+                    <th>专辑</th>
+                    <th>时长</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><div class="song"><span class="dot"></span><span>晴天</span></div></td><td>周杰伦</td><td>叶惠美</td><td>4:29</td><td><button class="icon-button" aria-label="播放"><svg class="icon"><use href="#i-play"/></svg></button></td></tr>
+                  <tr><td><div class="song"><span class="dot"></span><span>稻香</span></div></td><td>周杰伦</td><td>魔杰座</td><td>3:43</td><td><button class="icon-button" aria-label="收藏"><svg class="icon"><use href="#i-heart"/></svg></button></td></tr>
+                  <tr><td><div class="song"><span class="dot"></span><span>夜曲</span></div></td><td>周杰伦</td><td>十一月的肖邦</td><td>3:47</td><td><button class="icon-button" aria-label="歌词"><svg class="icon"><use href="#i-lyric"/></svg></button></td></tr>
+                  <tr><td><div class="song"><span class="dot"></span><span>一路向北</span></div></td><td>周杰伦</td><td>J III</td><td>4:55</td><td><button class="icon-button" aria-label="播放"><svg class="icon"><use href="#i-play"/></svg></button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </main>
+
+          <aside class="pane hide-md">
+            <h3><svg class="icon"><use href="#i-lyric"/></svg>歌词 / 推荐</h3>
+            <div class="chip ok" style="margin-bottom:8px"><svg class="icon" style="width:13px;height:13px"><use href="#i-star"/></svg>双平台同步正常</div>
+            <div class="lyric">故事的小黄花 从出生那年就飘着<br>童年的荡秋千 随记忆一直晃到现在<br><br>你说你会哭 不是因为在乎...</div>
+            <div class="side-list" style="margin-top:9px">
+              <div class="side-item"><div class="meta"><b>告白气球</b><p>网易云 推荐</p></div></div>
+              <div class="side-item"><div class="meta"><b>青花瓷</b><p>QQ 推荐</p></div></div>
+            </div>
+          </aside>
+        </div>
+
+        <footer class="player-dock" aria-label="底部播放器">
+          <div>
+            <strong style="display:flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>晴天 - 周杰伦</strong>
+            <div class="progress"><span></span></div>
+          </div>
+          <div>
+            <button class="icon-button" aria-label="上一首"><svg class="icon"><use href="#i-prev"/></svg></button>
+            <button class="icon-button" aria-label="播放"><svg class="icon"><use href="#i-play"/></svg></button>
+            <button class="icon-button" aria-label="下一首"><svg class="icon"><use href="#i-next"/></svg></button>
+          </div>
+          <div style="text-align:right">
+            <span class="chip warn"><span class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>01:36 / 04:29</span>
+          </div>
+        </footer>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

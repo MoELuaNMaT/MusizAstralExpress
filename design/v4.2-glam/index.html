@@ -1,0 +1,300 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ALLMusic V4.2 - Retro Fusion UX Glam</title>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="spark-layer" aria-hidden="true">
+    <span class="spark pink" style="left:6%;top:11%;--dur:2.8s"></span>
+    <span class="spark cyan" style="left:18%;top:26%;--dur:3.2s"></span>
+    <span class="spark violet" style="left:34%;top:13%;--dur:2.1s"></span>
+    <span class="spark pink" style="left:48%;top:7%;--dur:2.7s"></span>
+    <span class="spark cyan" style="left:62%;top:18%;--dur:2.3s"></span>
+    <span class="spark violet" style="left:78%;top:9%;--dur:2.9s"></span>
+    <span class="spark pink" style="left:90%;top:19%;--dur:3.3s"></span>
+    <span class="spark cyan" style="left:12%;top:68%;--dur:2.5s"></span>
+    <span class="spark violet" style="left:29%;top:82%;--dur:2.6s"></span>
+    <span class="spark pink" style="left:57%;top:76%;--dur:2.2s"></span>
+    <span class="spark cyan" style="left:73%;top:84%;--dur:2.8s"></span>
+    <span class="spark violet" style="left:88%;top:72%;--dur:2.4s"></span>
+  </div>
+
+  <div class="desktop-bg" aria-hidden="true">
+    <div class="desktop-icon"><span class="icon">🗑️</span><span>Recycle Bin</span></div>
+    <div class="desktop-icon"><span class="icon">🎵</span><span>ALLMusic.lnk</span></div>
+    <div class="desktop-icon"><span class="icon">💖</span><span>GlamSkin.dat</span></div>
+  </div>
+
+  <main class="window-frame" aria-label="ALLMusic V4.2 UX 闪耀原型">
+    <header class="window-header">
+      <div class="title-left"><span>✨</span><span>ALLMUSIC_RETRO_FUSION_V4_2.exe</span></div>
+      <div class="window-controls">
+        <button class="win-btn" aria-label="最小化">_</button>
+        <button class="win-btn" aria-label="最大化">□</button>
+        <button class="win-btn close-btn" aria-label="关闭">×</button>
+      </div>
+    </header>
+
+    <section class="window-body">
+      <div class="quick-status">
+        <div class="status-left">
+          <span class="chip ok">网易云: 已连接</span>
+          <span class="chip ok">QQ: 已连接</span>
+          <span class="chip info pulse">当前模式: Glam UX</span>
+        </div>
+        <div class="status-right">
+          <button class="win-btn glam" id="toggle-disco">DISCO MODE</button>
+          <span class="chip warn">快捷键: 1/2/3 切页, 空格 播放/暂停</span>
+        </div>
+      </div>
+
+      <nav class="top-tabs" aria-label="主导航">
+        <button class="win-btn active-tab" data-page="login">1 登录与授权</button>
+        <button class="win-btn" data-page="home">2 聚合主页</button>
+        <button class="win-btn" data-page="player">3 播放详情</button>
+      </nav>
+
+      <section id="page-login" class="view-page active">
+        <div class="sticker">NEW! SHINY SKIN</div>
+        <div class="section-title">
+          <span>新手 3 步引导：先授权，再同步，再进入主页</span>
+          <button class="win-btn success" id="connect-all">一键连接双平台</button>
+        </div>
+
+        <div class="stepper" role="list">
+          <div class="step active" role="listitem">① 选择平台</div>
+          <div class="step" role="listitem">② 登录授权</div>
+          <div class="step" role="listitem">③ 同步完成</div>
+        </div>
+
+        <div class="layout-login">
+          <article class="pane glow">
+            <div class="section-title">
+              <span>网易云音乐</span>
+              <span class="chip ok">推荐扫码</span>
+            </div>
+
+            <div class="qr-box" aria-label="网易云二维码占位"></div>
+
+            <div class="row">
+              <div class="field">
+                <label for="ne-phone">手机号</label>
+                <input id="ne-phone" class="input95" value="138****6666" />
+              </div>
+              <div class="field">
+                <label for="ne-pass">密码</label>
+                <input id="ne-pass" class="input95" value="********" />
+              </div>
+            </div>
+
+            <div class="row">
+              <button class="win-btn">刷新二维码</button>
+              <button class="win-btn primary">登录并同步</button>
+            </div>
+
+            <div class="hint">如果二维码过期，先点“刷新二维码”；登录成功后会自动回写状态。</div>
+          </article>
+
+          <article class="pane glow">
+            <div class="section-title">
+              <span>QQ 音乐</span>
+              <span class="chip info">Cookie/扫码二选一</span>
+            </div>
+
+            <div class="qr-box" aria-label="QQ二维码占位"></div>
+
+            <div class="field">
+              <label for="qq-name">QQ 昵称（可选）</label>
+              <input id="qq-name" class="input95" value="Binaryify" />
+            </div>
+
+            <div class="field">
+              <label for="qq-cookie">Cookie</label>
+              <input id="qq-cookie" class="input95" value="p_skey=***; qqmusic_key=***" />
+            </div>
+
+            <div class="row">
+              <button class="win-btn">验证 Cookie</button>
+              <button class="win-btn primary">登录并同步</button>
+            </div>
+
+            <div class="hint">Cookie 失效时改用扫码；验证成功后会在顶部显示“已连接”。</div>
+          </article>
+        </div>
+      </section>
+
+      <section id="page-home" class="view-page">
+        <div class="sticker" style="transform:rotate(-8deg);right:auto;left:8px;background:linear-gradient(140deg,#d9efff,#9fe6ff);border-color:#70b1d0;color:#0c4d87;">TRENDING</div>
+        <div class="section-title">
+          <span>聚合主页：搜索、歌单、歌曲详情一屏完成</span>
+          <span class="chip info" id="home-result-count">结果: 5 首</span>
+        </div>
+
+        <div class="toolbar">
+          <input id="search-input" class="input95" value="周杰伦" aria-label="搜索关键词" />
+          <select id="platform-filter" class="select95" aria-label="平台筛选">
+            <option value="all">平台: 全部</option>
+            <option value="netease">仅网易云</option>
+            <option value="qq">仅 QQ</option>
+          </select>
+          <button class="win-btn primary" id="search-btn">开始搜索</button>
+          <button class="win-btn" id="clear-btn">清空</button>
+        </div>
+
+        <div class="layout-home">
+          <aside class="pane">
+            <div class="section-title"><span>歌单树</span><span class="chip">最近更新: 今天</span></div>
+            <div class="list-box" id="playlist-list">
+              <button class="item active clickable" type="button"><span>双平台我喜欢</span><span>1028 首</span></button>
+              <button class="item clickable" type="button"><span>网易云我喜欢</span><span>620 首</span></button>
+              <button class="item clickable" type="button"><span>QQ 我喜欢</span><span>408 首</span></button>
+              <button class="item clickable" type="button"><span>每日推荐（混合）</span><span>32 首</span></button>
+            </div>
+          </aside>
+
+          <section class="pane glow">
+            <div class="section-title"><span>歌曲列表</span><span class="chip warn">点击行可查看右侧详情</span></div>
+            <div class="list-box">
+              <table class="song-table" aria-label="搜索结果列表">
+                <thead>
+                  <tr><th style="width:33%">歌曲</th><th style="width:27%">歌手</th><th style="width:14%">平台</th><th style="width:10%">时长</th><th style="width:16%">操作</th></tr>
+                </thead>
+                <tbody id="song-tbody">
+                  <tr data-track="晴天 - 周杰伦" data-platform="netease"><td>晴天</td><td>周杰伦</td><td><span class="badge netease">网易云</span></td><td>4:29</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
+                  <tr data-track="稻香 - 周杰伦" data-platform="qq"><td>稻香</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>3:43</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
+                  <tr data-track="夜曲 - 周杰伦" data-platform="netease"><td>夜曲</td><td>周杰伦</td><td><span class="badge netease">网易云</span></td><td>3:47</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
+                  <tr data-track="一路向北 - 周杰伦" data-platform="qq"><td>一路向北</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>4:55</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
+                  <tr data-track="告白气球 - 周杰伦" data-platform="qq"><td>告白气球</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>3:35</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside class="pane">
+            <div class="section-title"><span>歌曲详情</span><span class="chip ok" id="detail-platform">平台: 网易云</span></div>
+            <div class="hint">当前选中：</div>
+            <div id="detail-track" style="font-size:13px;color:#0c4d87;">晴天 - 周杰伦</div>
+            <div class="hint">专辑：叶惠美</div>
+            <div class="hint">歌词预览：</div>
+            <div class="list-box" style="padding:8px;line-height:1.6;font-size:12px;">
+              故事的小黄花 从出生那年就飘着<br />
+              童年的荡秋千 随记忆一直晃到现在<br />
+              你说你会哭 不是因为在乎
+            </div>
+            <div class="row">
+              <button class="win-btn">♥ 收藏</button>
+              <button class="win-btn">刷新歌词</button>
+            </div>
+          </aside>
+        </div>
+
+        <div class="sticky-actions">
+          <div class="hint">建议路径：先选歌单 → 再筛选平台 → 最后点击播放</div>
+          <div style="display:flex;gap:8px;">
+            <button class="win-btn" id="batch-like">批量收藏</button>
+            <button class="win-btn primary" id="play-selected">播放所选</button>
+          </div>
+        </div>
+
+        <div class="home-playbar">
+          <div class="home-play-left">
+            <span class="chip info">播放栏</span>
+            <span class="home-play-title" id="home-nowplaying">晴天 - 周杰伦</span>
+          </div>
+          <div class="home-play-actions">
+            <button class="win-btn" id="home-prev">⏮</button>
+            <button class="win-btn primary" id="home-play-toggle">⏸</button>
+            <button class="win-btn" id="home-next">⏭</button>
+          </div>
+          <div class="home-play-progress">
+            <span id="home-current-time">01:36</span>
+            <input id="home-progress" class="progress-input" type="range" min="0" max="269" value="96" />
+            <span id="home-total-time">04:29</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-player" class="view-page">
+        <div class="section-title">
+          <span>播放器：更炫光谱 + 进度拖动 + 队列切歌</span>
+          <span class="chip info" id="now-title">晴天 - 周杰伦</span>
+        </div>
+
+        <div class="layout-player">
+          <article class="pane" style="padding:0;">
+            <div class="visualizer">
+              <div class="equalizer" aria-hidden="true">
+                <span style="--b:1.1s"></span><span style="--b:0.9s"></span><span style="--b:1.4s"></span><span style="--b:1s"></span><span style="--b:1.3s"></span>
+                <span style="--b:0.8s"></span><span style="--b:1.2s"></span><span style="--b:1s"></span><span style="--b:1.5s"></span><span style="--b:0.95s"></span>
+                <span style="--b:1.2s"></span><span style="--b:0.85s"></span><span style="--b:1.35s"></span><span style="--b:1.05s"></span>
+              </div>
+              <div id="cd-disc" class="cd spinning"></div>
+            </div>
+            <div class="cover-marquee">
+              <marquee id="cover-marq" scrollamount="4">晴天 - 周杰伦 · 双平台聚合播放中</marquee>
+            </div>
+          </article>
+
+          <article class="pane glow">
+            <div class="section-title"><span>播放控制</span><span class="chip warn" id="play-state-chip">状态: 播放中</span></div>
+            <div class="marquee-box"><marquee id="track-marq" scrollamount="4">NOW PLAYING: 晴天 - 周杰伦 · ALLMusic Glam Mode</marquee></div>
+
+            <div class="progress-row">
+              <span id="current-time">01:36</span>
+              <input id="progress" class="progress-input" type="range" min="0" max="269" value="96" />
+              <span id="total-time">04:29</span>
+            </div>
+
+            <div class="progress-row">
+              <span>音量</span>
+              <input id="volume" class="volume-input" type="range" min="0" max="100" value="76" />
+              <span id="volume-label">76%</span>
+            </div>
+
+            <div class="controls">
+              <button class="win-btn">⏮</button>
+              <button id="toggle-play" class="win-btn primary">⏸</button>
+              <button class="win-btn">⏭</button>
+              <button class="win-btn glam">✨</button>
+            </div>
+
+            <div class="section-title"><span>播放队列</span><span class="chip">共 3 首</span></div>
+            <div class="list-box" id="queue-list">
+              <button class="item active clickable" data-track="晴天 - 周杰伦" type="button"><span>1. 晴天 - 周杰伦</span><span>播放中</span></button>
+              <button class="item clickable" data-track="稻香 - 周杰伦" type="button"><span>2. 稻香 - 周杰伦</span><span>下一首</span></button>
+              <button class="item clickable" data-track="夜曲 - 周杰伦" type="button"><span>3. 夜曲 - 周杰伦</span><span>队列中</span></button>
+            </div>
+
+            <div class="hotkeys">
+              快捷键：<br />
+              1 / 2 / 3 = 切换页面<br />
+              空格 = 播放/暂停（在播放器页）
+            </div>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <footer class="window-footer">
+      <span class="status-field">STATUS: Ready</span>
+      <span class="status-field">双平台同步正常</span>
+      <span class="status-field" id="clock">00:00</span>
+    </footer>
+  </main>
+
+  <div class="taskbar">
+    <button class="start-btn"><span style="color:#0c4d87">❖</span> Start</button>
+    <div class="task-item active">ALLMUSIC_V4_2</div>
+    <div class="task-item">GlamSkin.ON</div>
+    <div class="tray"><span>🔊</span><span>ONLINE</span><span id="tray-time">00:00</span></div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">操作成功</div>
+
+    <script src="script.js"></script>
+</body>
+</html>

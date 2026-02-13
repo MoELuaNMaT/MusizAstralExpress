@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>† INTERNET ANGEL MUSIC †</title>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --angel-pink: #ffb6c1;
+            --angel-dark-pink: #ff69b4;
+            --angel-blue: #e0ffff;
+            --angel-purple: #e6e6fa;
+            --angel-bg: #f8f0ff;
+            --win-gray: #f0f0f0;
+            --text-color: #553355;
+            --shadow-light: #ffffff;
+            --shadow-dark: #888888;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--angel-bg);
+            /* 可爱的平铺背景图案 */
+            background-image:
+                radial-gradient(var(--angel-dark-pink) 15%, transparent 16%),
+                radial-gradient(var(--angel-dark-pink) 15%, transparent 16%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            font-family: 'DotGothic16', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        /* -------------------
+           Windows 95 风格窗口容器 
+           ------------------- */
+        #app-window {
+            width: 100%;
+            height: 100%;
+            max-width: 400px;
+            max-height: 800px;
+            background: var(--win-gray);
+            border: 4px solid #f0f0f0;
+            /* 经典的 3D 边框效果 */
+            border-top-color: var(--shadow-light);
+            border-left-color: var(--shadow-light);
+            border-right-color: var(--shadow-dark);
+            border-bottom-color: #444;
+            box-shadow: 10px 10px 0px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        @media (min-width: 768px) {
+            #app-window {
+                height: 85vh;
+                border-radius: 2px;
+            }
+        }
+
+        /* 窗口标题栏 */
+        .title-bar {
+            background: linear-gradient(90deg, var(--angel-dark-pink), var(--angel-pink));
+            padding: 4px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .title-btns span {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: var(--win-gray);
+            border: 2px outset var(--win-gray);
+            margin-left: 4px;
+            font-size: 10px;
+            line-height: 12px;
+            text-align: center;
+            color: black;
+            cursor: pointer;
+        }
+
+        .title-btns span:active {
+            border-style: inset;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #fffafa;
+            /* 雪白背景 */
+            padding: 10px;
+        }
+
+        /* 页面切换动画 */
+        .page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            background: #fffafa;
+            padding: 20px;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+        }
+
+        .active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+            z-index: 10;
+        }
+
+        /* SVG 图标通用样式 */
+        .icon {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-color);
+        }
+
+        .icon-btn {
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* -------------------
+           页面 1: 登录 (Fan Club)
+           ------------------- */
+        #login-page {
+            justify-content: center;
+        }
+
+        .avatar-frame {
+            width: 120px;
+            height: 120px;
+            border: 4px inset var(--win-gray);
+            background: var(--angel-blue);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* 模拟像素二维码 */
+        .pixel-qr {
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(45deg, var(--angel-dark-pink) 25%, transparent 25%),
+                linear-gradient(-45deg, var(--angel-dark-pink) 25%, transparent 25%);
+            background-size: 10px 10px;
+            opacity: 0.5;
+        }
+
+        .login-btn {
+            margin-top: 30px;
+            background: var(--win-gray);
+            border: 3px outset var(--win-gray);
+            padding: 10px 20px;
+            font-family: 'DotGothic16', sans-serif;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            color: var(--angel-dark-pink);
+        }
+
+        .login-btn:active {
+            border-style: inset;
+        }
+
+        /* -------------------
+           页面 2: 播放列表 (Chat/File Log)
+           ------------------- */
+        #list-page {
+            align-items: stretch;
+            padding: 10px;
+        }
+
+        .file-list {
+            border: 2px inset var(--win-gray);
+            background: white;
+            flex: 1;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .track-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px dashed var(--angel-pink);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .track-item:hover {
+            background: var(--angel-blue);
+            color: var(--angel-dark-pink);
+        }
+
+        .track-icon {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            fill: var(--angel-dark-pink);
+        }
+
+        .track-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .track-name {
+            font-size: 1rem;
+        }
+
+        .track-time {
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+
+        /* -------------------
+           页面 3: 播放器 (CD Player)
+           ------------------- */
+        #player-page {
+            justify-content: space-between;
+            padding-bottom: 40px;
+        }
+
+        .nav-back {
+            align-self: flex-start;
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 2px outset var(--win-gray);
+            background: var(--win-gray);
+            padding: 2px 8px;
+        }
+
+        .cd-container {
+            width: 220px;
+            height: 220px;
+            background: rgb(255, 255, 255);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 1) 100%);
+            border-radius: 50%;
+            border: 6px solid var(--angel-pink);
+            box-shadow: 0 0 15px var(--angel-pink);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        /* CD 内圈图片 */
+        .cd-art {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, transparent 20%, var(--angel-blue) 21%, var(--angel-purple) 60%);
+            position: absolute;
+            opacity: 0.8;
+        }
+
+        .cd-hole {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            border: 2px solid var(--win-gray);
+            z-index: 2;
+        }
+
+        .spinning {
+            animation: spin 5s linear infinite;
+        }
+
+        .player-info {
+            text-align: center;
+            background: var(--angel-blue);
+            border: 2px inset var(--win-gray);
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            background: var(--win-gray);
+            border: 2px outset var(--win-gray);
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+        }
+
+        .control-btn:active {
+            transform: translate(1px, 1px);
+            box-shadow: none;
+        }
+
+        .play-btn-large {
+            width: 55px;
+            height: 55px;
+            background: var(--angel-dark-pink);
+        }
+
+        .play-btn-large svg {
+            fill: white;
+        }
+
+        /* 动画 */
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .float-anim {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* 底部状态栏 */
+        .status-bar {
+            background: var(--win-gray);
+            border-top: 2px solid #ccc;
+            padding: 4px;
+            font-size: 0.8rem;
+            display: flex;
+            gap: 10px;
+        }
+
+        .status-field {
+            border: 2px inset var(--win-gray);
+            padding: 0 5px;
+            background: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-window">
+        <div class="title-bar">
+            <span>† ANGEL_PLAYER.exe</span>
+            <div class="title-btns">
+                <span>_</span>
+                <span>□</span>
+                <span style="background:#ff69b4; color:white;">×</span>
+            </div>
+        </div>
+
+        <div class="content-area">
+
+            <div id="login-page" class="page active">
+                <h2 style="color: var(--angel-dark-pink); text-shadow: 1px 1px 0px var(--angel-blue);">PLEASE SCAN</h2>
+
+                <div class="avatar-frame">
+                    <div class="pixel-qr"></div>
+                </div>
+
+                <p style="font-size: 0.9rem; color: #888;">Only true angels can enter...</p>
+
+                <button class="login-btn" onclick="goTo('list')">
+                    <svg class="icon" viewBox="0 0 24 24" style="fill:var(--angel-dark-pink)">
+                        <path
+                            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                    LOGIN
+                </button>
+            </div>
+
+            <div id="list-page" class="page">
+                <div style="margin-bottom: 10px; display: flex; align-items: center; gap:5px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffd700">
+                        <path
+                            d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                    </svg>
+                    <span>C:\Music\Angel\Favorites</span>
+                </div>
+
+                <div class="file-list">
+                    <div class="track-item" onclick="playTrack('INTERNET OVERDOSE', 'Aiobahn')">
+                        <svg class="track-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                        </svg>
+                        <div class="track-info">
+                            <span class="track-name">INTERNET OVERDOSE</span>
+                            <span class="track-time">3:40 • .mp3</span>
+                        </div>
+                    </div>
+
+                    <div class="track-item" onclick="playTrack('Angel Break', 'Virtual cat')">
+                        <svg class="track-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                        </svg>
+                        <div class="track-info">
+                            <span class="track-name">Angel Break</span>
+                            <span class="track-time">2:15 • .wav</span>
+                        </div>
+                    </div>
+
+                    <div class="track-item" onclick="playTrack('Emotional Prism', 'Bigwave')">
+                        <svg class="track-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                        </svg>
+                        <div class="track-info">
+                            <span class="track-name">Emotional Prism</span>
+                            <span class="track-time">4:20 • .mp3</span>
+                        </div>
+                    </div>
+
+                    <div class="track-item" onclick="playTrack('Secret File', 'Unknown')">
+                        <svg class="track-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                        </svg>
+                        <div class="track-info">
+                            <span class="track-name">Secret_Message.txt</span>
+                            <span class="track-time">0:05 • .txt</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="nav-back" style="margin-top:10px;" onclick="goTo('login')">← Logout</button>
+            </div>
+
+            <div id="player-page" class="page">
+                <button class="nav-back" onclick="goTo('list')">← Back to List</button>
+
+                <div class="cd-container" id="cd-disc">
+                    <div class="cd-art"></div>
+                    <div class="cd-hole"></div>
+                    <svg style="position:absolute; top:-10px; right:-10px; width:40px; height:40px; fill:#ffd700;"
+                        viewBox="0 0 24 24" class="float-anim">
+                        <path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z" />
+                    </svg>
+                </div>
+
+                <div class="player-info float-anim">
+                    <h3 id="song-title" style="margin:0; color:var(--angel-dark-pink)">Loading...</h3>
+                    <p id="artist-name" style="margin:5px 0 0 0; font-size:0.9rem;">Wait...</p>
+                </div>
+
+                <div class="controls-row">
+                    <div class="control-btn icon-btn">
+                        <svg class="icon" viewBox="0 0 24 24" style="fill:#888">
+                            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                        </svg>
+                    </div>
+                    <div class="control-btn play-btn-large icon-btn" onclick="togglePlay()">
+                        <svg id="play-icon" class="icon" viewBox="0 0 24 24" style="display:none">
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
+                        <svg id="pause-icon" class="icon" viewBox="0 0 24 24">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                        </svg>
+                    </div>
+                    <div class="control-btn icon-btn">
+                        <svg class="icon" viewBox="0 0 24 24" style="fill:#888">
+                            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div style="width:100%; margin-top:15px; display:flex; gap:5px; justify-content:center;">
+                    <svg width="12" height="12" fill="#ff69b4">
+                        <path
+                            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                    <div
+                        style="flex:1; height:4px; background:var(--win-gray); border:1px solid #ccc; align-self:center; position:relative;">
+                        <div style="width:60%; height:100%; background:var(--angel-dark-pink);"></div>
+                    </div>
+                    <span style="font-size:0.8rem;">3:40</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="status-bar">
+            <div class="status-field" style="flex:1;">Ready</div>
+            <div class="status-field">♥ 999+</div>
+        </div>
+    </div>
+
+    <script>
+        // 页面路由系统
+        function goTo(pageId) {
+            // 隐藏所有页面
+            document.querySelectorAll('.page').forEach(el => {
+                el.classList.remove('active');
+            });
+            // 显示目标页面
+            document.getElementById(pageId + '-page').classList.add('active');
+        }
+
+        // 播放状态控制
+        let isPlaying = true;
+        const cdElement = document.getElementById('cd-disc');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const titleEl = document.getElementById('song-title');
+        const artistEl = document.getElementById('artist-name');
+
+        function playTrack(title, artist) {
+            titleEl.innerText = title;
+            artistEl.innerText = artist;
+            goTo('player');
+
+            isPlaying = true;
+            updatePlayState();
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            updatePlayState();
+        }
+
+        function updatePlayState() {
+            if (isPlaying) {
+                cdElement.classList.add('spinning');
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+            } else {
+                cdElement.classList.remove('spinning');
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+            }
+        }
+
+        // 初始化动画状态
+        updatePlayState();
+    </script>
+
+</body>
+
+</html>

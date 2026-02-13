@@ -1,0 +1,80 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K V3 - 桌面播放页</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 6v12l10-6z"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M7 6v12"/><path d="m18 6-8 6 8 6z"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M17 6v12"/><path d="m6 6 8 6-8 6z"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.3A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></symbol>
+      <symbol id="i-lyric" viewBox="0 0 24 24"><path d="M5 6h14"/><path d="M5 11h10"/><path d="M5 16h14"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 13c1.5 0 1.5-2 3-2s1.5 2 3 2 1.5-2 3-2 1.5 2 3 2 1.5-2 3-2 1.5 2 3 2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="headline">
+      <a class="back-pill focusable" href="./desktop-player.html"><span class="ball"></span><span>Y2K V3 / Desktop Player</span></a>
+      <div class="muted">页面：<a href="./desktop-login.html">登录页</a> · <a href="./desktop-home.html">主界面</a> · <a href="./mobile-player.html">移动端</a></div>
+    </div>
+
+    <div class="desktop-area">
+      <span class="glitter top"></span><span class="glitter bottom"></span>
+      <section class="window90">
+        <div class="titlebar90">
+          <div class="title"><svg class="icon"><use href="#i-disc"/></svg><span>ALLMusic 千禧播放核心 · TTPlayer Extreme Skin</span></div>
+          <div class="sys-btns"><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="win-body">
+          <div class="hero90">
+            <aside class="pane90">
+              <div class="disc" aria-label="动态唱片封面"></div>
+              <div class="stickers"><span class="sticker">Crystal Plastic</span><span class="sticker">Hyper Chrome</span><span class="sticker">Y2K POP</span></div>
+            </aside>
+
+            <main class="pane90">
+              <h3><svg class="icon"><use href="#i-wave"/></svg>播放信息</h3>
+              <h2 style="margin:0;font-size:1.5rem">晴天</h2>
+              <p class="muted" style="margin:4px 0 0">周杰伦 · 叶惠美 · 双平台音源同步</p>
+
+              <div class="marquee90" style="margin-top:10px"><span>Now Playing ... 晴天 / 周杰伦 / Quality: Lossless / Visualizer: Rainbow Pulse / Skin: QQ-2005</span></div>
+
+              <div class="progress90" style="margin-top:10px"><span style="width:44%"></span></div>
+              <div style="display:flex;justify-content:space-between" class="muted"><span>01:52</span><span>04:29</span></div>
+
+              <div class="menu90" style="margin-top:8px">
+                <button class="icon90"><svg class="icon"><use href="#i-prev"/></svg></button>
+                <button class="btn90 hot"><svg class="icon"><use href="#i-play"/></svg>播放</button>
+                <button class="icon90"><svg class="icon"><use href="#i-next"/></svg></button>
+                <button class="icon90"><svg class="icon"><use href="#i-heart"/></svg></button>
+                <button class="icon90"><svg class="icon"><use href="#i-lyric"/></svg></button>
+              </div>
+
+              <div class="chips"><span class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>视觉冲击模式</span><span class="chip warn">EQ: Pop-Retro</span></div>
+
+              <section class="pane90" style="margin-top:8px;background:var(--glass-soft)">
+                <h3><svg class="icon"><use href="#i-lyric"/></svg>歌词面板</h3>
+                <div class="lyric90">故事的小黄花 从出生那年就飘着<br>童年的荡秋千 随记忆一直晃到现在<br><br>你说你会哭 不是因为在乎<br>只是因为太久没下雨...</div>
+              </section>
+            </main>
+          </div>
+
+          <div class="taskbar90">
+            <div class="task-list"><span class="task-item">PLAYER_CORE.DLL</span><span class="task-item">LYRIC_SYNC.ON</span></div>
+            <span class="chip warn"><span class="eq90" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>LIVE VIS</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

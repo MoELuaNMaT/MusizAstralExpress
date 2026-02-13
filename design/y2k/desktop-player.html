@@ -1,0 +1,82 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K - 桌面播放页</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 6v12l10-6z"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M7 6v12"/><path d="m18 6-8 6 8 6z"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M17 6v12"/><path d="m6 6 8 6-8 6z"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.3A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></symbol>
+      <symbol id="i-lyric" viewBox="0 0 24 24"><path d="M5 6h14"/><path d="M5 11h10"/><path d="M5 16h14"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 13c1.5 0 1.5-2 3-2s1.5 2 3 2 1.5-2 3-2 1.5 2 3 2 1.5-2 3-2 1.5 2 3 2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-header">
+      <a class="brand-link" href="./desktop-player.html"><span class="brand-dot"></span><span>ALLMusic Y2K / Desktop Player</span></a>
+      <div class="scene-meta">相关页面：<a href="./desktop-login.html">登录页</a> · <a href="./desktop-home.html">主界面</a> · <a href="./mobile-player.html">移动端</a></div>
+    </div>
+
+    <section class="window">
+      <div class="titlebar">
+        <div class="titlebar-left"><svg class="icon"><use href="#i-disc"/></svg><span>ALLMusic 千千风播放器</span></div>
+        <div class="titlebar-actions"><span class="win-btn"></span><span class="win-btn"></span><span class="win-btn"></span></div>
+      </div>
+
+      <div class="workspace">
+        <div class="hero-player">
+          <aside class="pane">
+            <div class="album-art" aria-label="专辑封面"></div>
+            <div class="decor-row">
+              <span class="sticker">WinXP Aqua</span>
+              <span class="sticker">Y2K Chrome</span>
+              <span class="sticker">QQ Space</span>
+            </div>
+          </aside>
+
+          <main class="pane info-grid">
+            <h3><svg class="icon"><use href="#i-wave"/></svg>播放详情</h3>
+            <div>
+              <h2 style="margin:0;font-size:1.45rem">晴天</h2>
+              <p style="margin:4px 0 0;color:var(--muted)">周杰伦 · 叶惠美 · 网易云 + QQ 双源</p>
+            </div>
+
+            <div class="progress"><span style="width:42%"></span></div>
+            <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:.82rem"><span>01:52</span><span>04:29</span></div>
+
+            <div class="menu-strip">
+              <button class="icon-button" aria-label="上一首"><svg class="icon"><use href="#i-prev"/></svg></button>
+              <button class="bevel primary" aria-label="播放"><svg class="icon"><use href="#i-play"/></svg>播放</button>
+              <button class="icon-button" aria-label="下一首"><svg class="icon"><use href="#i-next"/></svg></button>
+              <button class="icon-button" aria-label="收藏"><svg class="icon"><use href="#i-heart"/></svg></button>
+              <button class="icon-button" aria-label="歌词"><svg class="icon"><use href="#i-lyric"/></svg></button>
+            </div>
+
+            <div class="stat-row">
+              <div class="stat-box"><div class="scene-meta">音质</div><strong>Lossless</strong></div>
+              <div class="stat-box"><div class="scene-meta">播放模式</div><strong>顺序</strong></div>
+              <div class="stat-box"><div class="scene-meta">倍速</div><strong>1.0x</strong></div>
+            </div>
+
+            <section class="pane" style="background:var(--win-soft)">
+              <h3><svg class="icon"><use href="#i-lyric"/></svg>歌词面板</h3>
+              <div class="lyric" style="max-height:220px">故事的小黄花 从出生那年就飘着<br>童年的荡秋千 随记忆一直晃到现在<br><br>你说你会哭 不是因为在乎<br>只是因为太久没下雨<br><br>风在山路吹 过往的画面全都是我不对...</div>
+            </section>
+
+            <div class="chip ok"><svg class="icon" style="width:13px;height:13px"><use href="#i-star"/></svg>千禧年播放器 UI：金属按键 + 玻璃壳 + 霓虹进度条</div>
+          </main>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,341 @@
+:root {
+/* 核心配色：天使粉、甚至带点病娇感的深粉、Win95灰 */
+--bg-desktop: #b8c0c8;
+--win-gray: #e0e0e0;
+--win-light: #ffffff;
+--win-dark: #808080;
+--win-black: #000000;
+
+--accent-pink: #ff85c0;
+--accent-dark: #b60056;
+--accent-blue: #85c0ff;
+
+--font-pixel: 'DotGothic16', sans-serif;
+}
+
+* { box-sizing: border-box; user-select: none; }
+
+body {
+margin: 0;
+overflow: hidden;
+font-family: var(--font-pixel);
+background-color: var(--bg-desktop);
+/* 经典的Windows桌面点阵背景 */
+background-image: radial-gradient(var(--win-dark) 1px, transparent 1px);
+background-size: 20px 20px;
+height: 100vh;
+}
+
+/* --- 桌面图标 --- */
+.desktop-bg {
+position: absolute;
+top: 0; left: 0; width: 100%; height: 100%;
+padding: 20px;
+z-index: 0;
+}
+.desktop-icon {
+width: 80px;
+text-align: center;
+color: white;
+text-shadow: 1px 1px 0 #000;
+margin-bottom: 20px;
+cursor: pointer;
+}
+.icon-img { font-size: 32px; margin-bottom: 5px; }
+
+/* --- 窗口设计准则：经典的3D边框 --- */
+.window-frame {
+position: absolute;
+/* 默认居中 */
+top: 50%; left: 50%;
+transform: translate(-50%, -50%);
+width: 380px;
+height: 600px;
+background: var(--win-gray);
+border: 2px solid var(--win-gray);
+/* 3D 凸起效果 */
+box-shadow: inset 1px 1px var(--win-light),
+inset -1px -1px var(--win-dark),
+2px 2px 0px rgba(0,0,0,0.2);
+z-index: 10;
+display: flex;
+flex-direction: column;
+}
+
+/* 标题栏 */
+.window-header {
+background: linear-gradient(90deg, #000080, #1084d0); /* 经典的蓝条 */
+padding: 4px 6px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+color: white;
+cursor: grab; /* 拖拽手势 */
+}
+.window-header:active { cursor: grabbing; }
+
+.title-left { display: flex; align-items: center; gap: 5px; font-size: 14px; }
+
+.window-controls { display: flex; gap: 2px; }
+.win-btn {
+background: var(--win-gray);
+border: 1px solid #000;
+/* 3D 按钮样式 */
+box-shadow: inset 1px 1px var(--win-light), inset -1px -1px var(--win-dark);
+font-family: var(--font-pixel);
+cursor: pointer;
+font-size: 12px;
+padding: 2px 6px;
+}
+.win-btn:active {
+box-shadow: inset 1px 1px var(--win-dark), inset -1px -1px var(--win-light);
+transform: translate(1px, 1px);
+}
+.close-btn { font-weight: bold; }
+
+/* 内容区 */
+.window-body {
+flex: 1;
+position: relative;
+padding: 10px;
+overflow: hidden;
+}
+
+/* 页面切换逻辑 */
+.view-page {
+position: absolute;
+top: 0; left: 0; width: 100%; height: 100%;
+background: var(--win-gray);
+display: flex;
+flex-direction: column;
+padding: 15px;
+transition: opacity 0.2s;
+opacity: 0;
+pointer-events: none;
+z-index: 1;
+}
+.view-page.active {
+opacity: 1;
+pointer-events: auto;
+z-index: 5;
+}
+
+/* === 页面1: 登录 === */
+.login-container {
+height: 100%;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+background: #fffafa;
+border: 2px inset var(--win-gray); /* 凹陷效果 */
+}
+.avatar-box {
+width: 100px; height: 100px;
+border: 2px solid var(--accent-pink);
+margin-bottom: 15px;
+padding: 5px;
+}
+.pixel-pattern {
+width: 100%; height: 100%;
+background-image: conic-gradient(var(--accent-pink) 25%, transparent 0 50%, var(--accent-pink) 0 75%, transparent 0);
+background-size: 20px 20px;
+}
+.glitch-text {
+font-size: 2rem;
+color: var(--accent-dark);
+text-shadow: 2px 0 var(--accent-blue);
+margin: 10px 0;
+}
+.big-btn {
+margin-top: 20px;
+padding: 8px 20px;
+font-size: 1.2rem;
+color: var(--accent-dark);
+}
+
+/* === 页面2: 列表 === */
+.status-strip {
+background: white;
+border: 1px inset var(--win-gray);
+padding: 5px;
+margin-bottom: 10px;
+font-size: 12px;
+display: flex;
+justify-content: space-between;
+}
+.file-list {
+flex: 1;
+background: white;
+border: 2px inset var(--win-gray);
+overflow-y: auto;
+padding: 5px;
+}
+.file-item {
+display: flex;
+align-items: center;
+padding: 8px;
+border-bottom: 1px dotted #ccc;
+cursor: pointer;
+}
+.file-item:hover {
+background: #000080;
+color: white;
+}
+.file-icon { margin-right: 10px; color: gold; }
+.file-info { display: flex; flex-direction: column; }
+.fsize { font-size: 10px; opacity: 0.7; }
+.footer-btn { margin-top: 10px; width: 100%; padding: 8px; }
+
+/* === 页面3: 播放器 === */
+.player-layout {
+height: 100%;
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+}
+.visualizer-box {
+flex: 1;
+background: black;
+border: 2px inset var(--win-gray);
+display: flex;
+align-items: center;
+justify-content: center;
+position: relative;
+overflow: hidden;
+}
+/* 网格线装饰 */
+.visualizer-box::after {
+content: "";
+position: absolute;
+width: 200%; height: 200%;
+background-image: linear-gradient(rgba(0,255,0,0.2) 1px, transparent 1px),
+linear-gradient(90deg, rgba(0,255,0,0.2) 1px, transparent 1px);
+background-size: 20px 20px;
+}
+.cd-disc {
+width: 180px; height: 180px;
+border-radius: 50%;
+background: conic-gradient(from 0deg, #333, #666, #333, #666, #333);
+border: 4px solid var(--accent-pink);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 2;
+box-shadow: 0 0 15px var(--accent-pink);
+}
+.cd-inner {
+width: 60px; height: 60px;
+background: url('https://placehold.co/60x60/purple/white?text=ANGEL');
+background-size: cover;
+border-radius: 50%;
+border: 4px solid white;
+}
+.spinning { animation: spin 4s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.track-display {
+background: black;
+color: var(--accent-pink);
+font-family: monospace;
+padding: 8px;
+border: 2px inset var(--win-gray);
+margin: 10px 0;
+}
+.controls-grid {
+display: flex;
+justify-content: center;
+gap: 15px;
+margin-bottom: 10px;
+}
+.icon-btn {
+width: 40px; height: 40px;
+font-size: 18px;
+}
+
+/* 底部状态栏 */
+.window-footer {
+border-top: 1px solid #999;
+padding: 4px 8px;
+font-size: 12px;
+display: flex;
+justify-content: space-between;
+background: var(--win-gray);
+}
+
+/* 系统任务栏 (模拟) */
+.taskbar {
+position: absolute;
+bottom: 0; left: 0; width: 100%;
+height: 40px;
+background: var(--win-gray);
+border-top: 2px solid var(--win-light);
+display: flex;
+align-items: center;
+padding: 2px;
+z-index: 999;
+}
+.start-btn {
+height: 100%;
+padding: 0 10px;
+font-weight: bold;
+font-family: var(--font-pixel);
+border: 2px outset var(--win-gray);
+background: var(--win-gray);
+margin-right: 10px;
+display: flex;
+align-items: center;
+gap: 5px;
+}
+.task-item {
+height: 90%;
+padding: 0 15px;
+background: #ccc;
+border: 2px inset var(--win-gray);
+display: flex;
+align-items: center;
+font-size: 12px;
+font-weight: bold;
+}
+.tray-area {
+margin-left: auto;
+border: 2px inset var(--win-gray);
+background: white;
+height: 80%;
+display: flex;
+align-items: center;
+padding: 0 10px;
+gap: 10px;
+font-size: 12px;
+margin-right: 4px;
+}
+
+/* ----------------------------------
+响应式设计准则 (Mobile)
+---------------------------------- */
+@media (max-width: 768px) {
+/* 隐藏桌面背景和任务栏 */
+.desktop-bg, .taskbar {
+display: none;
+}
+
+/* 窗口全屏化 */
+.window-frame {
+width: 100%;
+height: 100%;
+top: 0; left: 0;
+transform: none;
+border: none;
+box-shadow: none;
+}
+
+.window-header {
+border-radius: 0;
+padding: 10px;
+}
+
+/* 禁用拖拽手势 */
+.window-header {
+cursor: default;
+}
+}

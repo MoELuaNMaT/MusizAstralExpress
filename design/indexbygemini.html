@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>† INTERNET ANGEL 2000 †</title>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="desktop-bg">
+        <div class="desktop-icon">
+            <div class="icon-img">🗑️</div>
+            <span>Recycle Bin</span>
+        </div>
+        <div class="desktop-icon">
+            <div class="icon-img">💖</div>
+            <span>Secret.txt</span>
+        </div>
+    </div>
+
+    <div id="app-window" class="window-frame">
+        <div class="window-header" id="drag-handle">
+            <div class="title-left">
+                <span class="icon-sparkle">✨</span>
+                <span>ANGEL_PLAYER.exe</span>
+            </div>
+            <div class="window-controls">
+                <button class="win-btn">_</button>
+                <button class="win-btn">□</button>
+                <button class="win-btn close-btn">×</button>
+            </div>
+        </div>
+
+        <div class="window-body">
+
+            <div id="page-login" class="view-page active">
+                <div class="login-container">
+                    <div class="avatar-box">
+                        <div class="pixel-pattern"></div>
+                    </div>
+                    <h2 class="glitch-text" data-text="WELCOME">WELCOME</h2>
+                    <p class="sub-text">† Only for followers †</p>
+                    <button class="win-btn big-btn" onclick="router.go('list')">
+                        Connect to Angel
+                    </button>
+                </div>
+            </div>
+
+            <div id="page-list" class="view-page">
+                <div class="status-strip">
+                    <span>DIR: C:\My_Hearts\Music</span>
+                    <span>3 FILES</span>
+                </div>
+                <div class="file-list">
+                    <div class="file-item" onclick="player.play('INTERNET OVERDOSE', 'Aiobahn')">
+                        <span class="file-icon">♪</span>
+                        <div class="file-info">
+                            <span class="fname">INTERNET OVERDOSE.mp3</span>
+                            <span class="fsize">4.2MB</span>
+                        </div>
+                    </div>
+                    <div class="file-item" onclick="player.play('Angel Break', 'Virtual Cat')">
+                        <span class="file-icon">♪</span>
+                        <div class="file-info">
+                            <span class="fname">Angel_Break.wav</span>
+                            <span class="fsize">12.5MB</span>
+                        </div>
+                    </div>
+                    <div class="file-item" onclick="player.play('Dark Web', 'Unknown')">
+                        <span class="file-icon">♪</span>
+                        <div class="file-info">
+                            <span class="fname">Dark_Web_Vibes.mp3</span>
+                            <span class="fsize">3.3MB</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="win-btn footer-btn" onclick="router.go('login')">← Logout</button>
+            </div>
+
+            <div id="page-player" class="view-page">
+                <div class="player-layout">
+                    <div class="visualizer-box">
+                        <div class="cd-disc" id="cd-disc">
+                            <div class="cd-inner"></div>
+                        </div>
+                    </div>
+
+                    <div class="track-display">
+                        <marquee scrollamount="4" id="track-marquee">WAITING FOR COMMAND...</marquee>
+                    </div>
+
+                    <div class="controls-grid">
+                        <button class="win-btn icon-btn">⏮</button>
+                        <button class="win-btn icon-btn play-toggle" onclick="player.toggle()">▶</button>
+                        <button class="win-btn icon-btn">⏭</button>
+                    </div>
+
+                    <button class="win-btn footer-btn" onclick="router.go('list')">← Back to List</button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="window-footer">
+            <span id="clock">00:00 AM</span>
+            <span>♥ ONLINE</span>
+        </div>
+    </div>
+
+    <div class="taskbar">
+        <button class="start-btn">
+            <span style="color:blue">❖</span> Start
+        </button>
+        <div class="task-item active">
+            ANGEL_PLAYER
+        </div>
+        <div class="tray-area">
+            <span>🔊</span>
+            <span>12:00</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

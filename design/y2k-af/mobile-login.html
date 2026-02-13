@@ -1,0 +1,62 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K AF - 移动登录</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.8 12 4l9 6.8"/><path d="M6.5 9.8V20h11V9.8"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-head">
+      <a class="badge-link" href="./mobile-login.html"><span class="dot"></span><span>ALLMusic Y2K (ArtFate Ref) / Mobile Login</span></a>
+      <div class="meta">页面：<a href="./mobile-home.html">主界面</a> · <a href="./mobile-player.html">播放页</a> · <a href="./desktop-login.html">桌面端</a></div>
+    </div>
+
+    <div class="phone-wrap" style="grid-template-columns:minmax(280px,420px)">
+      <article class="phone">
+        <div class="screen">
+          <div class="notch"></div>
+          <div class="m-head"><span>9:41</span><span>5G · 88%</span></div>
+
+          <section class="m-win">
+            <div class="win-header" style="min-height:36px"><div class="win-title"><svg class="icon"><use href="#i-star"/></svg><span>登录中心</span></div></div>
+            <div class="m-body" style="display:grid;gap:8px">
+              <button class="btn primary"><svg class="icon"><use href="#i-user"/></svg>账号登录</button>
+              <label class="input"><svg class="icon"><use href="#i-user"/></svg><input value="138****6666"/></label>
+              <label class="input"><svg class="icon"><use href="#i-lock"/></svg><input type="password" value="********"/></label>
+              <button class="btn"><svg class="icon"><use href="#i-qr"/></svg>二维码登录</button>
+              <div class="chips"><span class="chip warn"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>Candy + Chrome</span></div>
+            </div>
+          </section>
+
+          <section class="m-win">
+            <div class="win-header" style="min-height:34px"><div class="win-title"><svg class="icon"><use href="#i-qr"/></svg><span>扫码区</span></div></div>
+            <div class="m-body">
+              <div style="width:170px;height:170px;margin:0 auto;border:1px solid var(--line);border-radius:12px;background:repeating-linear-gradient(90deg,#fff,#fff 8px,#111 8px,#111 16px)"></div>
+              <p class="meta" style="text-align:center;margin:8px 0 0">请使用 App 扫码</p>
+            </div>
+          </section>
+
+          <nav class="tabbar">
+            <button><svg class="icon"><use href="#i-home"/></svg></button>
+            <button class="active"><svg class="icon"><use href="#i-user"/></svg></button>
+            <button><svg class="icon"><use href="#i-disc"/></svg></button>
+          </nav>
+        </div>
+      </article>
+    </div>
+  </div>
+</body>
+</html>
