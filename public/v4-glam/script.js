@@ -97,6 +97,7 @@
     lyricCache: Object.create(null),
     lyricPending: Object.create(null),
     currentPlayerSong: null,
+    currentPlayerTimeMs: 0,
     lastLocalApiReadyAt: 0,
   };
 
@@ -269,19 +270,90 @@
       .replace(/^\s+|\s+$/g, '');
   }
 
-  function toLyricLines(rawLyric) {
-    return String(rawLyric || '')
-      .split(/\r?\n/g)
-      .map(stripLyricLine)
-      .filter(Boolean);
+  function toLyricMillis(minuteText, secondText, decimalText) {
+    const minute = Number(minuteText);
+    const second = Number(secondText);
+    if (!Number.isFinite(minute) || !Number.isFinite(second)) {
+      return 0;
+    }
+
+    let ms = 0;
+    if (decimalText) {
+      const normalized = String(decimalText).padEnd(3, '0').slice(0, 3);
+      ms = Number(normalized) || 0;
+    }
+
+    return (minute * 60 * 1000) + (second * 1000) + ms;
   }
 
-  function buildLyricScrollText(lines) {
+  function parseLyricPayload(rawLyric) {
+    const timeTagRegex = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
+    const timeline = [];
+    const plainLines = [];
+
+    String(rawLyric || '')
+      .split(/\r?\n/g)
+      .forEach((rawLine) => {
+        const line = String(rawLine || '').trim();
+        if (!line) {
+          return;
+        }
+
+        const matches = Array.from(line.matchAll(timeTagRegex));
+        const text = stripLyricLine(line);
+        if (!text) {
+          return;
+        }
+
+        if (matches.length === 0) {
+          plainLines.push(text);
+          return;
+        }
+
+        matches.forEach((match) => {
+          const minuteText = match[1];
+          const secondText = match[2];
+          const decimalText = match[3];
+          timeline.push({
+            timeMs: toLyricMillis(minuteText, secondText, decimalText),
+            text,
+          });
+        });
+      });
+
+    timeline.sort((a, b) => a.timeMs - b.timeMs);
+    if (timeline.length > 0) {
+      return {
+        lines: timeline.map((item) => item.text),
+        timeline,
+      };
+    }
+
+    return {
+      lines: plainLines,
+      timeline: [],
+    };
+  }
+
+  function resolveLyricText(lines, timeline, currentTimeMs) {
     const safeLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
     if (safeLines.length === 0) {
-      return 'No lyric available';
+      return '';
     }
-    return safeLines.slice(0, 80).join('   |   ');
+
+    const safeTimeline = Array.isArray(timeline) ? timeline : [];
+    if (safeTimeline.length > 0) {
+      const target = Math.max(0, Number(currentTimeMs) || 0);
+      for (let index = safeTimeline.length - 1; index >= 0; index -= 1) {
+        if (target >= safeTimeline[index].timeMs) {
+          return safeTimeline[index].text;
+        }
+      }
+      return safeTimeline[0].text;
+    }
+
+    const rollingIndex = Math.floor(Math.max(0, Number(currentTimeMs) || 0) / 3000) % safeLines.length;
+    return safeLines[rollingIndex] || safeLines[0] || '';
   }
 
   function getLyricMode() {
@@ -307,7 +379,7 @@
     cdCenterCoverEl.style.backgroundImage = '';
   }
 
-  function renderPlayerLyrics(song) {
+  function renderPlayerLyrics(song, currentTimeMs) {
     if (!lyricLineOneEl || !lyricLineTwoEl) {
       return;
     }
@@ -327,25 +399,32 @@
       return;
     }
 
-    const originalText = buildLyricScrollText(cacheEntry.originalLines);
-    const translatedText = buildLyricScrollText(cacheEntry.translatedLines);
+    const originalText = resolveLyricText(cacheEntry.originalLines, cacheEntry.originalTimeline, currentTimeMs);
+    const translatedText = resolveLyricText(cacheEntry.translatedLines, cacheEntry.translatedTimeline, currentTimeMs);
+    const primaryFallback = originalText || translatedText || 'No lyric available';
     const mode = getLyricMode();
 
     if (mode === 'original') {
-      lyricLineOneEl.textContent = originalText;
+      lyricLineOneEl.textContent = originalText || translatedText || 'No lyric available';
       lyricLineTwoEl.style.display = 'none';
       return;
     }
 
     if (mode === 'translated') {
-      lyricLineOneEl.textContent = translatedText;
+      lyricLineOneEl.textContent = translatedText || originalText || 'No lyric available';
       lyricLineTwoEl.style.display = 'none';
       return;
     }
 
-    lyricLineOneEl.textContent = originalText;
-    lyricLineTwoEl.textContent = translatedText;
-    lyricLineTwoEl.style.display = 'block';
+    lyricLineOneEl.textContent = primaryFallback;
+    if (translatedText && translatedText !== primaryFallback) {
+      lyricLineTwoEl.textContent = translatedText;
+      lyricLineTwoEl.style.display = 'block';
+      return;
+    }
+
+    lyricLineTwoEl.textContent = '';
+    lyricLineTwoEl.style.display = 'none';
   }
 
   async function ensureLyricsLoaded(song) {
@@ -364,9 +443,13 @@
 
     const task = bridge.loadSongLyrics(song)
       .then((lyricResult) => {
+        const originalPayload = parseLyricPayload(lyricResult && lyricResult.lyric);
+        const translatedPayload = parseLyricPayload(lyricResult && lyricResult.translatedLyric);
         const entry = {
-          originalLines: toLyricLines(lyricResult && lyricResult.lyric),
-          translatedLines: toLyricLines(lyricResult && lyricResult.translatedLyric),
+          originalLines: originalPayload.lines,
+          originalTimeline: originalPayload.timeline,
+          translatedLines: translatedPayload.lines,
+          translatedTimeline: translatedPayload.timeline,
         };
         state.lyricCache[song.id] = entry;
         return entry;
@@ -375,7 +458,9 @@
         console.error('[V4 Glam] lyric load failed:', error);
         const fallback = {
           originalLines: [],
+          originalTimeline: [],
           translatedLines: [],
+          translatedTimeline: [],
         };
         state.lyricCache[song.id] = fallback;
         return fallback;
@@ -1095,14 +1180,16 @@
     try {
       const playerState = await bridge.getPlayerState();
       const currentSong = playerState && playerState.currentSong ? playerState.currentSong : null;
+      const currentTimeMs = Number(playerState && playerState.currentTime) || 0;
       state.currentPlayerSong = currentSong;
+      state.currentPlayerTimeMs = currentTimeMs;
       updateCurrentTrackDisplay(currentSong);
       updateDiscCenterCover(currentSong);
-      renderPlayerLyrics(currentSong);
+      renderPlayerLyrics(currentSong, currentTimeMs);
       if (currentSong && !state.lyricCache[currentSong.id]) {
         void ensureLyricsLoaded(currentSong).then(() => {
           if (state.currentPlayerSong && state.currentPlayerSong.id === currentSong.id) {
-            renderPlayerLyrics(currentSong);
+            renderPlayerLyrics(currentSong, state.currentPlayerTimeMs);
           }
         });
       }
@@ -1348,7 +1435,7 @@
         }
         state.lyricMode = mode;
         updateLyricModeButtons();
-        renderPlayerLyrics(state.currentPlayerSong);
+        renderPlayerLyrics(state.currentPlayerSong, state.currentPlayerTimeMs);
       });
     });
     updateLyricModeButtons();

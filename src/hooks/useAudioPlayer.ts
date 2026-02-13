@@ -2,6 +2,35 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore, usePlayerStore } from '@/stores';
 import { playerService } from '@/services/player.service';
 
+const sharedAudioState: {
+  element: HTMLAudioElement | null;
+  loadedSongId: string | null;
+} = {
+  element: null,
+  loadedSongId: null,
+};
+
+export function stopSharedAudioPlayback(options: { resetSource?: boolean } = {}): void {
+  const audio = sharedAudioState.element;
+  if (!audio) {
+    sharedAudioState.loadedSongId = null;
+    return;
+  }
+
+  try {
+    audio.pause();
+  } catch {
+    // noop
+  }
+
+  if (options.resetSource) {
+    audio.removeAttribute('src');
+    audio.load();
+  }
+
+  sharedAudioState.loadedSongId = null;
+}
+
 function toMs(seconds: number): number {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return 0;
@@ -31,16 +60,25 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
   const playNext = usePlayerStore((state) => state.playNext);
 
   const [retryNonce, setRetryNonce] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const requestSeqRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const getAudio = useCallback(() => {
-    if (!audioRef.current) {
+    if (!sharedAudioState.element) {
       const audio = new Audio();
       audio.preload = 'auto';
-      audioRef.current = audio;
+      sharedAudioState.element = audio;
     }
-    return audioRef.current;
+    return sharedAudioState.element;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestSeqRef.current += 1;
+      stopSharedAudioPlayback();
+    };
   }, []);
 
   useEffect(() => {
@@ -63,8 +101,8 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
     };
     const onError = () => {
       const state = usePlayerStore.getState();
-      const songName = state.currentSong?.name || '当前歌曲';
-      state.setError(`${songName} 播放失败，已自动切到下一首。`);
+      const songName = state.currentSong?.name || 'Current song';
+      state.setError(`${songName} playback failed, switched to next song.`);
       state.playNext();
     };
 
@@ -96,8 +134,16 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
+      sharedAudioState.loadedSongId = null;
       setCurrentTime(0);
       setDuration(0);
+      setIsLoading(false);
+      return;
+    }
+
+    if (sharedAudioState.loadedSongId === currentSong.id && audio.src) {
+      setDuration(toMs(audio.duration));
+      setCurrentTime(toMs(audio.currentTime));
       setIsLoading(false);
       return;
     }
@@ -114,20 +160,21 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
         qqCookie: cookies.qq,
       });
 
-      if (requestSeqRef.current !== sequence) {
+      if (!mountedRef.current || requestSeqRef.current !== sequence) {
         return;
       }
 
       if (!resolved.success || !resolved.url) {
         setIsLoading(false);
         setIsPlaying(false);
-        setError(resolved.error || `${currentSong.name} 暂无可用播放链接。`);
+        setError(resolved.error || `${currentSong.name} has no playable url.`);
         return;
       }
 
       if (audio.src !== resolved.url) {
         audio.src = resolved.url;
       }
+      sharedAudioState.loadedSongId = currentSong.id;
 
       audio.currentTime = 0;
       setCurrentTime(0);
@@ -141,12 +188,12 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
       try {
         await audio.play();
       } catch (error) {
-        if (requestSeqRef.current !== sequence) {
+        if (!mountedRef.current || requestSeqRef.current !== sequence) {
           return;
         }
         setIsLoading(false);
         setIsPlaying(false);
-        setError(error instanceof Error ? error.message : '播放启动失败，请重试。');
+        setError(error instanceof Error ? error.message : 'Failed to start playback.');
       }
     };
 
@@ -177,7 +224,7 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
 
     void audio.play().catch((error) => {
       setIsPlaying(false);
-      setError(error instanceof Error ? error.message : '播放失败，请重试。');
+      setError(error instanceof Error ? error.message : 'Playback failed.');
     });
   }, [currentSong?.id, getAudio, isPlaying, setError, setIsPlaying]);
 
@@ -189,6 +236,7 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
 
   const retryCurrent = useCallback(() => {
     setRetryNonce((prev) => prev + 1);
+    sharedAudioState.loadedSongId = null;
     usePlayerStore.getState().setIsPlaying(true);
   }, []);
 

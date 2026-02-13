@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useAuthStore, usePlayerStore } from '@/stores';
-import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { stopSharedAudioPlayback, useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { authService } from '@/services/auth.service';
 import { libraryService } from '@/services/library.service';
 import { HomePage } from '@/pages/Home';
@@ -422,6 +422,15 @@ function App() {
         };
       },
       switchUiVersion: async (next) => {
+        if (next === uiVersion) {
+          return;
+        }
+
+        // Prevent hidden UI audio from continuing after mode switch.
+        const player = usePlayerStore.getState();
+        player.setIsPlaying(false);
+        player.setIsLoading(false);
+        stopSharedAudioPlayback();
         setUiVersion(next);
       },
       getUiVersion: async () => uiVersion,

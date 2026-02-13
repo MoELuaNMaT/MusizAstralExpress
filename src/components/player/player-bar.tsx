@@ -440,32 +440,37 @@ export function PlayerBar() {
     return parsedOriginalLyric.lines.length > 0 ? activeOriginalLyricIndex : activeTranslatedLyricIndex;
   }, [activeOriginalLyricIndex, activeTranslatedLyricIndex, lyricDisplayMode, parsedOriginalLyric.lines.length]);
 
-  const fallbackSongText = useMemo(
-    () => (currentSong ? `${currentSong.name} - ${currentSong.artist || '未知歌手'}` : ''),
-    [currentSong],
-  );
-
   const barOriginalPair = useMemo(
-    () => resolveLyricPair(parsedBarOriginalLyric, activeBarOriginalLyricIndex, currentTime, fallbackSongText),
-    [activeBarOriginalLyricIndex, currentTime, fallbackSongText, parsedBarOriginalLyric],
+    () => resolveLyricPair(parsedBarOriginalLyric, activeBarOriginalLyricIndex, currentTime, ''),
+    [activeBarOriginalLyricIndex, currentTime, parsedBarOriginalLyric],
   );
   const barTranslatedPair = useMemo(
-    () => resolveLyricPair(parsedBarTranslatedLyric, activeBarTranslatedLyricIndex, currentTime, fallbackSongText),
-    [activeBarTranslatedLyricIndex, currentTime, fallbackSongText, parsedBarTranslatedLyric],
+    () => resolveLyricPair(parsedBarTranslatedLyric, activeBarTranslatedLyricIndex, currentTime, ''),
+    [activeBarTranslatedLyricIndex, currentTime, parsedBarTranslatedLyric],
   );
 
-  const barDisplayLines = useMemo(() => {
+  const barLyricLines = useMemo(() => {
+    const originalLine = barOriginalPair[0] || '';
+    const translatedLine = barTranslatedPair[0] || '';
+
     if (lyricDisplayMode === 'original') {
-      return barOriginalPair;
+      return {
+        line1: originalLine || translatedLine || '♪ 暂无歌词',
+        line2: '',
+      };
     }
+
     if (lyricDisplayMode === 'translated') {
-      return barTranslatedPair;
+      return {
+        line1: translatedLine || originalLine || '♪ 暂无歌词',
+        line2: '',
+      };
     }
-    return [
-      barOriginalPair[0] || fallbackSongText,
-      barTranslatedPair[0] || barOriginalPair[1] || barOriginalPair[0] || '',
-    ] as [string, string];
-  }, [barOriginalPair, barTranslatedPair, fallbackSongText, lyricDisplayMode]);
+
+    const line1 = originalLine || translatedLine || '♪ 暂无歌词';
+    const line2 = translatedLine && translatedLine !== line1 ? translatedLine : '';
+    return { line1, line2 };
+  }, [barOriginalPair, barTranslatedPair, lyricDisplayMode]);
 
   const closeDetail = useCallback(() => {
     lyricRequestSeqRef.current += 1;
@@ -798,13 +803,15 @@ export function PlayerBar() {
               </button>
 
               <div className="flex-1 min-w-0 space-y-1 lg:-translate-y-3">
-                <div className="space-y-0.5 text-center lg:mb-1">
+                <div className="space-y-0.5 text-center lg:mb-1" aria-label="播放栏歌词">
                   <p className="truncate text-sm font-semibold tracking-wide text-emerald-200 md:text-base">
-                    {barDisplayLines[0] || '♪ 正在准备歌词...'}
+                    {barLyricLines.line1}
                   </p>
-                  <p className="truncate text-xs tracking-wide text-cyan-200 md:text-sm">
-                    {barDisplayLines[1] || (lyricDisplayMode === 'bilingual' ? '暂无中文歌词' : '♪')}
-                  </p>
+                  {lyricDisplayMode === 'bilingual' && barLyricLines.line2 ? (
+                    <p className="truncate text-xs tracking-wide text-cyan-200 md:text-sm">
+                      {barLyricLines.line2}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-12 text-right text-xs text-slate-400">{currentPositionLabel}</span>
