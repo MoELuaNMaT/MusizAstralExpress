@@ -18,6 +18,8 @@
 - npm 9+
 - Python 3.10+（用于 QQ 本地适配服务）
 - Rust 工具链（仅在运行 Tauri 桌面端时需要）
+- JDK 17+ + Android SDK（仅在运行 Android 端时需要）
+- macOS + Xcode（仅在推进 iOS 端时需要）
 
 ## 快速开始
 
@@ -45,6 +47,16 @@ npm run dev:all
 - `npm run dev:all`：启动网易 API + QQ 适配服务 + 前端
 - `npm run tauri:dev`：启动桌面端调试（含双 API）
 - `npm run build`：TypeScript 检查并打包前端
+- `npm run android:check`：检查 Android 必需环境变量与命令
+- `npm run android:init`：初始化 Android 工程（需先通过环境检查）
+- `npm run android:dev`：启动安卓调试（含双 API）
+- `npm run android:build`：构建安卓包（含双 API）
+- `npm run ios:plan`：查看 iOS 端后续接入步骤
+
+## 移动端开发（初始接入）
+
+- Android：已完成命令与配置预置，详见 `docs/mobile/README.md`
+- iOS：已预留 `src-tauri/tauri.ios.conf.json`，等 macOS 环境就绪后可直接初始化
 
 ## 最小 Smoke 测试
 

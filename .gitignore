@@ -40,3 +40,15 @@ src-tauri/Cargo.lock
 # Python cache
 __pycache__/
 *.py[cod]
+
+# Tauri mobile generated artifacts
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/.cxx/
+src-tauri/gen/android/build/
+src-tauri/gen/android/app/build/
+src-tauri/gen/android/local.properties
+src-tauri/gen/android/.idea/
+src-tauri/gen/ios/build/
+
+# Local packaging output
+release/

@@ -16,7 +16,12 @@
     "dev:services:clean": "npm run ports:clean && npm run dev:services",
     "dev:all": "concurrently --kill-others-on-fail --names \"netease,qq,web\" \"npm run api:netease\" \"npm run api:qq\" \"npm run dev\"",
     "tauri:dev": "npm run ports:clean && concurrently --kill-others-on-fail --names \"netease,qq,tauri\" \"npm run api:netease\" \"npm run api:qq\" \"npm run tauri dev\"",
-    "smoke:services": "node scripts/smoke-services.cjs"
+    "smoke:services": "node scripts/smoke-services.cjs",
+    "android:check": "node scripts/check-android-env.cjs",
+    "android:init": "npm run android:check && npm run tauri android init -- --ci",
+    "android:dev": "npm run android:check && npm run ports:clean && concurrently --kill-others-on-fail --names \"netease,qq,android\" \"npm run api:netease\" \"npm run api:qq\" \"npm run tauri android dev\"",
+    "android:build": "npm run android:check && npm run ports:clean && concurrently --kill-others-on-fail --names \"netease,qq,android\" \"npm run api:netease\" \"npm run api:qq\" \"npm run tauri android build\"",
+    "ios:plan": "node scripts/ios-plan.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
