@@ -16,6 +16,19 @@
 5. Run `npm run android:init`
 6. Connect emulator/device, then run `npm run android:dev`
 
+## API base URL strategy (Android adaptation WIP)
+
+- Frontend services now support configurable API base URLs:
+  - `VITE_NETEASE_API_BASE_URL`
+  - `VITE_QQ_API_BASE_URL`
+- Optional runtime override via localStorage key:
+  - `allmusic_api_base_overrides_v1`
+  - shape: `{ "netease": "http://host:3000", "qq": "http://host:3001" }`
+- Fallback behavior:
+  - Tauri mobile runtime defaults to `http://10.0.2.2:3000/3001` (Android emulator host mapping)
+  - Desktop/web fallback remains `http://localhost:3000/3001`
+- Local Node/Python API auto-bootstrap is skipped on likely Tauri mobile runtime.
+
 ## iOS placeholder notes
 
 - iOS build requires macOS + Xcode

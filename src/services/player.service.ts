@@ -1,7 +1,8 @@
 import type { UnifiedSong } from '@/types';
+import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
 
-const NETEASE_API_BASE_URL = 'http://localhost:3000';
-const QQ_API_BASE_URL = 'http://localhost:3001';
+const NETEASE_API_BASE_URL = getNeteaseApiBaseUrl();
+const QQ_API_BASE_URL = getQQApiBaseUrl();
 
 interface ResolvePlayUrlContext {
   neteaseCookie?: string | null;

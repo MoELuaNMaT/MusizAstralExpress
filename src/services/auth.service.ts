@@ -9,17 +9,18 @@ import type {
   MusicPlatform,
   UnifiedUser,
 } from '@/types';
+import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
 
 /**
  * NetEase API endpoints configuration
  */
 const NETEASE_API_CONFIG = {
-  baseUrl: 'http://localhost:3000',
+  baseUrl: getNeteaseApiBaseUrl(),
   timeout: 30000,
 };
 
 const QQ_API_CONFIG = {
-  baseUrl: 'http://localhost:3001',
+  baseUrl: getQQApiBaseUrl(),
   timeout: 30000,
 };
 

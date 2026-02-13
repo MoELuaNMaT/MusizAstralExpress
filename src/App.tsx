@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useAuthStore, usePlayerStore } from '@/stores';
 import { stopSharedAudioPlayback, useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { canUseTauriInvoke, isLikelyTauriMobileRuntime } from '@/lib/runtime';
 import { authService } from '@/services/auth.service';
 import { libraryService } from '@/services/library.service';
 import { HomePage } from '@/pages/Home';
@@ -107,15 +108,6 @@ function buildLibraryContext() {
   };
 }
 
-function canUseTauriInvoke(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const tauriInternals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__;
-  return typeof tauriInternals?.invoke === 'function';
-}
-
 function V4AudioEngine({
   onSeekReady,
   onRetryReady,
@@ -197,7 +189,7 @@ function App() {
   }, []);
 
   const bootstrapLocalApis = useCallback(async () => {
-    if (!canUseTauriInvoke() || localApiBootstrappedRef.current) {
+    if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime() || localApiBootstrappedRef.current) {
       return;
     }
 
@@ -259,7 +251,7 @@ function App() {
   }, [bootstrapLocalApis]);
 
   useEffect(() => {
-    if (!canUseTauriInvoke()) {
+    if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime()) {
       return;
     }
 

@@ -1290,8 +1290,8 @@ export function HomePage() {
               </div>
             </div>
 
-            <div className="grid min-h-0 flex-1 items-start gap-4 xl:grid-cols-[340px,1fr]">
-              <section className="am-song-scrollbar min-h-0 space-y-3 overflow-y-scroll pr-1">
+            <div className="grid min-h-0 flex-1 items-stretch gap-4 xl:grid-cols-[340px,1fr]">
+              <section className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1">
                 {isPlaylistLoading ? (
                   <div className="py-10 text-slate-300 flex items-center justify-center gap-2">
                     <Spinner size="sm" />
@@ -1333,7 +1333,7 @@ export function HomePage() {
                 )}
               </section>
 
-              <section className="min-w-0 min-h-0 flex flex-col space-y-2">
+              <section className="min-w-0 h-full min-h-0 flex flex-col space-y-2">
                 {!selectedPlaylist ? (
                   <p className="text-sm text-slate-400">{text.noSelectedPlaylist}</p>
                 ) : isDetailLoading ? (
@@ -1439,8 +1439,8 @@ export function HomePage() {
               </Button>
             </div>
 
-            <div className="grid min-h-0 flex-1 items-start gap-4 xl:grid-cols-[260px,1fr]">
-              <section className="am-song-scrollbar min-h-0 space-y-3 overflow-y-scroll pr-1">
+            <div className="grid min-h-0 flex-1 items-stretch gap-4 xl:grid-cols-[260px,1fr]">
+              <section className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1">
                 <button
                   type="button"
                   onClick={() => setDailySourceTab('merged')}
@@ -1488,7 +1488,7 @@ export function HomePage() {
                 </button>
               </section>
 
-              <section className="min-w-0 min-h-0 flex flex-col space-y-2">
+              <section className="min-w-0 h-full min-h-0 flex flex-col space-y-2">
                 {isDailyLoading ? (
                   <div className="py-10 text-slate-300 flex items-center justify-center gap-2">
                     <Spinner size="sm" />

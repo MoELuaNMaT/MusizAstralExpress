@@ -1,8 +1,9 @@
 ﻿import type { UnifiedPlaylist, UnifiedSong, PlaylistType } from '@/types';
 import { invoke } from '@tauri-apps/api/core';
+import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
 
-const NETEASE_API_BASE_URL = 'http://localhost:3000';
-const QQ_API_BASE_URL = 'http://localhost:3001';
+const NETEASE_API_BASE_URL = getNeteaseApiBaseUrl();
+const QQ_API_BASE_URL = getQQApiBaseUrl();
 const DEFAULT_COVER = 'https://p.qlogo.cn/gh/0/0/100';
 const NETEASE_WEB_ORDER_CACHE_KEY = 'allmusic_netease_web_order_cache_v1';
 const NETEASE_WEB_ORDER_CACHE_LIMIT = 5000;
