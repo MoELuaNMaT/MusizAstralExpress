@@ -1,4 +1,4 @@
-﻿import { memo, type ChangeEvent, type FormEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { memo, type ChangeEvent, type FormEvent, type MouseEvent as ReactMouseEvent, type WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore, usePlayerStore } from '@/stores';
 import { libraryService } from '@/services/library.service';
 import { formatDuration } from '@/lib/utils';
@@ -967,6 +967,27 @@ export function HomePage() {
     await loadDailyRecommendations();
   };
 
+  const handleScrollableWheel = useCallback((event: ReactWheelEvent<HTMLElement>) => {
+    const container = event.currentTarget;
+    if (container.scrollHeight <= container.clientHeight) {
+      return;
+    }
+
+    const baseDelta = event.deltaMode === 1
+      ? event.deltaY * 16
+      : event.deltaMode === 2
+        ? event.deltaY * container.clientHeight
+        : event.deltaY;
+
+    if (!Number.isFinite(baseDelta) || baseDelta === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    container.scrollTop += baseDelta;
+  }, []);
+
   const handleRefreshCurrentDetail = async () => {
     if (!selectedPlaylist) {
       return;
@@ -1029,7 +1050,7 @@ export function HomePage() {
   }
 
   return (
-    <div className="am-screen h-screen overflow-hidden text-white">
+    <div className="am-screen h-screen overflow-hidden flex flex-col text-white">
       <div className="am-spark-layer" aria-hidden="true">
         <span className="am-spark am-spark-pink" style={{ left: '6%', top: '11%', animationDuration: '2.8s' }} />
         <span className="am-spark am-spark-cyan" style={{ left: '18%', top: '26%', animationDuration: '3.1s' }} />
@@ -1290,8 +1311,12 @@ export function HomePage() {
               </div>
             </div>
 
-            <div className="grid min-h-0 flex-1 items-stretch gap-4 xl:grid-cols-[340px,1fr]">
-              <section className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] items-stretch gap-4 xl:grid-cols-[340px,1fr]">
+              <section
+                className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1"
+                onWheel={handleScrollableWheel}
+                onWheelCapture={handleScrollableWheel}
+              >
                 {isPlaylistLoading ? (
                   <div className="py-10 text-slate-300 flex items-center justify-center gap-2">
                     <Spinner size="sm" />
@@ -1333,7 +1358,7 @@ export function HomePage() {
                 )}
               </section>
 
-              <section className="min-w-0 h-full min-h-0 flex flex-col space-y-2">
+              <section className="min-w-0 h-full min-h-0 overflow-hidden flex flex-col space-y-2">
                 {!selectedPlaylist ? (
                   <p className="text-sm text-slate-400">{text.noSelectedPlaylist}</p>
                 ) : isDetailLoading ? (
@@ -1346,7 +1371,11 @@ export function HomePage() {
                 ) : playlistDetailSongs.length === 0 ? (
                   <p className="text-sm text-slate-400">{text.noSongsInPlaylist}</p>
                 ) : (
-                  <div className="am-song-scrollbar min-h-0 flex-1 overflow-y-scroll pr-1 space-y-2">
+                  <div
+                    className="am-song-scrollbar min-h-0 flex-1 overflow-y-scroll pr-1 space-y-2"
+                    onWheel={handleScrollableWheel}
+                    onWheelCapture={handleScrollableWheel}
+                  >
                     {visiblePlaylistDetailSongs.map((song, index) => {
                       const likeKey = getSongLikeKey(song);
                       const isLiked = Boolean(song.isLiked);
@@ -1439,8 +1468,12 @@ export function HomePage() {
               </Button>
             </div>
 
-            <div className="grid min-h-0 flex-1 items-stretch gap-4 xl:grid-cols-[260px,1fr]">
-              <section className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] items-stretch gap-4 xl:grid-cols-[260px,1fr]">
+              <section
+                className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1"
+                onWheel={handleScrollableWheel}
+                onWheelCapture={handleScrollableWheel}
+              >
                 <button
                   type="button"
                   onClick={() => setDailySourceTab('merged')}
@@ -1488,7 +1521,7 @@ export function HomePage() {
                 </button>
               </section>
 
-              <section className="min-w-0 h-full min-h-0 flex flex-col space-y-2">
+              <section className="min-w-0 h-full min-h-0 overflow-hidden flex flex-col space-y-2">
                 {isDailyLoading ? (
                   <div className="py-10 text-slate-300 flex items-center justify-center gap-2">
                     <Spinner size="sm" />
@@ -1499,7 +1532,11 @@ export function HomePage() {
                 ) : activeDailySongs.length === 0 ? (
                   <p className="text-sm text-slate-400">{text.noDailySongsInSource}</p>
                 ) : (
-                  <div className="am-song-scrollbar min-h-0 flex-1 overflow-y-scroll pr-1 space-y-2">
+                  <div
+                    className="am-song-scrollbar min-h-0 flex-1 overflow-y-scroll pr-1 space-y-2"
+                    onWheel={handleScrollableWheel}
+                    onWheelCapture={handleScrollableWheel}
+                  >
                     {activeDailySongs.map((song, index) => {
                       const likeKey = getSongLikeKey(song);
                       const isLiked = Boolean(song.isLiked);
