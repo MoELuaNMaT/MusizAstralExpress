@@ -10,6 +10,7 @@ import type {
   UnifiedUser,
 } from '@/types';
 import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
+import { canUseTauriInvoke } from '@/lib/runtime';
 
 /**
  * NetEase API endpoints configuration
@@ -36,6 +37,18 @@ class AuthService {
     this.apiBase = NETEASE_API_CONFIG.baseUrl;
   }
 
+  private isTauriRuntime(): boolean {
+    return canUseTauriInvoke();
+  }
+
+  private appendNeteaseCookie(endpoint: string, cookie?: string | null): string {
+    if (this.isTauriRuntime() || !cookie?.trim()) {
+      return endpoint;
+    }
+    const separator = endpoint.includes('?') ? '&' : '?';
+    return `${endpoint}${separator}cookie=${encodeURIComponent(cookie.trim())}`;
+  }
+
   /**
    * Helper to make API requests
    */
@@ -45,19 +58,14 @@ class AuthService {
     skipCodeCheck = false
   ): Promise<ApiResponse<T>> {
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...options.headers as Record<string, string>,
-      };
-
-      // Add session cookie if available
-      if (this.sessionCookie) {
-        headers['Cookie'] = this.sessionCookie;
-      }
-
-      const response = await fetch(`${this.apiBase}${endpoint}`, {
+      const resolvedEndpoint = this.appendNeteaseCookie(endpoint, this.sessionCookie);
+      const response = await fetch(`${this.apiBase}${resolvedEndpoint}`, {
         ...options,
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.isTauriRuntime() && this.sessionCookie ? { Cookie: this.sessionCookie } : {}),
+          ...options.headers as Record<string, string>,
+        },
       });
 
       // Extract and store cookies from response
@@ -952,8 +960,10 @@ class AuthService {
    */
   async verifyLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
     if (platform === 'netease') {
-      const response = await fetch(`${this.apiBase}/login/status`, {
-        headers: { Cookie: cookie },
+      const endpoint = this.appendNeteaseCookie('/login/status', cookie);
+      const response = await fetch(`${this.apiBase}${endpoint}`, {
+        headers: this.isTauriRuntime() ? { Cookie: cookie } : undefined,
+        cache: 'no-store',
       });
       const data = await response.json();
       return data.data?.code === 200 || data.code === 200;
@@ -981,8 +991,10 @@ class AuthService {
    */
   async getUserInfo(platform: MusicPlatform, cookie: string): Promise<UnifiedUser | null> {
     if (platform === 'netease') {
-      const response = await fetch(`${this.apiBase}/user/account`, {
-        headers: { Cookie: cookie },
+      const endpoint = this.appendNeteaseCookie('/user/account', cookie);
+      const response = await fetch(`${this.apiBase}${endpoint}`, {
+        headers: this.isTauriRuntime() ? { Cookie: cookie } : undefined,
+        cache: 'no-store',
       });
       const data = await response.json();
 
@@ -1028,9 +1040,11 @@ class AuthService {
    */
   async logout(platform: MusicPlatform, cookie: string): Promise<boolean> {
     if (platform === 'netease') {
-      const response = await fetch(`${this.apiBase}/logout`, {
+      const endpoint = this.appendNeteaseCookie('/logout', cookie);
+      const response = await fetch(`${this.apiBase}${endpoint}`, {
         method: 'POST',
-        headers: { Cookie: cookie },
+        headers: this.isTauriRuntime() ? { Cookie: cookie } : undefined,
+        cache: 'no-store',
       });
       const data = await response.json();
       return data.code === 200;
