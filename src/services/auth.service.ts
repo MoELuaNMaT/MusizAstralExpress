@@ -954,6 +954,35 @@ class AuthService {
     return null;
   }
 
+  /**
+   * Renew login session
+   */
+  async renewLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
+    if (platform === 'netease') {
+      const endpoint = this.appendNeteaseCookie(`/login/refresh?timestamp=${Date.now()}`, cookie);
+      try {
+        const response = await fetch(`${this.apiBase}${endpoint}`, {
+          method: 'POST',
+          headers: this.isTauriRuntime() ? { Cookie: cookie } : undefined,
+          cache: 'no-store',
+        });
+        const data = await response.json();
+        if (data.code === 200) {
+          return true;
+        }
+      } catch {
+        // Fall through to verification fallback.
+      }
+
+      return this.verifyLogin('netease', cookie);
+    }
+
+    if (platform === 'qq') {
+      return this.verifyLogin('qq', cookie);
+    }
+
+    return false;
+  }
 
   /**
    * Verify login status
