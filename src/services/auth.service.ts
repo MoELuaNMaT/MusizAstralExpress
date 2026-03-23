@@ -959,22 +959,41 @@ class AuthService {
    */
   async renewLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
     if (platform === 'netease') {
-      const endpoint = this.appendNeteaseCookie(`/login/refresh?timestamp=${Date.now()}`, cookie);
+      const normalizedCookie = cookie?.trim();
+      if (!normalizedCookie) {
+        return false;
+      }
+
+      if (this.sessionCookie !== normalizedCookie) {
+        this.sessionCookie = normalizedCookie;
+      }
+
+      const endpoint = this.appendNeteaseCookie(`/login/refresh?timestamp=${Date.now()}`, normalizedCookie);
       try {
         const response = await fetch(`${this.apiBase}${endpoint}`, {
           method: 'POST',
-          headers: this.isTauriRuntime() ? { Cookie: cookie } : undefined,
+          headers: this.isTauriRuntime() ? { Cookie: normalizedCookie } : undefined,
           cache: 'no-store',
         });
-        const data = await response.json();
-        if (data.code === 200) {
+        const data = await response.json().catch(() => ({}));
+
+        const setCookieHeader = response.headers.get('Set-Cookie');
+        if (setCookieHeader) {
+          this.sessionCookie = setCookieHeader;
+        }
+        if (typeof (data as { cookie?: unknown }).cookie === 'string') {
+          this.sessionCookie = (data as { cookie?: string }).cookie;
+        }
+
+        if (response.ok && ((data as { code?: number; data?: { code?: number } }).code === 200
+          || (data as { data?: { code?: number } }).data?.code === 200)) {
           return true;
         }
       } catch {
         // Fall through to verification fallback.
       }
 
-      return this.verifyLogin('netease', cookie);
+      return this.verifyLogin('netease', normalizedCookie);
     }
 
     if (platform === 'qq') {
