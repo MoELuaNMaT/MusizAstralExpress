@@ -21,6 +21,7 @@ interface StoredCredentials {
 interface AuthState {
   users: Record<MusicPlatform, UnifiedUser | null>;
   cookies: Record<MusicPlatform, string | null>;
+  isAuthenticated: boolean;
   isLoading: boolean;
 }
 
@@ -145,6 +146,10 @@ function toUnifiedUser(stored: StoredAuthUser): UnifiedUser {
   };
 }
 
+function resolveIsAuthenticated(users: Record<MusicPlatform, UnifiedUser | null>): boolean {
+  return Boolean(users.netease || users.qq);
+}
+
 export const selectIsAuthenticated = (state: AuthState) =>
   Boolean(state.users.netease || state.users.qq);
 
@@ -158,6 +163,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     netease: null,
     qq: null,
   },
+  isAuthenticated: false,
   isLoading: true,
 
   // Actions
@@ -190,7 +196,12 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         }
       }
 
-      set({ users, cookies, isLoading: false });
+      set({
+        users,
+        cookies,
+        isAuthenticated: resolveIsAuthenticated(users),
+        isLoading: false,
+      });
     } catch (error) {
       console.error('Failed to load stored credentials:', error);
       set({ isLoading: false });
@@ -220,10 +231,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         upsertFallbackCredential(platform, user, cookie);
       }
 
-      set((state) => ({
-        users: { ...state.users, [platform]: user },
-        cookies: { ...state.cookies, [platform]: cookie },
-      }));
+      set((state) => {
+        const nextUsers = { ...state.users, [platform]: user };
+        return {
+          users: nextUsers,
+          cookies: { ...state.cookies, [platform]: cookie },
+          isAuthenticated: resolveIsAuthenticated(nextUsers),
+        };
+      });
     } catch (error) {
       console.error('Failed to store auth:', error);
       throw error;
@@ -241,10 +256,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       }
       removeFallbackCredential(platform);
 
-      set((state) => ({
-          users: { ...state.users, [platform]: null },
+      set((state) => {
+        const nextUsers = { ...state.users, [platform]: null };
+        return {
+          users: nextUsers,
           cookies: { ...state.cookies, [platform]: null },
-        }));
+          isAuthenticated: resolveIsAuthenticated(nextUsers),
+        };
+      });
     } catch (error) {
       console.error('Failed to remove auth:', error);
       throw error;
@@ -270,6 +289,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       set({
         users: { netease: null, qq: null },
         cookies: { netease: null, qq: null },
+        isAuthenticated: false,
       });
     } catch (error) {
       console.error('Failed to clear auth:', error);
