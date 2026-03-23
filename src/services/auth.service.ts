@@ -42,29 +42,13 @@ class AuthService {
   }
 
   private normalizeSetCookieHeader(header: string): string {
-    // Split Set-Cookie safely, keeping expires commas intact.
-    const parts: string[] = [];
-    let current = '';
-    let inExpires = false;
-    for (let i = 0; i < header.length; i += 1) {
-      const ch = header[i];
-      const slice = header.slice(i).toLowerCase();
-      if (!inExpires && slice.startsWith('expires=')) {
-        inExpires = true;
-      }
-      if (inExpires && ch === ';') {
-        inExpires = false;
-      }
-      if (ch === ',' && !inExpires) {
-        parts.push(current);
-        current = '';
-        continue;
-      }
-      current += ch;
-    }
-    if (current.trim()) parts.push(current);
+    // Split on cookie boundaries (comma followed by next key=value), ignoring Expires commas.
+    // Regex: comma + lookahead for "<cookie-name>=<value>".
+    const parts = header.split(/,(?=\s*[^;=]+=[^;]*)/);
 
     const cookies = parts
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
       .map((part) => part.split(';')[0].trim())
       .filter((part) => part.includes('='));
 
