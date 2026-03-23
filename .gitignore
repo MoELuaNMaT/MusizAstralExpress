@@ -36,6 +36,9 @@ src-tauri/Cargo.lock
 .claude/
 .project-memory/
 .vendor/
+.gradle-android/
+.cargo-home/
+.worktrees/
 
 # Python cache
 __pycache__/
