@@ -41,6 +41,36 @@ class AuthService {
     return canUseTauriInvoke();
   }
 
+  private normalizeSetCookieHeader(header: string): string {
+    // Split Set-Cookie safely, keeping expires commas intact.
+    const parts: string[] = [];
+    let current = '';
+    let inExpires = false;
+    for (let i = 0; i < header.length; i += 1) {
+      const ch = header[i];
+      const slice = header.slice(i).toLowerCase();
+      if (!inExpires && slice.startsWith('expires=')) {
+        inExpires = true;
+      }
+      if (inExpires && ch === ';') {
+        inExpires = false;
+      }
+      if (ch === ',' && !inExpires) {
+        parts.push(current);
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    if (current.trim()) parts.push(current);
+
+    const cookies = parts
+      .map((part) => part.split(';')[0].trim())
+      .filter((part) => part.includes('='));
+
+    return cookies.join('; ');
+  }
+
   private appendNeteaseCookie(endpoint: string, cookie?: string | null): string {
     if (this.isTauriRuntime() || !cookie?.trim()) {
       return endpoint;
@@ -150,7 +180,13 @@ class AuthService {
       };
 
       if (this.qqSessionCookie) {
-        headers.Cookie = this.qqSessionCookie;
+        if (this.isTauriRuntime()) {
+          headers.Cookie = this.qqSessionCookie;
+        } else {
+          const bearer = `Bearer ${this.qqSessionCookie}`;
+          headers.Authorization = bearer;
+          headers.token = bearer;
+        }
       }
 
       const response = await fetch(`${QQ_API_CONFIG.baseUrl}${endpoint}`, {
@@ -160,7 +196,9 @@ class AuthService {
 
       const setCookieHeader = response.headers.get('Set-Cookie');
       if (setCookieHeader) {
-        this.qqSessionCookie = setCookieHeader;
+        this.qqSessionCookie = this.isTauriRuntime()
+          ? setCookieHeader
+          : this.normalizeSetCookieHeader(setCookieHeader);
       }
 
       const data = await response.json();
