@@ -1003,8 +1003,9 @@ class AuthService {
         if (setCookieHeader) {
           this.sessionCookie = setCookieHeader;
         }
-        if (typeof (data as { cookie?: unknown }).cookie === 'string') {
-          this.sessionCookie = (data as { cookie?: string }).cookie;
+        const cookieFromBody = (data as { cookie?: unknown }).cookie;
+        if (typeof cookieFromBody === 'string') {
+          this.sessionCookie = cookieFromBody;
         }
 
         if (response.ok && ((data as { code?: number; data?: { code?: number } }).code === 200
