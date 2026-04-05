@@ -9,7 +9,7 @@
  * 3) Search endpoint contract (QQ adapter)
  */
 
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -27,6 +27,7 @@ if (typeof fetch !== 'function') {
 }
 
 const children = [];
+let isStoppingChildren = false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,26 +44,31 @@ function createLogger(prefix, stream) {
 }
 
 function runNpmScript(scriptName, extraEnv = {}) {
-  const child = spawn(`npm run ${scriptName}`, {
+  const command = process.platform === 'win32' ? (process.env.comspec || 'cmd.exe') : 'npm';
+  const args = process.platform === 'win32'
+    ? ['/d', '/s', '/c', `npm run ${scriptName}`]
+    : ['run', scriptName];
+
+  const child = spawn(command, args, {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
       ...extraEnv,
     },
-    shell: true,
+    shell: false,
     windowsHide: true,
   });
 
   child.stdout.on('data', createLogger(scriptName, process.stdout));
   child.stderr.on('data', createLogger(`${scriptName}:err`, process.stderr));
   child.on('exit', (code) => {
-    if (code !== 0) {
+    if (code !== 0 && !isStoppingChildren) {
       process.stderr.write(`[${scriptName}] exited with code ${code}\n`);
     }
   });
 
-  children.push(child);
+  children.push({ scriptName, child });
   return child;
 }
 
@@ -148,28 +154,74 @@ async function ensureServicesReady() {
   });
 }
 
+function killChildTree(child, force = false) {
+  if (!child || child.exitCode !== null || !child.pid) {
+    return;
+  }
+
+  try {
+    if (process.platform === 'win32') {
+      const args = ['/PID', String(child.pid), '/T'];
+      if (force) {
+        args.push('/F');
+      }
+      spawnSync('taskkill', args, { stdio: 'ignore', windowsHide: true });
+      return;
+    }
+
+    child.kill(force ? 'SIGKILL' : 'SIGTERM');
+  } catch {
+    // ignore
+  }
+}
+
+function waitChildClose(child, timeoutMs = 5000) {
+  if (!child || child.exitCode !== null) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve(false);
+      }
+    }, timeoutMs);
+
+    const onClose = () => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve(true);
+      }
+    };
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.removeListener('close', onClose);
+    };
+
+    child.once('close', onClose);
+  });
+}
+
 async function stopChildren() {
   if (children.length === 0) return;
+  isStoppingChildren = true;
 
-  for (const child of children) {
-    try {
-      child.kill('SIGTERM');
-    } catch {
-      // ignore
-    }
+  for (const { child } of children) {
+    killChildTree(child, false);
   }
 
   await sleep(1200);
 
-  for (const child of children) {
-    if (!child.killed) {
-      try {
-        child.kill('SIGKILL');
-      } catch {
-        // ignore
-      }
-    }
+  for (const { child } of children) {
+    killChildTree(child, true);
   }
+
+  await Promise.all(children.map(({ child }) => waitChildClose(child)));
 }
 
 async function main() {

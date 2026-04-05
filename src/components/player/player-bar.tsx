@@ -122,12 +122,21 @@ function RepeatOneIcon({ className = 'h-4 w-4' }: IconProps) {
   );
 }
 
-function VolumeIcon({ className = 'h-4 w-4' }: IconProps) {
+function VolumeIcon({ className = 'h-4 w-4', level = 1, muted = false }: IconProps & { level?: number; muted?: boolean }) {
+  if (muted || level === 0) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M11 5L6 9H3v6h3l5 4V5Z" />
+        <line x1="23" y1="9" x2="17" y2="15" />
+        <line x1="17" y1="9" x2="23" y2="15" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M11 5L6 9H3v6h3l5 4V5Z" />
-      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-      <path d="M18.5 6a8.5 8.5 0 0 1 0 12" />
+      {level >= 0.1 && <path d="M15.5 8.5a5 5 0 0 1 0 7" />}
+      {level >= 0.6 && <path d="M18.5 6a8.5 8.5 0 0 1 0 12" />}
     </svg>
   );
 }
@@ -320,6 +329,7 @@ export function PlayerBar() {
   const [showQueue, setShowQueue] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCoverExpanded, setIsCoverExpanded] = useState(false);
+  const [isVolumePanelOpen, setIsVolumePanelOpen] = useState(false);
   const [detailLyric, setDetailLyric] = useState('');
   const [detailTranslatedLyric, setDetailTranslatedLyric] = useState('');
   const [detailLyricError, setDetailLyricError] = useState<string | null>(null);
@@ -344,6 +354,7 @@ export function PlayerBar() {
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const playMode = usePlayerStore((state) => state.playMode);
   const volume = usePlayerStore((state) => state.volume);
+  const isMuted = usePlayerStore((state) => state.isMuted);
   const currentTime = usePlayerStore((state) => state.currentTime);
   const duration = usePlayerStore((state) => state.duration);
   const isLoading = usePlayerStore((state) => state.isLoading);
@@ -356,6 +367,8 @@ export function PlayerBar() {
   const removeFromQueue = usePlayerStore((state) => state.removeFromQueue);
   const clearQueue = usePlayerStore((state) => state.clearQueue);
   const setVolume = usePlayerStore((state) => state.setVolume);
+  const setIsMuted = usePlayerStore((state) => state.setIsMuted);
+  const toggleMute = usePlayerStore((state) => state.toggleMute);
   const setPlayMode = usePlayerStore((state) => state.setPlayMode);
 
   const { seekTo, retryCurrent } = useAudioPlayer();
@@ -363,6 +376,34 @@ export function PlayerBar() {
   const lyricRequestSeqRef = useRef(0);
   const barLyricRequestSeqRef = useRef(0);
   const activeLyricLineRef = useRef<HTMLParagraphElement | null>(null);
+  const volumePanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isVolumePanelOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (volumePanelRef.current && !volumePanelRef.current.contains(target)) {
+        setIsVolumePanelOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsVolumePanelOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isVolumePanelOpen]);
 
   const playModeLabel = playModeLabelMap[playMode];
   const progressMax = Math.max(duration, 0);
@@ -736,6 +777,62 @@ export function PlayerBar() {
                     </div>
                   )}
                 </div>
+
+                {/* Detail Playback Controls */}
+                <div className="mt-4 border-t border-slate-700 pt-4 md:mt-6">
+                  <div className="am-player-detail-controls-wrap mx-auto max-w-2xl">
+                    <div className="flex flex-col items-center gap-4 md:gap-6">
+                      <div className="flex w-full items-center gap-3">
+                        <span className="w-10 text-right text-xs font-mono text-slate-400">{currentPositionLabel}</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={progressMax || 0}
+                          value={progressValue}
+                          onChange={(event) => seekTo(Number(event.target.value))}
+                          className="am-player-progress-range flex-1"
+                        />
+                        <span className="w-10 text-xs font-mono text-slate-400">{durationLabel}</span>
+                      </div>
+                      <div className="flex w-full flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 md:gap-4">
+                          <Button variant="ghost" size="sm" onClick={playPrevious} className="h-10 w-10 p-0" title="上一首">
+                            <PrevIcon className="h-6 w-6" />
+                          </Button>
+                          <Button variant="primary" size="sm" onClick={togglePlay} disabled={isLoading} className="h-14 w-14 rounded-full p-0 shadow-lg" title={isPlaying ? '暂停' : '播放'}>
+                            {isLoading ? '…' : isPlaying ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8" />}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={playNext} className="h-10 w-10 p-0" title="下一首">
+                            <NextIcon className="h-6 w-6" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 md:gap-8">
+                          <Button variant="ghost" size="sm" onClick={handlePlayModeSwitch} className="flex h-auto flex-col items-center gap-1 py-1" title={playModeLabel}>
+                            <PlayModeIcon mode={playMode} className="h-5 w-5" />
+                            <span className="text-[10px] font-bold uppercase tracking-tighter opacity-70">{playModeLabel}</span>
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" onClick={toggleMute} className="h-9 w-9 p-0" title={isMuted ? '取消静音' : '静音'}>
+                              <VolumeIcon className="h-5 w-5" level={volume} muted={isMuted} />
+                            </Button>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={isMuted ? 0 : Math.round(volume * 100)}
+                              onChange={(event) => {
+                                const v = Number(event.target.value) / 100;
+                                setVolume(v);
+                                if (v > 0 && isMuted) setIsMuted(false);
+                              }}
+                              className="am-player-volume-range w-24 md:w-32"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
           </div>
         </div>
@@ -802,7 +899,7 @@ export function PlayerBar() {
                 </div>
               </button>
 
-              <div className="flex-1 min-w-0 space-y-1 lg:-translate-y-3">
+              <div className="flex-1 min-w-0 space-y-2 lg:-translate-y-3">
                 <div className="space-y-0.5 text-center lg:mb-1" aria-label="播放栏歌词">
                   <p className="truncate text-sm font-semibold tracking-wide text-emerald-200 md:text-base">
                     {barLyricLines.line1}
@@ -821,59 +918,95 @@ export function PlayerBar() {
                     max={progressMax || 0}
                     value={progressValue}
                     onChange={(event) => seekTo(Number(event.target.value))}
-                    className="flex-1 accent-blue-500"
+                    className="am-player-progress-range flex-1"
                   />
                   <span className="w-12 text-xs text-slate-400">{durationLabel}</span>
                 </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePlayModeSwitch}
+                    className="inline-flex items-center gap-1"
+                    title={playModeLabel}
+                    aria-label={playModeLabel}
+                  >
+                    <PlayModeIcon mode={playMode} />
+                    <span className="hidden md:inline">{playModeLabel}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={playPrevious}
+                    className="h-9 w-9 p-0 inline-flex items-center justify-center"
+                    title="上一首"
+                    aria-label="上一首"
+                  >
+                    <PrevIcon />
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={togglePlay}
+                    disabled={isLoading}
+                    className="h-10 w-10 rounded-full p-0 inline-flex items-center justify-center"
+                    title={isPlaying ? '暂停' : '播放'}
+                    aria-label={isPlaying ? '暂停' : '播放'}
+                  >
+                    {isLoading ? '…' : isPlaying ? <PauseIcon /> : <PlayIcon />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={playNext}
+                    className="h-9 w-9 p-0 inline-flex items-center justify-center"
+                    title="下一首"
+                    aria-label="下一首"
+                  >
+                    <NextIcon />
+                  </Button>
+                  <div ref={volumePanelRef} className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsVolumePanelOpen((prev) => !prev)}
+                      className="h-8 w-8 p-0"
+                      title="音量"
+                      aria-label="音量"
+                      aria-expanded={isVolumePanelOpen}
+                    >
+                      <VolumeIcon className="h-4 w-4 shrink-0 text-slate-300" level={volume} muted={isMuted} />
+                    </Button>
+                    {isVolumePanelOpen && (
+                      <div className="absolute bottom-full left-1/2 z-20 mb-2 w-44 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={isMuted ? 0 : Math.round(volume * 100)}
+                          onChange={(event) => {
+                            const v = Number(event.target.value) / 100;
+                            setVolume(v);
+                            if (v <= 0 && !isMuted) {
+                              setIsMuted(true);
+                            }
+                            if (v > 0 && isMuted) {
+                              setIsMuted(false);
+                            }
+                          }}
+                          className="am-player-volume-range w-full"
+                        />
+                        <p className="mt-1 text-right text-[11px] text-slate-400">
+                          {isMuted ? 0 : Math.round(volume * 100)}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-2 lg:w-[380px] lg:pl-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="inline-flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={playPrevious}
-                      className="h-9 w-9 p-0 inline-flex items-center justify-center"
-                      title="上一首"
-                      aria-label="上一首"
-                    >
-                      <PrevIcon />
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={togglePlay}
-                      disabled={isLoading}
-                      className="h-10 w-10 rounded-full p-0 inline-flex items-center justify-center"
-                      title={isPlaying ? '暂停' : '播放'}
-                      aria-label={isPlaying ? '暂停' : '播放'}
-                    >
-                      {isLoading ? '…' : isPlaying ? <PauseIcon /> : <PlayIcon />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={playNext}
-                      className="h-9 w-9 p-0 inline-flex items-center justify-center"
-                      title="下一首"
-                      aria-label="下一首"
-                    >
-                      <NextIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePlayModeSwitch}
-                      className="inline-flex items-center gap-1"
-                      title={playModeLabel}
-                      aria-label={playModeLabel}
-                    >
-                      <PlayModeIcon mode={playMode} />
-                      <span className="hidden md:inline">{playModeLabel}</span>
-                    </Button>
-                  </div>
-
+              <div className="flex flex-col gap-2 lg:w-[260px] lg:pl-2">
+                <div className="flex items-center justify-center lg:justify-end">
                   <div className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900/60 p-0.5">
                     {(Object.keys(lyricDisplayModeLabelMap) as LyricDisplayMode[]).map((mode) => (
                       <Button
@@ -890,53 +1023,39 @@ export function PlayerBar() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  <div className="inline-flex min-w-0 flex-1 items-center gap-2 pr-2">
-                    <VolumeIcon className="h-4 w-4 shrink-0 text-slate-300" />
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={Math.round(volume * 100)}
-                      onChange={(event) => setVolume(Number(event.target.value) / 100)}
-                      className="w-full min-w-[140px] max-w-[220px] accent-blue-500"
-                    />
-                  </div>
-
-                  <div className="inline-flex items-center gap-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={openDetail}
-                      className="h-8 w-8 p-0 inline-flex items-center justify-center"
-                      title="详情"
-                      aria-label="详情"
-                    >
-                      <InfoIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowQueue((prev) => !prev)}
-                      className="inline-flex items-center gap-1 px-2.5"
-                      title={`队列(${queue.length})`}
-                      aria-label={`队列(${queue.length})`}
-                    >
-                      <QueueIcon />
-                      <span className="hidden sm:inline">队列</span>
-                      <span className="text-xs">({queue.length})</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearQueue}
-                      className="h-8 w-8 p-0 inline-flex items-center justify-center"
-                      title="清空队列"
-                      aria-label="清空队列"
-                    >
-                      <TrashIcon />
-                    </Button>
-                  </div>
+                <div className="flex items-center justify-center gap-3 lg:justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={openDetail}
+                    className="h-8 w-8 p-0 inline-flex items-center justify-center"
+                    title="详情"
+                    aria-label="详情"
+                  >
+                    <InfoIcon />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowQueue((prev) => !prev)}
+                    className="inline-flex items-center gap-1 px-2.5"
+                    title={`队列(${queue.length})`}
+                    aria-label={`队列(${queue.length})`}
+                  >
+                    <QueueIcon />
+                    <span className="hidden sm:inline">队列</span>
+                    <span className="text-xs">({queue.length})</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearQueue}
+                    className="h-8 w-8 p-0 inline-flex items-center justify-center"
+                    title="清空队列"
+                    aria-label="清空队列"
+                  >
+                    <TrashIcon />
+                  </Button>
                 </div>
               </div>
             </div>

@@ -26,8 +26,7 @@
           <span class="chip info pulse">当前模式: Glam UX</span>
         </div>
         <div class="status-right">
-          <button class="win-btn" id="switch-classic">切回 Classic UI</button>
-          <button class="win-btn glam" id="toggle-disco">DISCO MODE</button>
+          <button class="win-btn" id="open-ui-switcher">切换主题中心</button>
           <span class="chip warn">快捷键: 1/2/3 切页, 空格 播放/暂停</span>
         </div>
       </div>
@@ -42,13 +41,6 @@
         <div class="sticker">NEW! SHINY SKIN</div>
         <div class="section-title">
           <span>新手 3 步引导：先授权，再同步，再进入主页</span>
-          <button class="win-btn success" id="connect-all">一键连接双平台</button>
-        </div>
-
-        <div class="stepper" role="list">
-          <div class="step active" role="listitem">① 选择平台</div>
-          <div class="step" role="listitem">② 登录授权</div>
-          <div class="step" role="listitem">③ 同步完成</div>
         </div>
 
         <div class="layout-login">
@@ -112,18 +104,17 @@
         <div class="sticker" style="transform:rotate(-8deg);right:auto;left:8px;background:linear-gradient(140deg,#d9efff,#9fe6ff);border-color:#70b1d0;color:#0c4d87;">TRENDING</div>
         <div class="section-title">
           <span>聚合主页：搜索、歌单、歌曲详情一屏完成</span>
-          <span class="chip info" id="home-result-count">结果: 5 首</span>
+          <span class="chip info" id="home-result-count">结果: 加载中</span>
         </div>
 
         <div class="toolbar">
-          <input id="search-input" class="input95" value="周杰伦" aria-label="搜索关键词" />
+          <input id="search-input" class="input95" type="search" value="" aria-label="搜索关键词" placeholder="输入歌曲或歌手关键词" autocomplete="off" />
           <select id="platform-filter" class="select95" aria-label="平台筛选">
             <option value="all">平台: 全部</option>
             <option value="netease">仅网易云</option>
             <option value="qq">仅 QQ</option>
           </select>
           <button class="win-btn primary" id="search-btn">开始搜索</button>
-          <button class="win-btn" id="clear-btn">清空</button>
         </div>
 
         <div class="layout-home">
@@ -145,11 +136,7 @@
                   <tr><th style="width:33%">歌曲</th><th style="width:27%">歌手</th><th style="width:14%">平台</th><th style="width:10%">时长</th><th style="width:16%">操作</th></tr>
                 </thead>
                 <tbody id="song-tbody">
-                  <tr data-track="晴天 - 周杰伦" data-platform="netease"><td>晴天</td><td>周杰伦</td><td><span class="badge netease">网易云</span></td><td>4:29</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
-                  <tr data-track="稻香 - 周杰伦" data-platform="qq"><td>稻香</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>3:43</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
-                  <tr data-track="夜曲 - 周杰伦" data-platform="netease"><td>夜曲</td><td>周杰伦</td><td><span class="badge netease">网易云</span></td><td>3:47</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
-                  <tr data-track="一路向北 - 周杰伦" data-platform="qq"><td>一路向北</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>4:55</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
-                  <tr data-track="告白气球 - 周杰伦" data-platform="qq"><td>告白气球</td><td>周杰伦</td><td><span class="badge qq">QQ</span></td><td>3:35</td><td><button class="win-btn play-now">▶ 播放</button></td></tr>
+                  <tr><td colspan="5" style="text-align:center;color:#666">正在加载混合歌单...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -158,16 +145,12 @@
           <aside class="pane">
             <div class="section-title"><span>歌曲详情</span><span class="chip ok" id="detail-platform">平台: 网易云</span></div>
             <div class="hint">当前选中：</div>
-            <div id="detail-track" style="font-size:13px;color:#0c4d87;">晴天 - 周杰伦</div>
-            <div class="hint" id="detail-album">专辑：叶惠美</div>
+            <div id="detail-track" style="font-size:13px;color:#0c4d87;">等待载入歌曲...</div>
+            <div class="hint" id="detail-album">专辑：--</div>
             <div class="hint">歌词预览：</div>
-            <div class="list-box" id="detail-lyric" style="padding:8px;line-height:1.6;font-size:12px;">
-              故事的小黄花 从出生那年就飘着<br />
-              童年的荡秋千 随记忆一直晃到现在<br />
-              你说你会哭 不是因为在乎
-            </div>
+            <div class="list-box" id="detail-lyric"></div>
             <div class="row">
-              <button class="win-btn">♥ 收藏</button>
+              <button class="win-btn" id="like-selected" type="button">♡ 收藏</button>
               <button class="win-btn">刷新歌词</button>
             </div>
           </aside>
@@ -176,7 +159,6 @@
         <div class="sticky-actions">
           <div class="hint">建议路径：先选歌单 → 再筛选平台 → 最后点击播放</div>
           <div style="display:flex;gap:8px;">
-            <button class="win-btn" id="batch-like">批量收藏</button>
             <button class="win-btn primary" id="play-selected">播放所选</button>
           </div>
         </div>
@@ -184,9 +166,10 @@
         <div class="home-playbar">
           <div class="home-play-left">
             <span class="chip info">播放栏</span>
-            <span class="home-play-title" id="home-nowplaying">晴天 - 周杰伦</span>
+            <span class="home-play-title" id="home-nowplaying">等待播放</span>
           </div>
           <div class="home-play-actions">
+            <button class="win-btn" id="home-play-mode" title="切换播放模式">➡️</button>
             <button class="win-btn" id="home-prev">⏮</button>
             <button class="win-btn primary" id="home-play-toggle">⏸</button>
             <button class="win-btn" id="home-next">⏭</button>
@@ -207,7 +190,7 @@
       <section id="page-player" class="view-page">
         <div class="section-title">
           <span>播放器：更炫光谱 + 进度拖动 + 队列切歌</span>
-          <span class="chip info" id="now-title">晴天 - 周杰伦</span>
+          <span class="chip info" id="now-title">等待播放</span>
         </div>
 
         <div class="layout-player">
@@ -237,7 +220,7 @@
 
           <article class="pane glow">
             <div class="section-title"><span>播放控制</span><span class="chip warn" id="play-state-chip">状态: 播放中</span></div>
-            <div class="marquee-box"><marquee id="track-marq" scrollamount="4">NOW PLAYING: 晴天 - 周杰伦 · ALLMusic Glam Mode</marquee></div>
+            <div class="marquee-box"><marquee id="track-marq" scrollamount="4">NOW PLAYING: Waiting for queue · ALLMusic Glam Mode</marquee></div>
 
             <div class="progress-row">
               <span id="current-time">01:36</span>
@@ -245,24 +228,23 @@
               <span id="total-time">04:29</span>
             </div>
 
-            <div class="progress-row">
+            <div class="progress-row volume-row">
               <span>音量</span>
               <input id="volume" class="volume-input" type="range" min="0" max="100" value="76" />
               <span id="volume-label">76%</span>
             </div>
 
             <div class="controls">
-              <button class="win-btn">⏮</button>
+              <button class="win-btn" id="player-play-mode" title="切换播放模式">➡️</button>
+              <button class="win-btn" id="player-prev">⏮</button>
               <button id="toggle-play" class="win-btn primary">⏸</button>
-              <button class="win-btn">⏭</button>
+              <button class="win-btn" id="player-next">⏭</button>
               <button class="win-btn glam">✨</button>
             </div>
 
             <div class="section-title"><span>播放队列</span><span class="chip" id="queue-count">共 3 首</span></div>
             <div class="list-box" id="queue-list">
-              <button class="item active clickable" data-track="晴天 - 周杰伦" type="button"><span>1. 晴天 - 周杰伦</span><span>播放中</span></button>
-              <button class="item clickable" data-track="稻香 - 周杰伦" type="button"><span>2. 稻香 - 周杰伦</span><span>下一首</span></button>
-              <button class="item clickable" data-track="夜曲 - 周杰伦" type="button"><span>3. 夜曲 - 周杰伦</span><span>队列中</span></button>
+              <div class="hint" style="padding:8px;">队列加载中...</div>
             </div>
 
             <div class="hotkeys">

@@ -1,0 +1,79 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K AF - 桌面登录</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M17 17h4v4h-4z"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 1 0-.7-7.9A5.5 5.5 0 0 0 5 12.2 3.8 3.8 0 0 0 7 18z"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-head">
+      <a class="badge-link" href="./desktop-login.html"><span class="dot"></span><span>ALLMusic Y2K (ArtFate Ref) / Desktop Login</span></a>
+      <div class="meta">页面：<a href="./desktop-home.html">主界面</a> · <a href="./desktop-player.html">播放页</a> · <a href="./mobile-login.html">移动端</a></div>
+    </div>
+
+    <div class="desktop">
+      <span class="float-decor a"></span><span class="float-decor b"></span>
+      <section class="win">
+        <div class="win-header">
+          <div class="win-title"><svg class="icon"><use href="#i-star"/></svg><span>ALLMusic 千禧登录中心 (2003 Skin)</span></div>
+          <div class="win-actions"><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="win-body" style="padding:16px">
+          <div style="display:grid;grid-template-columns:1.05fr .95fr;gap:12px">
+            <section class="block">
+              <h3><svg class="icon"><use href="#i-user"/></svg>账号登录</h3>
+              <div class="toolbar" role="tablist" aria-label="登录方式">
+                <button class="btn primary"><svg class="icon"><use href="#i-cloud"/></svg>网易云</button>
+                <button class="btn"><svg class="icon"><use href="#i-cloud"/></svg>QQ音乐</button>
+                <button class="btn"><svg class="icon"><use href="#i-qr"/></svg>二维码</button>
+              </div>
+
+              <div style="display:grid;gap:8px">
+                <label class="input"><svg class="icon"><use href="#i-user"/></svg><input value="138****6666" aria-label="账号" /></label>
+                <label class="input"><svg class="icon"><use href="#i-lock"/></svg><input type="password" value="********" aria-label="密码" /></label>
+                <div class="toolbar">
+                  <button class="btn primary"><svg class="icon"><use href="#i-user"/></svg>登录并同步</button>
+                  <button class="btn"><svg class="icon"><use href="#i-star"/></svg>记住皮肤</button>
+                </div>
+              </div>
+
+              <div class="star-row" style="margin-top:10px">
+                <span class="star">Candy Color</span>
+                <span class="star">Chrome Plastic</span>
+                <span class="star">Future Retro</span>
+              </div>
+            </section>
+
+            <section class="block">
+              <h3><svg class="icon"><use href="#i-qr"/></svg>扫码面板</h3>
+              <div style="border:1px solid var(--line-soft);border-radius:12px;padding:12px;background:var(--glass-soft)">
+                <div style="width:190px;height:190px;margin:0 auto;border-radius:12px;border:1px solid var(--line);background:repeating-linear-gradient(90deg,#fff,#fff 8px,#111 8px,#111 16px)"></div>
+                <p class="meta" style="text-align:center;margin:10px 0 0">请用网易云/QQ音乐 App 扫码</p>
+                <p class="meta" style="text-align:center;margin:6px 0 0">状态：等待确认...</p>
+              </div>
+
+              <div class="chips" style="margin-top:10px">
+                <span class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>乐观主义色彩</span>
+                <span class="chip warn"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>技术乌托邦</span>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

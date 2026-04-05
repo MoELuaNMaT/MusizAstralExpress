@@ -1,76 +1,38 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
-import type { UnifiedSong, PlayMode } from '@/types';
+import type { UnifiedSong, PlayMode, PreferredQuality, PlayerState } from '@/types';
+import { getSongLikeKey } from '@/utils/home.utils';
 
-/**
- * Player store state
- */
-interface PlayerState {
-  /** Current playing song */
-  currentSong: UnifiedSong | null;
-  /** Play queue */
-  queue: UnifiedSong[];
-  /** Current queue index */
-  currentIndex: number;
-  /** Is playing */
-  isPlaying: boolean;
-  /** Play mode */
-  playMode: PlayMode;
-  /** Volume (0-1) */
-  volume: number;
-  /** Current playback position (ms) */
-  currentTime: number;
-  /** Total duration (ms) */
-  duration: number;
-  /** Is buffering/loading */
-  isLoading: boolean;
-  /** Playback error message */
-  error: string | null;
-}
-
-/**
- * Player store actions
- */
 interface PlayerActions {
-  /** Set current song */
   setCurrentSong: (song: UnifiedSong | null) => void;
-  /** Set play queue */
   setQueue: (songs: UnifiedSong[], startIndex?: number) => void;
-  /** Add songs to queue */
   addToQueue: (songs: UnifiedSong[]) => void;
-  /** Remove song from queue */
   removeFromQueue: (index: number) => void;
-  /** Clear queue */
   clearQueue: () => void;
-  /** Play song at index */
   playAt: (index: number) => void;
-  /** Play next song */
   playNext: () => void;
-  /** Play previous song */
   playPrevious: () => void;
-  /** Toggle play/pause */
   togglePlay: () => void;
-  /** Set playing state */
   setIsPlaying: (isPlaying: boolean) => void;
-  /** Set play mode */
   setPlayMode: (mode: PlayMode) => void;
-  /** Set volume */
   setVolume: (volume: number) => void;
-  /** Set current time */
+  setIsMuted: (isMuted: boolean) => void;
+  toggleMute: () => void;
   setCurrentTime: (time: number) => void;
-  /** Set total duration */
   setDuration: (duration: number) => void;
-  /** Set loading state */
   setIsLoading: (isLoading: boolean) => void;
-  /** Set playback error */
   setError: (error: string | null) => void;
-  /** Reset player */
+  setPreferredQuality: (quality: PreferredQuality) => void;
+  updateCurrentSongLiked: (isLiked: boolean) => void;
+  updateSongLikedByKey: (
+    song: Pick<UnifiedSong, 'platform' | 'originalId' | 'qqSongId' | 'qqSongMid'>,
+    isLiked: boolean,
+  ) => void;
+  pushHistory: (song: UnifiedSong) => void;
+  clearHistory: () => void;
   reset: () => void;
 }
 
-/**
- * Initial state
- */
 const initialState: PlayerState = {
   currentSong: null,
   queue: [],
@@ -82,6 +44,9 @@ const initialState: PlayerState = {
   duration: 0,
   isLoading: false,
   error: null,
+  preferredQuality: '320',
+  history: [],
+  isMuted: false,
 };
 
 const PLAYER_STORE_KEY = 'allmusic_player_v1';
@@ -119,22 +84,34 @@ function randomNextIndex(currentIndex: number, queueLength: number): number {
   if (queueLength <= 1) {
     return Math.max(0, currentIndex);
   }
+  const offset = 1 + Math.floor(Math.random() * (queueLength - 1));
+  return (currentIndex + offset) % queueLength;
+}
 
-  let nextIndex = currentIndex;
-  for (let i = 0; i < 5; i += 1) {
-    const candidate = Math.floor(Math.random() * queueLength);
-    if (candidate !== currentIndex) {
-      nextIndex = candidate;
-      break;
+function patchSongsLikedByKey(
+  songs: UnifiedSong[],
+  likeKey: string,
+  isLiked: boolean,
+): { songs: UnifiedSong[]; changed: boolean } {
+  let changed = false;
+  const nextSongs = songs.map((song) => {
+    if (getSongLikeKey(song) !== likeKey || Boolean(song.isLiked) === isLiked) {
+      return song;
     }
-  }
-  return nextIndex;
+    changed = true;
+    return { ...song, isLiked };
+  });
+
+  return {
+    songs: changed ? nextSongs : songs,
+    changed,
+  };
 }
 
 /**
  * Player store
  */
-export const usePlayerStore = create<PlayerState & PlayerActions>()(persist((set, get) => ({
+export const usePlayerStore = create<PlayerState & PlayerActions>()(persist((set) => ({
   ...initialState,
 
   setCurrentSong: (song) =>
@@ -306,6 +283,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(persist((set
 
   setVolume: (volume) => set({ volume: Math.max(0, Math.min(1, volume)) }),
 
+  setIsMuted: (isMuted) => set({ isMuted }),
+
+  toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
+
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
 
   setDuration: (duration) => set({ duration: Math.max(0, duration) }),
@@ -314,14 +295,63 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(persist((set
 
   setError: (error) => set({ error }),
 
-  reset: () => {
-    const state = get();
-    if (state.currentSong || state.queue.length > 0 || state.isPlaying) {
-      set(initialState);
-      return;
-    }
-    set(initialState);
-  },
+  setPreferredQuality: (quality) => set({ preferredQuality: quality }),
+
+  updateCurrentSongLiked: (isLiked) =>
+    set((state) => {
+      if (!state.currentSong) {
+        return state;
+      }
+
+      const likeKey = getSongLikeKey(state.currentSong);
+      const nextCurrentSong = Boolean(state.currentSong.isLiked) === isLiked
+        ? state.currentSong
+        : { ...state.currentSong, isLiked };
+      const queuePatch = patchSongsLikedByKey(state.queue, likeKey, isLiked);
+      const historyPatch = patchSongsLikedByKey(state.history, likeKey, isLiked);
+
+      if (!queuePatch.changed && !historyPatch.changed && nextCurrentSong === state.currentSong) {
+        return state;
+      }
+
+      return {
+        currentSong: nextCurrentSong,
+        queue: queuePatch.songs,
+        history: historyPatch.songs,
+      };
+    }),
+
+  updateSongLikedByKey: (song, isLiked) =>
+    set((state) => {
+      const likeKey = getSongLikeKey(song);
+      const queuePatch = patchSongsLikedByKey(state.queue, likeKey, isLiked);
+      const historyPatch = patchSongsLikedByKey(state.history, likeKey, isLiked);
+
+      const nextCurrentSong = state.currentSong
+        && getSongLikeKey(state.currentSong) === likeKey
+        && Boolean(state.currentSong.isLiked) !== isLiked
+        ? { ...state.currentSong, isLiked }
+        : state.currentSong;
+
+      if (!queuePatch.changed && !historyPatch.changed && nextCurrentSong === state.currentSong) {
+        return state;
+      }
+
+      return {
+        currentSong: nextCurrentSong,
+        queue: queuePatch.songs,
+        history: historyPatch.songs,
+      };
+    }),
+
+  pushHistory: (song) =>
+    set((state) => ({
+      history: [song, ...state.history.filter((item) => item.id !== song.id)].slice(0, 100),
+    })),
+
+  clearHistory: () => set({ history: [] }),
+
+  reset: () => set(initialState),
 }), {
   name: PLAYER_STORE_KEY,
   storage: createJSONStorage(resolvePlayerStorage),
@@ -330,6 +360,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(persist((set
     currentIndex: state.currentIndex,
     playMode: state.playMode,
     volume: state.volume,
+    isMuted: state.isMuted,
+    preferredQuality: state.preferredQuality,
+    history: state.history.slice(0, 100),
   }),
   merge: (persistedState, currentState) => {
     const persisted = persistedState as Partial<PlayerState>;
@@ -346,6 +379,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(persist((set
       currentSong: currentIndex >= 0 ? queue[currentIndex] : null,
       playMode: persisted.playMode || currentState.playMode,
       volume: typeof persisted.volume === 'number' ? persisted.volume : currentState.volume,
+      isMuted: typeof persisted.isMuted === 'boolean' ? persisted.isMuted : currentState.isMuted,
+      preferredQuality: persisted.preferredQuality || currentState.preferredQuality,
+      history: Array.isArray(persisted.history) ? persisted.history.slice(0, 100) : currentState.history,
       isPlaying: false,
       currentTime: 0,
       duration: 0,

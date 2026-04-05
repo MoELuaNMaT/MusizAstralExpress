@@ -23,8 +23,16 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // Reduce watcher pressure from generated/artifact directories in local dev.
+      ignored: [
+        "**/src-tauri/**",
+        "**/dist/**",
+        "**/dist-portable/**",
+        "**/artifacts/**",
+        "**/release/**",
+        "**/design/**",
+        "**/research_add_time/**",
+      ],
     },
   },
 }));

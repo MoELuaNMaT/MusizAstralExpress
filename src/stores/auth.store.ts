@@ -1,12 +1,10 @@
 import { create } from 'zustand';
 import type { UnifiedUser, MusicPlatform } from '@/types';
 import { invoke } from '@tauri-apps/api/core';
+import { canUseTauriInvoke } from '@/lib/runtime';
 
 const AUTH_FALLBACK_STORAGE_KEY = 'allmusic_auth_fallback_v1';
 
-/**
- * Tauri-stored user credential structure
- */
 interface StoredAuthUser {
   platform: string;
   user_id: string;
@@ -20,51 +18,34 @@ interface StoredCredentials {
   cookie: string;
 }
 
-/**
- * Auth store state
- */
 interface AuthState {
-  /** Logged in users */
   users: Record<MusicPlatform, UnifiedUser | null>;
-  /** Cookies for each platform */
   cookies: Record<MusicPlatform, string | null>;
-  /** Is any user logged in */
-  isAuthenticated: boolean;
-  /** Is loading from storage */
   isLoading: boolean;
 }
 
-/**
- * Auth store actions
- */
 interface AuthActions {
-  /** Load stored credentials on app start */
   loadStoredCredentials: () => Promise<void>;
-  /** Set user login state */
   setUser: (platform: MusicPlatform, user: UnifiedUser, cookie: string) => Promise<void>;
-  /** Remove user (logout) */
   removeUser: (platform: MusicPlatform) => Promise<void>;
-  /** Update user cookie */
   updateCookie: (platform: MusicPlatform, cookie: string) => void;
-  /** Clear all auth data */
   clearAll: () => Promise<void>;
-  /** Check if platform is logged in */
   isPlatformLoggedIn: (platform: MusicPlatform) => boolean;
-  /** Get all logged in platforms */
   getLoggedInPlatforms: () => MusicPlatform[];
-}
-
-function canUseTauriInvoke(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const tauriInternals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__;
-  return typeof tauriInternals?.invoke === 'function';
 }
 
 function isValidPlatform(platform: string): platform is MusicPlatform {
   return platform === 'netease' || platform === 'qq';
+}
+
+const OBFUSCATION_KEY = 'ALLMusic_v1';
+
+function xorObfuscate(input: string, key: string): string {
+  const chars: string[] = [];
+  for (let i = 0; i < input.length; i += 1) {
+    chars.push(String.fromCharCode(input.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+  }
+  return chars.join('');
 }
 
 function readFallbackCredentials(): StoredCredentials[] {
@@ -78,7 +59,15 @@ function readFallbackCredentials(): StoredCredentials[] {
       return [];
     }
 
-    const parsed = JSON.parse(raw) as StoredCredentials[];
+    let json: string;
+    try {
+      json = xorObfuscate(atob(raw), OBFUSCATION_KEY);
+    } catch {
+      // Fallback: try reading as plain JSON for migration from old format
+      json = raw;
+    }
+
+    const parsed = JSON.parse(json) as StoredCredentials[];
     if (!Array.isArray(parsed)) {
       return [];
     }
@@ -102,7 +91,8 @@ function writeFallbackCredentials(credentials: StoredCredentials[]): void {
     return;
   }
 
-  localStorage.setItem(AUTH_FALLBACK_STORAGE_KEY, JSON.stringify(credentials));
+  const json = JSON.stringify(credentials);
+  localStorage.setItem(AUTH_FALLBACK_STORAGE_KEY, btoa(xorObfuscate(json, OBFUSCATION_KEY)));
 }
 
 function toStoredAuthUser(platform: MusicPlatform, user: UnifiedUser): StoredAuthUser {
@@ -115,9 +105,20 @@ function toStoredAuthUser(platform: MusicPlatform, user: UnifiedUser): StoredAut
   };
 }
 
-/**
- * Convert stored user to unified user
- */
+function upsertFallbackCredential(platform: MusicPlatform, user: UnifiedUser, cookie: string): void {
+  const current = readFallbackCredentials().filter((item) => item.user.platform !== platform);
+  current.push({
+    user: toStoredAuthUser(platform, user),
+    cookie,
+  });
+  writeFallbackCredentials(current);
+}
+
+function removeFallbackCredential(platform: MusicPlatform): void {
+  const current = readFallbackCredentials().filter((item) => item.user.platform !== platform);
+  writeFallbackCredentials(current);
+}
+
 function toUnifiedUser(stored: StoredAuthUser): UnifiedUser {
   return {
     platform: stored.platform as MusicPlatform,
@@ -128,9 +129,9 @@ function toUnifiedUser(stored: StoredAuthUser): UnifiedUser {
   };
 }
 
-/**
- * Auth store
- */
+export const selectIsAuthenticated = (state: AuthState) =>
+  Boolean(state.users.netease || state.users.qq);
+
 export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   // State
   users: {
@@ -141,15 +142,20 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     netease: null,
     qq: null,
   },
-  isAuthenticated: false,
   isLoading: true,
 
   // Actions
   loadStoredCredentials: async () => {
     try {
-      const stored: StoredCredentials[] = canUseTauriInvoke()
-        ? await invoke('get_all_auth')
-        : readFallbackCredentials();
+      let stored: StoredCredentials[] = readFallbackCredentials();
+
+      if (canUseTauriInvoke()) {
+        try {
+          stored = await invoke<StoredCredentials[]>('get_all_auth');
+        } catch (error) {
+          console.warn('Failed to read Tauri auth store, fallback to local storage:', error);
+        }
+      }
 
       const users: Record<MusicPlatform, UnifiedUser | null> = {
         netease: null,
@@ -168,9 +174,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         }
       }
 
-      const isAuthenticated = Object.values(users).some((u) => u !== null);
-
-      set({ users, cookies, isAuthenticated, isLoading: false });
+      set({ users, cookies, isLoading: false });
     } catch (error) {
       console.error('Failed to load stored credentials:', error);
       set({ isLoading: false });
@@ -179,27 +183,30 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   setUser: async (platform, user, cookie) => {
     try {
+      let shouldPersistFallback = !canUseTauriInvoke();
+
       if (canUseTauriInvoke()) {
-        await invoke('store_auth', {
-          platform,
-          userId: user.userId,
-          nickname: user.nickname,
-          avatarUrl: user.avatarUrl,
-          cookie,
-        });
-      } else {
-        const current = readFallbackCredentials().filter((item) => item.user.platform !== platform);
-        current.push({
-          user: toStoredAuthUser(platform, user),
-          cookie,
-        });
-        writeFallbackCredentials(current);
+        try {
+          await invoke('store_auth', {
+            platform,
+            userId: user.userId,
+            nickname: user.nickname,
+            avatarUrl: user.avatarUrl,
+            cookie,
+          });
+        } catch (error) {
+          console.warn('Failed to persist auth to Tauri store, fallback to local storage:', error);
+          shouldPersistFallback = true;
+        }
+      }
+
+      if (shouldPersistFallback) {
+        upsertFallbackCredential(platform, user, cookie);
       }
 
       set((state) => ({
         users: { ...state.users, [platform]: user },
         cookies: { ...state.cookies, [platform]: cookie },
-        isAuthenticated: true,
       }));
     } catch (error) {
       console.error('Failed to store auth:', error);
@@ -210,23 +217,18 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   removeUser: async (platform) => {
     try {
       if (canUseTauriInvoke()) {
-        await invoke('remove_auth', { platform });
-      } else {
-        const current = readFallbackCredentials().filter((item) => item.user.platform !== platform);
-        writeFallbackCredentials(current);
+        try {
+          await invoke('remove_auth', { platform });
+        } catch (error) {
+          console.warn('Failed to remove auth from Tauri store, fallback to local storage:', error);
+        }
       }
+      removeFallbackCredential(platform);
 
-      set((state) => {
-        const newUsers = { ...state.users, [platform]: null };
-        const newCookies = { ...state.cookies, [platform]: null };
-        const hasLoggedIn = Object.values(newUsers).some((u) => u !== null);
-
-        return {
-          users: newUsers,
-          cookies: newCookies,
-          isAuthenticated: hasLoggedIn,
-        };
-      });
+      set((state) => ({
+          users: { ...state.users, [platform]: null },
+          cookies: { ...state.cookies, [platform]: null },
+        }));
     } catch (error) {
       console.error('Failed to remove auth:', error);
       throw error;
@@ -241,15 +243,17 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   clearAll: async () => {
     try {
       if (canUseTauriInvoke()) {
-        await invoke('clear_all_auth');
-      } else {
-        writeFallbackCredentials([]);
+        try {
+          await invoke('clear_all_auth');
+        } catch (error) {
+          console.warn('Failed to clear Tauri auth store, fallback to local storage:', error);
+        }
       }
+      writeFallbackCredentials([]);
 
       set({
         users: { netease: null, qq: null },
         cookies: { netease: null, qq: null },
-        isAuthenticated: false,
       });
     } catch (error) {
       console.error('Failed to clear auth:', error);

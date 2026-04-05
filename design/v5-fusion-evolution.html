@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic V5 - Fusion Evolution Design</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass-bg: rgba(15, 23, 42, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #00ecff;
+            --accent-secondary: #9b4dff;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+            background: #020617;
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(0, 236, 255, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(155, 77, 255, 0.15) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(30, 41, 59, 0.5) 0px, transparent 50%);
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .active-nav-item {
+            background: linear-gradient(90deg, rgba(0, 236, 255, 0.15) 0%, transparent 100%);
+            border-left: 3px solid var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .search-input-wrap:focus-within {
+            box-shadow: 0 0 0 2px rgba(0, 236, 255, 0.3);
+        }
+
+        /* 隐藏滚动条但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { 
+            background: rgba(255, 255, 255, 0.1); 
+            border-radius: 10px; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+        .song-row-active {
+            background: rgba(0, 236, 255, 0.08);
+            border-color: rgba(0, 236, 255, 0.2);
+        }
+
+        .playback-bar-blur {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(32px);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* 渐变文本 */
+        .text-gradient {
+            background: linear-gradient(135deg, #00ecff 0%, #9b4dff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 状态图标动画 */
+        .playing-bars span {
+            display: inline-block;
+            width: 3px;
+            background: var(--accent-primary);
+            margin-right: 1px;
+            animation: bounce 0.6s infinite alternate;
+        }
+        @keyframes bounce {
+            from { height: 4px; }
+            to { height: 12px; }
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden">
+
+    <!-- 侧边导航栏 -->
+    <aside class="w-64 glass-panel flex flex-col z-50">
+        <div class="p-8">
+            <h1 class="text-2xl font-bold tracking-tight text-gradient">ALLMusic</h1>
+            <p class="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-semibold">Evolution Engine</p>
+        </div>
+
+        <nav class="flex-1 px-4 space-y-1">
+            <div class="text-[11px] font-bold text-slate-500 uppercase px-4 mb-2 tracking-widest">Main</div>
+            <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl active-nav-item transition-all duration-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                <span class="text-sm font-medium">发现音乐</span>
+            </a>
+            <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <span class="text-sm font-medium">聚合库</span>
+            </a>
+            <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="text-sm font-medium">最近播放</span>
+            </a>
+
+            <div class="pt-8 pb-2 text-[11px] font-bold text-slate-500 uppercase px-4 tracking-widest">Library</div>
+            <div class="px-2 space-y-1 overflow-y-auto no-scrollbar max-h-64">
+                <a href="#" class="flex items-center justify-between px-4 py-2 text-xs text-slate-400 hover:text-white group">
+                    <span class="truncate">我喜欢的音乐</span>
+                    <span class="opacity-0 group-hover:opacity-100 transition-opacity">❤️</span>
+                </a>
+                <a href="#" class="flex items-center justify-between px-4 py-2 text-xs text-slate-400 hover:text-white group">
+                    <span class="truncate">深夜专注 Playlist</span>
+                    <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">24首</span>
+                </a>
+                <a href="#" class="flex items-center justify-between px-4 py-2 text-xs text-slate-400 hover:text-white group">
+                    <span class="truncate">2026 年度总结</span>
+                    <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">100首</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="p-6 border-t border-white/5">
+            <div class="flex items-center gap-3 p-3 glass-card rounded-2xl cursor-pointer">
+                <img src="https://p.qlogo.cn/gh/0/0/100" class="w-10 h-10 rounded-full border-2 border-cyan-500/30" />
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold truncate">Binaryify</p>
+                    <p class="text-[10px] text-emerald-400 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        双平台已连接
+                    </p>
+                </div>
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        
+        <!-- 顶部搜索栏 -->
+        <header class="h-20 flex items-center justify-between px-10 z-40 bg-transparent">
+            <div class="flex items-center gap-6 flex-1 max-w-2xl">
+                <div class="flex gap-2">
+                    <button class="w-8 h-8 flex items-center justify-center rounded-full glass-card text-slate-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button class="w-8 h-8 flex items-center justify-center rounded-full glass-card text-slate-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="relative flex-1 group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <svg class="w-4 h-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" 
+                        class="w-full h-11 bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 text-sm focus:outline-none focus:bg-white/10 focus:border-cyan-500/50 transition-all placeholder:text-slate-600" 
+                        placeholder="搜索 歌曲、艺人、歌单...">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 glass-card px-3 py-1.5 rounded-full text-xs font-medium">
+                    <span class="text-rose-400">N</span>
+                    <span class="w-px h-3 bg-white/10"></span>
+                    <span class="text-emerald-400">Q</span>
+                    <span class="ml-1 text-slate-400">服务正常</span>
+                </div>
+                <button class="w-10 h-10 flex items-center justify-center rounded-full glass-card relative">
+                    <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    <span class="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#020617]"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 滚动内容区 -->
+        <div class="flex-1 overflow-y-auto px-10 pb-32 custom-scrollbar">
+            
+            <!-- 英雄推荐位 -->
+            <section class="mt-4 mb-10">
+                <div class="relative h-64 rounded-3xl overflow-hidden glass-card group">
+                    <img src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=1200" 
+                         class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700">
+                    <div class="absolute inset-0 bg-gradient-to-r from-[#020617] via-transparent to-transparent"></div>
+                    <div class="relative h-full flex flex-col justify-center px-12 space-y-4">
+                        <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase tracking-widest rounded-full w-fit">每日推荐</span>
+                        <h2 class="text-4xl font-extrabold tracking-tight">发现属于你的<br><span class="text-gradient">音乐新维度</span></h2>
+                        <div class="flex gap-4 pt-2">
+                            <button class="px-6 py-2.5 bg-white text-slate-900 rounded-full font-bold text-sm hover:scale-105 transition-all">立即播放</button>
+                            <button class="px-6 py-2.5 glass-card rounded-full font-bold text-sm hover:bg-white/10 transition-all">收藏歌单</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 歌单列表与歌曲预览 -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                
+                <!-- 歌曲列表列 -->
+                <div class="xl:col-span-2 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold">最近热门</h3>
+                        <a href="#" class="text-xs text-cyan-400 hover:underline">查看全部</a>
+                    </div>
+
+                    <div class="space-y-1">
+                        <!-- 歌曲行模版 -->
+                        <div class="flex items-center gap-4 px-4 py-3 rounded-2xl border border-transparent hover:glass-card group transition-all cursor-pointer">
+                            <div class="w-6 text-xs text-slate-600 font-medium group-hover:hidden">01</div>
+                            <div class="w-6 hidden group-hover:flex items-center justify-center">
+                                <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=100" class="w-12 h-12 rounded-xl object-cover shadow-lg">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold truncate group-hover:text-cyan-400 transition-colors">晴天</p>
+                                <p class="text-xs text-slate-500 truncate mt-0.5">周杰伦 · 叶惠美</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded border border-red-500/20 text-[9px] text-red-400/80 font-bold">NETEASE</span>
+                                <span class="text-xs text-slate-600 font-mono">04:29</span>
+                            </div>
+                            <div class="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity pl-4">
+                                <button class="text-slate-400 hover:text-rose-500 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                                </button>
+                                <button class="text-slate-400 hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 播放中状态 -->
+                        <div class="flex items-center gap-4 px-4 py-3 rounded-2xl border glass-card song-row-active group transition-all cursor-pointer">
+                            <div class="w-6 flex items-center justify-center playing-bars">
+                                <span style="animation-delay: 0.1s"></span>
+                                <span style="animation-delay: 0.3s"></span>
+                                <span style="animation-delay: 0.2s"></span>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=100" class="w-12 h-12 rounded-xl object-cover shadow-lg">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold truncate text-cyan-400">稻香</p>
+                                <p class="text-xs text-slate-400 truncate mt-0.5">周杰伦 · 魔杰座</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded border border-emerald-500/20 text-[9px] text-emerald-400/80 font-bold">QQ MUSIC</span>
+                                <span class="text-xs text-slate-400 font-mono">03:43</span>
+                            </div>
+                            <div class="flex items-center gap-3 pl-4">
+                                <button class="text-rose-500">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                                </button>
+                                <button class="text-slate-400 hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4 px-4 py-3 rounded-2xl border border-transparent hover:glass-card group transition-all cursor-pointer">
+                            <div class="w-6 text-xs text-slate-600 font-medium group-hover:hidden">03</div>
+                            <div class="w-6 hidden group-hover:flex items-center justify-center">
+                                <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1459749411177-042180ce673c?auto=format&fit=crop&q=80&w=100" class="w-12 h-12 rounded-xl object-cover shadow-lg">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold truncate group-hover:text-cyan-400 transition-colors">一路向北</p>
+                                <p class="text-xs text-slate-500 truncate mt-0.5">周杰伦 · 11月的萧邦</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded border border-emerald-500/20 text-[9px] text-emerald-400/80 font-bold">QQ MUSIC</span>
+                                <span class="text-xs text-slate-600 font-mono">04:55</span>
+                            </div>
+                            <div class="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity pl-4">
+                                <button class="text-slate-400 hover:text-rose-500 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                                </button>
+                                <button class="text-slate-400 hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 推荐列表列 -->
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold">聚合推荐</h3>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="glass-card rounded-3xl p-4 flex flex-col gap-4 cursor-pointer">
+                            <div class="relative group">
+                                <img src="https://images.unsplash.com/photo-1514525253361-bee8718a7439?auto=format&fit=crop&q=80&w=200" class="w-full aspect-square rounded-2xl object-cover">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                                    <button class="w-10 h-10 bg-cyan-400 text-slate-900 rounded-full flex items-center justify-center shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-all">
+                                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold truncate">私人雷达</h4>
+                                <p class="text-[10px] text-slate-500 mt-1">根据你的双平台听歌习惯生成</p>
+                            </div>
+                        </div>
+
+                        <div class="glass-card rounded-3xl p-4 flex flex-col gap-4 cursor-pointer">
+                            <div class="relative group">
+                                <img src="https://images.unsplash.com/photo-1496293455970-f8581aae0e3c?auto=format&fit=crop&q=80&w=200" class="w-full aspect-square rounded-2xl object-cover">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                                    <button class="w-10 h-10 bg-cyan-400 text-slate-900 rounded-full flex items-center justify-center shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-all">
+                                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold truncate">华语流行经典</h4>
+                                <p class="text-[10px] text-slate-500 mt-1">902,342 次播放</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 动态状态卡片 -->
+                    <div class="glass-card rounded-3xl p-6 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border-white/10">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold">听歌报告现已更新</h4>
+                                <p class="text-[11px] text-slate-400">查看你在 2026 年 2 月的音乐足迹</p>
+                            </div>
+                        </div>
+                        <button class="w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition-all">立即查看</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 悬浮播放控制条 -->
+        <footer class="absolute bottom-6 left-10 right-10 h-24 playback-bar-blur rounded-[32px] px-8 flex items-center justify-between shadow-2xl z-[100]">
+            
+            <!-- 左侧歌曲信息 -->
+            <div class="flex items-center gap-4 w-72">
+                <div class="relative group cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=100" class="w-14 h-14 rounded-2xl object-cover shadow-lg">
+                    <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-2xl transition-opacity">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    </div>
+                </div>
+                <div class="min-w-0">
+                    <h5 class="text-sm font-bold truncate">稻香</h5>
+                    <p class="text-xs text-slate-400 truncate mt-0.5">周杰伦</p>
+                </div>
+                <button class="ml-2 text-slate-500 hover:text-rose-500 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                </button>
+            </div>
+
+            <!-- 中间播放控制 -->
+            <div class="flex-1 max-w-2xl flex flex-col items-center gap-3">
+                <div class="flex items-center gap-8">
+                    <button class="text-slate-500 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                    <button class="text-slate-300 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path></svg>
+                    </button>
+                    <button class="w-12 h-12 bg-white text-slate-900 rounded-full flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
+                    </button>
+                    <button class="text-slate-300 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>
+                    </button>
+                    <button class="text-slate-500 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="w-full flex items-center gap-3">
+                    <span class="text-[10px] text-slate-500 font-mono w-10 text-right">01:36</span>
+                    <div class="flex-1 h-1 bg-white/10 rounded-full relative group cursor-pointer">
+                        <div class="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full"></div>
+                        <div class="absolute top-1/2 left-1/3 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform"></div>
+                    </div>
+                    <span class="text-[10px] text-slate-500 font-mono w-10">03:43</span>
+                </div>
+            </div>
+
+            <!-- 右侧功能控制 -->
+            <div class="flex items-center justify-end gap-6 w-72">
+                <div class="flex items-center gap-2 group">
+                    <button class="text-slate-500 group-hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                    </button>
+                    <div class="w-20 h-1 bg-white/10 rounded-full relative overflow-hidden">
+                        <div class="absolute inset-y-0 left-0 w-3/4 bg-slate-300 rounded-full"></div>
+                    </div>
+                </div>
+                <button class="text-slate-500 hover:text-white transition-colors" title="播放队列">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                </button>
+                <button class="text-slate-500 hover:text-cyan-400 transition-colors" title="歌词">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </button>
+            </div>
+        </footer>
+
+    </main>
+
+</body>
+</html>

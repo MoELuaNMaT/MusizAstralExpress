@@ -1,0 +1,66 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K AF - 移动主界面</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.8 12 4l9 6.8"/><path d="M6.5 9.8V20h11V9.8"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.3A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 6v12l10-6z"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-head">
+      <a class="badge-link" href="./mobile-home.html"><span class="dot"></span><span>ALLMusic Y2K (ArtFate Ref) / Mobile Home</span></a>
+      <div class="meta">页面：<a href="./mobile-login.html">登录页</a> · <a href="./mobile-player.html">播放页</a> · <a href="./desktop-home.html">桌面端</a></div>
+    </div>
+
+    <div class="phone-wrap" style="grid-template-columns:minmax(280px,420px)">
+      <article class="phone">
+        <div class="screen">
+          <div class="notch"></div>
+          <div class="m-head"><span>9:41</span><span>5G · 88%</span></div>
+
+          <section class="m-win">
+            <div class="win-header" style="min-height:36px"><div class="win-title"><svg class="icon"><use href="#i-home"/></svg><span>主界面</span></div></div>
+            <div class="m-body" style="display:grid;gap:8px">
+              <label class="input"><svg class="icon"><use href="#i-search"/></svg><input value="晴天 周杰伦"/></label>
+              <div class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>双平台连接正常</div>
+              <div class="m-list">
+                <div class="m-item"><span style="display:inline-flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-heart"/></svg>双平台我喜欢</span><span class="meta">1028</span></div>
+                <div class="m-item"><span style="display:inline-flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>网易云我喜欢</span><span class="meta">620</span></div>
+                <div class="m-item"><span style="display:inline-flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>QQ 我喜欢</span><span class="meta">408</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="m-win">
+            <div class="win-header" style="min-height:34px"><div class="win-title"><svg class="icon"><use href="#i-play"/></svg><span>正在播放</span></div></div>
+            <div class="m-body">
+              <div class="m-item" style="background:rgba(0,232,255,.1)"><span style="display:inline-flex;align-items:center;gap:8px"><svg class="icon"><use href="#i-disc"/></svg>晴天 - 周杰伦</span><span class="meta">01:36</span></div>
+              <div class="progress" style="margin-top:10px"><span style="width:41%"></span></div>
+              <div class="star-row" style="margin-top:8px"><span class="star">QQ space spark</span><span class="star">retro ui</span></div>
+            </div>
+          </section>
+
+          <nav class="tabbar">
+            <button class="active"><svg class="icon"><use href="#i-home"/></svg></button>
+            <button><svg class="icon"><use href="#i-search"/></svg></button>
+            <button><svg class="icon"><use href="#i-play"/></svg></button>
+            <button><svg class="icon"><use href="#i-heart"/></svg></button>
+          </nav>
+        </div>
+      </article>
+    </div>
+  </div>
+</body>
+</html>

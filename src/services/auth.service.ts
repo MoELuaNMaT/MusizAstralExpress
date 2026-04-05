@@ -9,31 +9,22 @@ import type {
   MusicPlatform,
   UnifiedUser,
 } from '@/types';
-import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
-
-/**
- * NetEase API endpoints configuration
- */
-const NETEASE_API_CONFIG = {
-  baseUrl: getNeteaseApiBaseUrl(),
-  timeout: 30000,
-};
-
-const QQ_API_CONFIG = {
-  baseUrl: getQQApiBaseUrl(),
-  timeout: 30000,
-};
+import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/config/platform.config';
+import { normalizeImageUrl } from '@/lib/image-url';
 
 /**
  * Authentication Service
  */
 class AuthService {
-  private apiBase: string;
   private sessionCookie: string | null = null;
   private qqSessionCookie: string | null = null;
 
-  constructor() {
-    this.apiBase = NETEASE_API_CONFIG.baseUrl;
+  private getNeteaseApiBase(): string {
+    return getNeteaseApiBaseUrl();
+  }
+
+  private getQQApiBase(): string {
+    return getQQApiBaseUrl();
   }
 
   /**
@@ -55,7 +46,8 @@ class AuthService {
         headers['Cookie'] = this.sessionCookie;
       }
 
-      const response = await fetch(`${this.apiBase}${endpoint}`, {
+      const neteaseApiBase = this.getNeteaseApiBase();
+      const response = await fetch(`${neteaseApiBase}${endpoint}`, {
         ...options,
         headers,
       });
@@ -102,7 +94,7 @@ class AuthService {
       return {
         success: false,
         error: isConnectionIssue
-          ? `\u65e0\u6cd5\u8fde\u63a5\u7f51\u6613\u4e91\u63a5\u53e3\uff08${NETEASE_API_CONFIG.baseUrl}\uff09\uff0c\u8bf7\u786e\u8ba4 API \u670d\u52a1\u5df2\u542f\u52a8\u3002`
+          ? `\u65e0\u6cd5\u8fde\u63a5\u7f51\u6613\u4e91\u63a5\u53e3\uff08${this.getNeteaseApiBase()}\uff09\uff0c\u8bf7\u786e\u8ba4 API \u670d\u52a1\u5df2\u542f\u52a8\u3002`
           : message,
       };
     }
@@ -145,7 +137,8 @@ class AuthService {
         headers.Cookie = this.qqSessionCookie;
       }
 
-      const response = await fetch(`${QQ_API_CONFIG.baseUrl}${endpoint}`, {
+      const qqApiBase = this.getQQApiBase();
+      const response = await fetch(`${qqApiBase}${endpoint}`, {
         ...options,
         headers,
       });
@@ -189,7 +182,7 @@ class AuthService {
       return {
         success: false,
         error: isConnectionIssue
-          ? `\u65e0\u6cd5\u8fde\u63a5 QQ \u63a5\u53e3\uff08${QQ_API_CONFIG.baseUrl}\uff09\uff0c\u8bf7\u786e\u8ba4 QQ API \u670d\u52a1\u5df2\u542f\u52a8\u3002`
+          ? `\u65e0\u6cd5\u8fde\u63a5 QQ \u63a5\u53e3\uff08${this.getQQApiBase()}\uff09\uff0c\u8bf7\u786e\u8ba4 QQ API \u670d\u52a1\u5df2\u542f\u52a8\u3002`
           : message,
       };
     }
@@ -235,10 +228,10 @@ class AuthService {
     if (hint.includes('success') || hint.includes('\u767b\u5f55\u6210\u529f') || hint.includes('\u786e\u8ba4\u6210\u529f') || hint.includes('authorized')) {
       return 803;
     }
-    if (hint.includes('confirm') || hint.includes('???') || hint.includes('???') || hint.includes('???')) {
+    if (hint.includes('confirm') || hint.includes('确认') || hint.includes('扫码') || hint.includes('授权')) {
       return 802;
     }
-    if (hint.includes('expired') || hint.includes('??')) {
+    if (hint.includes('expired') || hint.includes('过期') || hint.includes('失效')) {
       return 800;
     }
     return 801;
@@ -281,7 +274,7 @@ class AuthService {
         platform: 'netease',
         userId: String(account.id),
         nickname: profile.nickname,
-        avatarUrl: profile.avatarUrl || '',
+        avatarUrl: normalizeImageUrl(profile.avatarUrl) || '',
         isLoggedIn: true,
       },
       cookie,
@@ -319,7 +312,7 @@ class AuthService {
         platform: 'netease',
         userId: String(account.id),
         nickname: profile.nickname,
-        avatarUrl: profile.avatarUrl || '',
+        avatarUrl: normalizeImageUrl(profile.avatarUrl) || '',
         isLoggedIn: true,
       },
       cookie,
@@ -404,7 +397,6 @@ class AuthService {
       { signal, cache: 'no-store' },
       true
     );
-    console.log('Raw QR check response:', response);
 
     if (response.success && response.data) {
       const data = response.data as any;
@@ -463,7 +455,6 @@ class AuthService {
     }
 
     const createResponse = await this.neteaseCreateQRCode(signal);
-    console.log('QR Code Response:', createResponse);
 
     if (!createResponse.success || !createResponse.data) {
       return {
@@ -473,8 +464,6 @@ class AuthService {
     }
 
     let { unikey, qrurl, qrimg } = createResponse.data;
-    console.log('QR Code URL:', qrurl);
-    console.log('QR Code IMG:', qrimg);
 
     // Use qrimg (base64) if available, otherwise use qrurl
     const displayUrl = qrimg || qrurl;
@@ -497,14 +486,12 @@ class AuthService {
       const checkResponse = await this.neteaseCheckQRCode(unikey, signal);
 
       if (!checkResponse.success || !checkResponse.data) {
-        console.log('Check failed, waiting 1s...');
         await this.delay(1000);
         attempts++;
         continue;
       }
 
-      const { code, cookie, message } = checkResponse.data;
-      console.log(`QR Status: ${code} (${code === 801 ? 'Waiting for scan' : code === 802 ? 'Scanned, waiting confirm' : code === 803 ? 'Confirmed!' : code === 800 ? 'Expired' : 'Unknown'})`, message || '');
+      const { code, cookie } = checkResponse.data;
 
       switch (code) {
         case 801:
@@ -538,7 +525,6 @@ class AuthService {
           };
         case 803:
           onStatusChange?.('已确认，正在登录...');
-          console.log('Login confirmed! Fetching user account info...');
 
           if (!cookie) {
             return {
@@ -562,7 +548,6 @@ class AuthService {
                 { signal },
                 true
               );
-              console.log('Account response:', accountResponse);
 
               if (accountResponse.success && accountResponse.data) {
                 const accountData = accountResponse.data as any;
@@ -596,7 +581,6 @@ class AuthService {
             error: '已确认登录，但获取用户信息失败，请重试。',
           };
         default:
-          console.log('Unknown code:', code);
       }
 
       await this.delay(1000);
@@ -903,7 +887,7 @@ class AuthService {
 
     for (const endpoint of endpoints) {
       try {
-        const response = await fetch(`${QQ_API_CONFIG.baseUrl}${endpoint}`, {
+        const response = await fetch(`${this.getQQApiBase()}${endpoint}`, {
           headers: authHeaders,
         });
 
@@ -935,7 +919,7 @@ class AuthService {
           return {
             userId: String(userId || this.extractQQUserId(cookie)),
             nickname: nickname || 'QQ \u97f3\u4e50\u7528\u6237',
-            avatarUrl: profile?.avatarUrl || profile?.avatar || profile?.headpic || '',
+            avatarUrl: normalizeImageUrl(profile?.avatarUrl || profile?.avatar || profile?.headpic) || '',
           };
         }
       } catch {
@@ -951,26 +935,67 @@ class AuthService {
    * Verify login status
    */
   async verifyLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
+    try {
+      if (platform === 'netease') {
+        const response = await fetch(`${this.getNeteaseApiBase()}/login/status`, {
+          headers: { Cookie: cookie },
+          cache: 'no-store',
+        });
+        const data = await response.json().catch(() => ({}));
+        return data.data?.code === 200 || data.code === 200;
+      }
+
+      if (platform === 'qq') {
+        if (!cookie?.trim()) {
+          return false;
+        }
+
+        const profile = await this.fetchQQProfile(cookie);
+        if (profile) {
+          return true;
+        }
+
+        // Fallback: if cookie contains key auth tokens, treat as logged in for local mode.
+        return this.hasQQAuthTokens(cookie);
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Try to renew login session in background.
+   */
+  async renewLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
+    if (!cookie?.trim()) {
+      return false;
+    }
+
     if (platform === 'netease') {
-      const response = await fetch(`${this.apiBase}/login/status`, {
-        headers: { Cookie: cookie },
-      });
-      const data = await response.json();
-      return data.data?.code === 200 || data.code === 200;
+      try {
+        const response = await fetch(`${this.getNeteaseApiBase()}/login/refresh?timestamp=${Date.now()}`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+          cache: 'no-store',
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && (data.code === 200 || data.data?.code === 200)) {
+          return true;
+        }
+      } catch {
+        // Ignore refresh endpoint errors and fallback to a direct status verification.
+      }
+
+      // Some local API deployments do not support /login/refresh reliably.
+      // If login status is still valid, do not treat this as renew failure.
+      return this.verifyLogin('netease', cookie);
     }
 
     if (platform === 'qq') {
-      if (!cookie?.trim()) {
-        return false;
-      }
-
-      const profile = await this.fetchQQProfile(cookie);
-      if (profile) {
-        return true;
-      }
-
-      // Fallback: if cookie contains key auth tokens, treat as logged in for local mode.
-      return this.hasQQAuthTokens(cookie);
+      // QQ 本地 cookie 登录当前无统一 refresh 接口，这里退化为可用性检查。
+      return this.verifyLogin('qq', cookie);
     }
 
     return false;
@@ -981,7 +1006,7 @@ class AuthService {
    */
   async getUserInfo(platform: MusicPlatform, cookie: string): Promise<UnifiedUser | null> {
     if (platform === 'netease') {
-      const response = await fetch(`${this.apiBase}/user/account`, {
+      const response = await fetch(`${this.getNeteaseApiBase()}/user/account`, {
         headers: { Cookie: cookie },
       });
       const data = await response.json();
@@ -1028,7 +1053,7 @@ class AuthService {
    */
   async logout(platform: MusicPlatform, cookie: string): Promise<boolean> {
     if (platform === 'netease') {
-      const response = await fetch(`${this.apiBase}/logout`, {
+      const response = await fetch(`${this.getNeteaseApiBase()}/logout`, {
         method: 'POST',
         headers: { Cookie: cookie },
       });

@@ -2,7 +2,9 @@
   const BRIDGE_WAIT_TIMEOUT = 8000;
   const PLAYER_SYNC_INTERVAL = 800;
   const AUTH_SYNC_INTERVAL = 8000;
-  const UI_VERSION_STORAGE_KEY = 'allmusic_ui_version_v1';
+  const LOCAL_API_READY_EVENT = 'allmusic:local-api-ready';
+  const BRIDGE_CACHE_UPDATED_EVENT = 'allmusic:bridge-cache-updated';
+  const OPEN_UI_SWITCHER_EVENT = 'allmusic:open-ui-switcher';
 
   const tabs = Array.from(document.querySelectorAll('.top-tabs .win-btn'));
   const pages = {
@@ -27,12 +29,11 @@
 
   const searchInputEl = document.getElementById('search-input');
   const searchBtnEl = document.getElementById('search-btn');
-  const clearBtnEl = document.getElementById('clear-btn');
   const platformFilterEl = document.getElementById('platform-filter');
 
   const connectAllEl = document.getElementById('connect-all');
   const playSelectedEl = document.getElementById('play-selected');
-  const batchLikeEl = document.getElementById('batch-like');
+  const likeSelectedEl = document.getElementById('like-selected');
   const neteaseQrBoxEl = document.getElementById('ne-qr-box');
   const neteasePhoneEl = document.getElementById('ne-phone');
   const neteasePassEl = document.getElementById('ne-pass');
@@ -76,11 +77,13 @@
 
   const homePrevEl = document.getElementById('home-prev');
   const homeNextEl = document.getElementById('home-next');
+  const homePlayModeEl = document.getElementById('home-play-mode');
+  const playerPlayModeEl = document.getElementById('player-play-mode');
 
   const clockEl = document.getElementById('clock');
   const trayTimeEl = document.getElementById('tray-time');
   const toggleDiscoEl = document.getElementById('toggle-disco');
-  const switchClassicEl = document.getElementById('switch-classic');
+  const openUiSwitcherEl = document.getElementById('open-ui-switcher');
 
   const quickStatusLeftEl = document.querySelector('.quick-status .status-left');
 
@@ -96,9 +99,18 @@
     lyricMode: 'original',
     lyricCache: Object.create(null),
     lyricPending: Object.create(null),
+    detailLyricSongId: '',
+    detailLyricMode: 'original',
+    detailLyricTimeline: [],
+    detailLyricRowEls: [],
+    detailLyricActiveIndex: -1,
+    detailLyricScrollRafId: 0,
+    detailLyricLastScrollTop: -1,
     currentPlayerSong: null,
     currentPlayerTimeMs: 0,
+    playMode: 'sequential',
     lastLocalApiReadyAt: 0,
+    lastBridgeCacheRefreshAt: 0,
   };
 
   let toastTimer = null;
@@ -130,19 +142,18 @@
     return false;
   }
 
-  async function switchUiVersion(nextVersion) {
+  async function requestOpenUiSwitcher() {
     const bridge = resolveBridge();
-    if (bridge && typeof bridge.switchUiVersion === 'function') {
-      await bridge.switchUiVersion(nextVersion);
+    if (bridge && typeof bridge.openUiSwitcher === 'function') {
+      await bridge.openUiSwitcher();
       return;
     }
 
-    window.localStorage.setItem(UI_VERSION_STORAGE_KEY, nextVersion);
     if (window.parent && window.parent !== window) {
-      window.parent.location.reload();
+      window.parent.postMessage({ type: OPEN_UI_SWITCHER_EVENT }, '*');
       return;
     }
-    window.location.reload();
+    window.dispatchEvent(new CustomEvent(OPEN_UI_SWITCHER_EVENT));
   }
 
   function showToast(message) {
@@ -473,15 +484,106 @@
     return task;
   }
 
-  function renderLyricPreview(lines) {
-    if (!detailLyricEl) {
+  function buildDetailLyricView(song, lyricEntry) {
+    if (!detailLyricEl) return;
+
+    const songId = song ? song.id : '';
+    state.detailLyricSongId = songId;
+    state.detailLyricTimeline = [];
+    state.detailLyricRowEls = [];
+    state.detailLyricActiveIndex = -1;
+    state.detailLyricLastScrollTop = -1;
+
+    if (!song || !lyricEntry) {
+      detailLyricEl.innerHTML = '<div class="hint" style="padding:16px;text-align:center;">No lyrics available</div>';
       return;
     }
-    if (!lines || lines.length === 0) {
-      detailLyricEl.innerHTML = '<div class="hint">No lyric preview</div>';
+
+    const timeline = (lyricEntry.originalTimeline && lyricEntry.originalTimeline.length > 0)
+      ? lyricEntry.originalTimeline
+      : (lyricEntry.translatedTimeline || []);
+
+    state.detailLyricTimeline = timeline;
+
+    if (timeline.length === 0) {
+      const lines = lyricEntry.originalLines.length > 0 ? lyricEntry.originalLines : lyricEntry.translatedLines;
+      if (lines.length === 0) {
+        detailLyricEl.innerHTML = '<div class="hint" style="padding:16px;text-align:center;">No lyrics available</div>';
+      } else {
+        detailLyricEl.innerHTML = lines.map(line => `<div class="detail-lyric-line">${escapeHtml(line)}</div>`).join('');
+      }
       return;
     }
-    detailLyricEl.innerHTML = lines.map((line) => escapeHtml(line)).join('<br />');
+
+    const fragment = document.createDocumentFragment();
+    const topSpacer = document.createElement('div');
+    topSpacer.className = 'lyric-spacer';
+    fragment.appendChild(topSpacer);
+
+    timeline.forEach((item, index) => {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'detail-lyric-line';
+      lineEl.textContent = item.text;
+      state.detailLyricRowEls.push(lineEl);
+      fragment.appendChild(lineEl);
+    });
+
+    const bottomSpacer = document.createElement('div');
+    bottomSpacer.className = 'lyric-spacer';
+    fragment.appendChild(bottomSpacer);
+
+    detailLyricEl.innerHTML = '';
+    detailLyricEl.appendChild(fragment);
+    detailLyricEl.scrollTop = 0;
+  }
+
+  function getActiveLyricIndex(timeline, currentTimeMs, hintIndex) {
+    if (!timeline || timeline.length === 0) return -1;
+    const target = Math.max(0, currentTimeMs);
+    if (hintIndex >= 0 && hintIndex < timeline.length) {
+      if (target >= timeline[hintIndex].timeMs) {
+        if (hintIndex === timeline.length - 1 || target < timeline[hintIndex + 1].timeMs) return hintIndex;
+        if (hintIndex + 1 < timeline.length && target >= timeline[hintIndex + 1].timeMs) {
+          if (hintIndex + 2 >= timeline.length || target < timeline[hintIndex + 2].timeMs) return hintIndex + 1;
+        }
+      }
+    }
+    let low = 0, high = timeline.length - 1, ans = -1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (timeline[mid].timeMs <= target) { ans = mid; low = mid + 1; }
+      else high = mid - 1;
+    }
+    return ans;
+  }
+
+  function syncDetailLyricByTime(currentSong, currentTimeMs) {
+    if (!detailLyricEl || !state.detailLyricTimeline.length || !currentSong || currentSong.id !== state.detailLyricSongId) return;
+    const nextIndex = getActiveLyricIndex(state.detailLyricTimeline, currentTimeMs, state.detailLyricActiveIndex);
+    if (nextIndex === state.detailLyricActiveIndex) return;
+    if (state.detailLyricActiveIndex >= 0 && state.detailLyricRowEls[state.detailLyricActiveIndex]) {
+      state.detailLyricRowEls[state.detailLyricActiveIndex].classList.remove('is-active');
+    }
+    state.detailLyricActiveIndex = nextIndex;
+    if (nextIndex >= 0 && state.detailLyricRowEls[nextIndex]) {
+      const activeEl = state.detailLyricRowEls[nextIndex];
+      activeEl.classList.add('is-active');
+      if (state.detailLyricScrollRafId) cancelAnimationFrame(state.detailLyricScrollRafId);
+      state.detailLyricScrollRafId = requestAnimationFrame(() => {
+        const containerHeight = detailLyricEl.clientHeight;
+        const lineTop = activeEl.offsetTop;
+        const lineHeight = activeEl.offsetHeight;
+        const safeScrollTop = Math.max(0, lineTop - (containerHeight / 2) + (lineHeight / 2));
+        if (Math.abs(safeScrollTop - state.detailLyricLastScrollTop) > 0.5) {
+          detailLyricEl.scrollTo({
+            top: safeScrollTop,
+            behavior: 'smooth'
+          });
+          state.detailLyricLastScrollTop = safeScrollTop;
+        }
+        state.detailLyricScrollRafId = 0;
+      });
+    }
   }
 
   function updateCurrentTrackDisplay(song) {
@@ -500,8 +602,8 @@
     const qqConnected = Boolean(authState && authState.users && authState.users.qq);
 
     quickStatusLeftEl.innerHTML = [
-      `<span class="chip ${neteaseConnected ? 'ok' : 'warn'}">NetEase: ${neteaseConnected ? 'Connected' : 'Offline'}</span>`,
-      `<span class="chip ${qqConnected ? 'ok' : 'warn'}">QQ: ${qqConnected ? 'Connected' : 'Offline'}</span>`,
+      `<button class="chip ${neteaseConnected ? 'ok' : 'warn'}" type="button" data-relogin="netease" title="点击重新登录 NetEase">NetEase: ${neteaseConnected ? 'Connected' : 'Offline'}</button>`,
+      `<button class="chip ${qqConnected ? 'ok' : 'warn'}" type="button" data-relogin="qq" title="点击重新登录 QQ">QQ: ${qqConnected ? 'Connected' : 'Offline'}</button>`,
       '<span class="chip info pulse">Mode: Glam UX</span>',
     ].join('');
   }
@@ -826,6 +928,15 @@
     if (detailAlbumEl) {
       detailAlbumEl.textContent = `Album: ${song && song.album ? song.album : 'Unknown Album'}`;
     }
+    if (likeSelectedEl) {
+      if (!song) {
+        likeSelectedEl.textContent = '♡ 收藏';
+        likeSelectedEl.disabled = true;
+        return;
+      }
+      likeSelectedEl.disabled = false;
+      likeSelectedEl.textContent = song.isLiked ? '♥ 已收藏' : '♡ 收藏';
+    }
   }
 
   async function refreshLyricPreview(song) {
@@ -833,7 +944,7 @@
     const requestToken = state.lyricRequestToken;
 
     if (!song) {
-      renderLyricPreview([]);
+      buildDetailLyricView(null, null);
       return;
     }
 
@@ -843,14 +954,11 @@
     }
 
     if (!lyricEntry) {
-      renderLyricPreview([]);
+      buildDetailLyricView(null, null);
       return;
     }
 
-    const lines = lyricEntry.originalLines.length > 0
-      ? lyricEntry.originalLines.slice(0, 5)
-      : lyricEntry.translatedLines.slice(0, 5);
-    renderLyricPreview(lines);
+    buildDetailLyricView(song, lyricEntry);
   }
 
   function selectSongByIndex(index) {
@@ -882,7 +990,7 @@
       }
       state.selectedSongIndex = -1;
       updateSongDetail(null);
-      renderLyricPreview([]);
+      refreshLyricPreview(null);
       return;
     }
 
@@ -945,10 +1053,14 @@
     renderSongTable();
   }
 
-  async function selectPlaylistEntry(entryId) {
+  async function selectPlaylistEntry(entryId, options) {
+    const silent = Boolean(options && options.silent);
+    const forceRefresh = Boolean(options && options.forceRefresh);
     const bridge = resolveBridge();
     if (!bridge) {
-      showToast('Bridge not ready');
+      if (!silent) {
+        showToast('Bridge not ready');
+      }
       return;
     }
 
@@ -959,19 +1071,21 @@
 
     state.currentEntryId = entry.id;
     renderPlaylistList();
-    setStatus(`Loading: ${entry.name}`);
+    if (!silent) {
+      setStatus(`Loading: ${entry.name}`);
+    }
 
     try {
       let nextSongs = [];
       let warning = '';
 
       if (entry.entryType === 'daily') {
-        const daily = await bridge.loadDailyRecommendations(60);
+        const daily = await bridge.loadDailyRecommendations({ limit: 30, forceRefresh });
         nextSongs = Array.isArray(daily && daily.songs) ? daily.songs : [];
         state.latestDailyCount = nextSongs.length;
         warning = Array.isArray(daily && daily.warnings) ? daily.warnings[0] || '' : '';
       } else {
-        const detail = await bridge.loadPlaylistDetail(entry);
+        const detail = await bridge.loadPlaylistDetail(entry, { silent, forceRefresh });
         nextSongs = Array.isArray(detail && detail.songs) ? detail.songs : [];
         warning = detail && detail.warning ? String(detail.warning) : '';
       }
@@ -979,48 +1093,89 @@
       state.allSongs = nextSongs;
       applyPlatformFilter();
       renderPlaylistList();
-      setStatus(`Loaded: ${entry.name}`);
-      showToast(`Loaded ${entry.name} (${nextSongs.length})`);
-      if (warning) {
+      if (!silent) {
+        setStatus(`Loaded: ${entry.name}`);
+        showToast(`Loaded ${entry.name} (${nextSongs.length})`);
+      }
+      if (warning && !silent) {
         showToast(warning);
       }
     } catch (error) {
       state.allSongs = [];
       state.visibleSongs = [];
       renderSongTable();
-      setStatus('Load failed');
-      showToast(error instanceof Error ? error.message : 'Playlist load failed');
+      if (!silent) {
+        setStatus('Load failed');
+        showToast(error instanceof Error ? error.message : 'Playlist load failed');
+      } else {
+        console.warn('[ALLMusic][V4] playlist detail silent refresh failed:', error);
+      }
     }
   }
 
-  async function loadPlaylists() {
+  async function loadPlaylists(options) {
+    const silent = Boolean(options && options.silent);
+    const forceRefresh = Boolean(options && options.forceRefresh);
     const bridge = resolveBridge();
     if (!bridge || typeof bridge.loadPlaylists !== 'function') {
       return;
     }
 
     try {
-      setStatus('Loading playlists');
-      const result = await bridge.loadPlaylists();
+      if (!silent) {
+        setStatus('Loading playlists');
+      }
+      const result = await bridge.loadPlaylists({ silent, forceRefresh });
       state.playlistEntries = buildPlaylistEntries(result && result.playlists);
       renderPlaylistList();
 
-      if (result && Array.isArray(result.warnings) && result.warnings[0]) {
+      if (!silent && result && Array.isArray(result.warnings) && result.warnings[0]) {
         showToast(result.warnings[0]);
       }
 
+      const selected = state.playlistEntries.find((entry) => entry.id === state.currentEntryId);
       const merged = state.playlistEntries.find((entry) => entry.id === 'merged_liked');
-      const first = merged || state.playlistEntries[0];
+      const first = selected || merged || state.playlistEntries[0];
       if (first) {
-        await selectPlaylistEntry(first.id);
+        await selectPlaylistEntry(first.id, { silent, forceRefresh });
       } else {
         state.allSongs = [];
         state.visibleSongs = [];
         renderSongTable();
       }
     } catch (error) {
-      setStatus('Playlist load failed');
-      showToast(error instanceof Error ? error.message : 'Playlist load failed');
+      if (!silent) {
+        setStatus('Playlist load failed');
+        showToast(error instanceof Error ? error.message : 'Playlist load failed');
+      } else {
+        console.warn('[ALLMusic][V4] playlists silent refresh failed:', error);
+      }
+    }
+  }
+
+  async function handleBridgeCacheUpdated(payload) {
+    if (!payload || payload.type !== BRIDGE_CACHE_UPDATED_EVENT) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - state.lastBridgeCacheRefreshAt < 400) {
+      return;
+    }
+    state.lastBridgeCacheRefreshAt = now;
+
+    if (payload.resource === 'playlists') {
+      if (!state.currentEntryId) {
+        return;
+      }
+      await loadPlaylists({ silent: true });
+      return;
+    }
+
+    if (payload.resource === 'playlist-detail' || payload.resource === 'daily-recommend') {
+      if (state.currentEntryId) {
+        await selectPlaylistEntry(state.currentEntryId, { silent: true });
+      }
     }
   }
 
@@ -1139,6 +1294,44 @@
     }
   }
 
+  function updatePlayModeUI(mode) {
+    const modeMap = {
+      sequential: { icon: '➡️', title: '顺序播放' },
+      loop: { icon: '🔁', title: '列表循环' },
+      shuffle: { icon: '🔀', title: '随机播放' },
+      'loop-one': { icon: '🔂', title: '单曲循环' },
+    };
+    const info = modeMap[mode] || modeMap.sequential;
+    if (homePlayModeEl) {
+      homePlayModeEl.textContent = info.icon;
+      homePlayModeEl.title = info.title;
+    }
+    if (playerPlayModeEl) {
+      playerPlayModeEl.textContent = info.icon;
+      playerPlayModeEl.title = info.title;
+    }
+  }
+
+  async function cyclePlayMode() {
+    const bridge = resolveBridge();
+    if (!bridge || typeof bridge.setPlayMode !== 'function') {
+      return;
+    }
+
+    const modes = ['sequential', 'loop', 'shuffle', 'loop-one'];
+    const currentIdx = modes.indexOf(state.playMode);
+    const nextMode = modes[(currentIdx + 1) % modes.length];
+
+    try {
+      await bridge.setPlayMode(nextMode);
+      state.playMode = nextMode;
+      updatePlayModeUI(nextMode);
+      showToast(`播放模式: ${nextMode.toUpperCase()}`);
+    } catch (error) {
+      console.error('[V4 Glam] set play mode failed:', error);
+    }
+  }
+
   function syncProgress(currentMs, durationMs) {
     const totalMs = Math.max(0, Number(durationMs) || 0);
     const safeCurrentMs = Math.max(0, Math.min(totalMs || Number.MAX_SAFE_INTEGER, Number(currentMs) || 0));
@@ -1197,7 +1390,13 @@
       updatePlayStateUI(playerState && playerState.isPlaying, playerState && playerState.isLoading);
       syncProgress(playerState && playerState.currentTime, playerState && playerState.duration);
       renderQueue(playerState && playerState.queue, playerState && playerState.currentIndex);
+      syncDetailLyricByTime(currentSong, currentTimeMs);
       syncSelectedSongByCurrentSong(currentSong);
+
+      if (playerState && playerState.playMode && playerState.playMode !== state.playMode) {
+        state.playMode = playerState.playMode;
+        updatePlayModeUI(state.playMode);
+      }
 
       if (volumeEl) {
         const volumePercent = Math.round((Number(playerState && playerState.volume) || 0) * 100);
@@ -1233,12 +1432,13 @@
     }
 
     try {
-      const result = await bridge.likeSong(selectedSong, true);
+      const nextLikeState = !selectedSong.isLiked;
+      const result = await bridge.likeSong(selectedSong, nextLikeState);
       if (result && result.success) {
-        selectedSong.isLiked = true;
+        selectedSong.isLiked = nextLikeState;
         renderSongTable();
         selectSongByIndex(state.selectedSongIndex);
-        showToast(`Liked: ${selectedSong.name}`);
+        showToast(`${nextLikeState ? 'Liked' : 'Unliked'}: ${selectedSong.name}`);
       } else {
         showToast((result && result.warning) || 'Like failed');
       }
@@ -1275,10 +1475,10 @@
       });
     }
 
-    if (clearBtnEl) {
-      clearBtnEl.addEventListener('click', () => {
-        if (searchInputEl) {
-          searchInputEl.value = '';
+    if (searchInputEl) {
+      searchInputEl.addEventListener('search', () => {
+        if (searchInputEl.value.trim()) {
+          return;
         }
         if (state.currentEntryId) {
           void selectPlaylistEntry(state.currentEntryId);
@@ -1304,8 +1504,8 @@
       });
     }
 
-    if (batchLikeEl) {
-      batchLikeEl.addEventListener('click', () => {
+    if (likeSelectedEl) {
+      likeSelectedEl.addEventListener('click', () => {
         void likeSelectedSong();
       });
     }
@@ -1340,10 +1540,27 @@
       });
     }
 
-    if (switchClassicEl) {
-      switchClassicEl.addEventListener('click', async () => {
-        showToast('Switching to Classic UI...');
-        await switchUiVersion('current');
+    if (openUiSwitcherEl) {
+      openUiSwitcherEl.addEventListener('click', async () => {
+        showToast('Opening theme center...');
+        await requestOpenUiSwitcher();
+      });
+    }
+
+    if (quickStatusLeftEl) {
+      quickStatusLeftEl.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const reloginButton = target.closest('[data-relogin]');
+        if (!(reloginButton instanceof HTMLElement)) {
+          return;
+        }
+        const platform = reloginButton.getAttribute('data-relogin') || 'platform';
+        go('login');
+        setStatus('已切换到登录页，请重新授权。');
+        showToast(`Re-login ${platform.toUpperCase()} in Login tab`);
       });
     }
 
@@ -1405,9 +1622,23 @@
       });
     }
 
-    const controlButtons = document.querySelectorAll('.controls .win-btn');
-    if (controlButtons[0]) {
-      controlButtons[0].addEventListener('click', async () => {
+    if (homePlayModeEl) {
+      homePlayModeEl.addEventListener('click', () => {
+        void cyclePlayMode();
+      });
+    }
+
+    if (playerPlayModeEl) {
+      playerPlayModeEl.addEventListener('click', () => {
+        void cyclePlayMode();
+      });
+    }
+
+    const playerPrevEl = document.getElementById('player-prev');
+    const playerNextEl = document.getElementById('player-next');
+
+    if (playerPrevEl) {
+      playerPrevEl.addEventListener('click', async () => {
         const bridge = resolveBridge();
         if (!bridge || typeof bridge.playPrevious !== 'function') {
           return;
@@ -1416,8 +1647,9 @@
         await syncPlayerState();
       });
     }
-    if (controlButtons[2]) {
-      controlButtons[2].addEventListener('click', async () => {
+
+    if (playerNextEl) {
+      playerNextEl.addEventListener('click', async () => {
         const bridge = resolveBridge();
         if (!bridge || typeof bridge.playNext !== 'function') {
           return;
@@ -1518,20 +1750,29 @@
       if (!payload || typeof payload !== 'object') {
         return;
       }
-      if (payload.type !== 'allmusic:local-api-ready') {
+      if (payload.type === LOCAL_API_READY_EVENT) {
+        const now = Date.now();
+        if (now - state.lastLocalApiReadyAt < 1500) {
+          return;
+        }
+        state.lastLocalApiReadyAt = now;
+
+        setStatus('Local APIs ready, refreshing playlists');
+        showToast('Local APIs ready, refreshing');
+        void loadPlaylists({ forceRefresh: true });
+        void syncPlayerState();
         return;
       }
 
-      const now = Date.now();
-      if (now - state.lastLocalApiReadyAt < 1500) {
-        return;
+      if (payload.type === BRIDGE_CACHE_UPDATED_EVENT) {
+        void handleBridgeCacheUpdated(payload);
       }
-      state.lastLocalApiReadyAt = now;
+    });
 
-      setStatus('Local APIs ready, refreshing playlists');
-      showToast('Local APIs ready, refreshing');
-      void loadPlaylists();
-      void syncPlayerState();
+    window.addEventListener(BRIDGE_CACHE_UPDATED_EVENT, (event) => {
+      if (event instanceof CustomEvent) {
+        void handleBridgeCacheUpdated(event.detail);
+      }
     });
   }
 
@@ -1545,6 +1786,13 @@
   async function init() {
     bindTabEvents();
     bindEvents();
+    if (searchInputEl) {
+      searchInputEl.value = '';
+    }
+    if (platformFilterEl) {
+      platformFilterEl.value = 'all';
+    }
+    updatePlayModeUI(state.playMode);
     go('home');
     updateClock();
     setInterval(updateClock, 1000);

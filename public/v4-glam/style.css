@@ -302,6 +302,11 @@
       box-shadow: 0 0 8px rgba(255,255,255,.4) inset;
     }
 
+    button.chip {
+      cursor: pointer;
+      font: inherit;
+    }
+
     .chip.ok { color: #0a6327; background: #d8ffdf; }
     .chip.warn { color: #7a4d00; background: #ffeec4; }
     .chip.info { color: #0c4d87; background: #d9efff; }
@@ -511,6 +516,33 @@
       min-height: 0;
       flex: 1;
     }
+
+    #detail-lyric {
+      display: flex;
+      flex-direction: column;
+      scroll-behavior: smooth;
+    }
+
+    .detail-lyric-line {
+      padding: 6px 12px;
+      min-height: 28px;
+      color: var(--text-soft);
+      opacity: 0.6;
+      font-size: 13px;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .detail-lyric-line.is-active {
+      color: var(--accent-dark-pink);
+      opacity: 1;
+      font-weight: bold;
+      background: rgba(255, 133, 192, 0.1);
+      box-shadow: inset 0 0 8px rgba(255, 133, 192, 0.15);
+      transform: scale(1.04);
+    }
+
+    .lyric-spacer { flex-shrink: 0; height: 50%; }
 
     .item {
       display: grid;
@@ -857,6 +889,11 @@
       gap: 8px;
       align-items: center;
       font-size: 11px;
+    }
+
+    .volume-row {
+      max-width: 60%;
+      margin: 0 auto;
     }
 
     .progress-input,

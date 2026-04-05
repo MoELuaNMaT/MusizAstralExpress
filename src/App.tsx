@@ -1,167 +1,77 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { useAuthStore, usePlayerStore } from '@/stores';
-import { stopSharedAudioPlayback, useAudioPlayer } from '@/hooks/useAudioPlayer';
-import { canUseTauriInvoke, isLikelyTauriMobileRuntime } from '@/lib/runtime';
-import { authService } from '@/services/auth.service';
-import { libraryService } from '@/services/library.service';
+import { useAlertStore, useAuthStore, usePlayerStore, useThemeStore } from '@/stores';
+import { canUseTauriInvoke, isDevLiteMode, isLikelyTauriMobileRuntime, isMobile } from '@/lib/runtime';
+import { captureUiSwitchPlaybackSnapshot, restoreUiSwitchPlaybackSnapshot } from '@/lib/ui-switch-snapshot';
+import { buildAuthFingerprint, bridgeCacheStore, bridgeInFlightStore } from '@/bridge/cache';
+import {
+  resolvePlaylistsWithBridgeCache as resolvePlaylistsCached,
+  resolvePlaylistDetailWithBridgeCache as resolveDetailCached,
+  resolveDailyRecommendationsWithBridgeCache as resolveDailyCached,
+} from '@/bridge/cache-resolvers';
+import { useBridgeApi } from '@/bridge/api-implementation';
+import { useLocalApiBootstrap } from '@/hooks/useLocalApiBootstrap';
+import { useAppEventListeners } from '@/hooks/useAppEventListeners';
+import { useThumbnailToolbar } from '@/hooks/useThumbnailToolbar';
+import { BridgeAudioEngine } from '@/components/bridge/bridge-audio-engine';
+import { LocalApiOverlay } from '@/components/local-api/local-api-overlay';
 import { HomePage } from '@/pages/Home';
 import { LoginPage } from '@/pages/Login';
-import type { LoginResult, UnifiedPlaylist, UnifiedSong } from '@/types';
-
-const THEME_MODE_STORAGE_KEY = 'allmusic_theme_mode_v1';
-const UI_VERSION_STORAGE_KEY = 'allmusic_ui_version_v1';
-const LOCAL_API_READY_EVENT = 'allmusic:local-api-ready';
-
-type UiVersion = 'current' | 'v4-glam';
-type AuthSnapshot = ReturnType<typeof useAuthStore.getState>;
-type PlayerSnapshot = ReturnType<typeof usePlayerStore.getState>;
-
-type BridgeAuthState = {
-  users: AuthSnapshot['users'];
-  cookies: AuthSnapshot['cookies'];
-  isAuthenticated: AuthSnapshot['isAuthenticated'];
-  hasConnectedAllPlatforms: boolean;
-};
-
-type BridgePlaylistResult = Awaited<ReturnType<typeof libraryService.loadUnifiedPlaylists>>;
-type BridgePlaylistDetailResult = Awaited<ReturnType<typeof libraryService.loadPlaylistDetail>>;
-type BridgeSearchResult = Awaited<ReturnType<typeof libraryService.searchUnifiedSongs>>;
-type BridgeDailyResult = Awaited<ReturnType<typeof libraryService.loadDailyRecommendations>>;
-type BridgeLyricResult = Awaited<ReturnType<typeof libraryService.loadSongLyrics>>;
-type BridgeLikeResult = Awaited<ReturnType<typeof libraryService.likeSong>>;
-
-type BridgePlayerState = Pick<
-PlayerSnapshot,
-| 'currentSong'
-| 'queue'
-| 'currentIndex'
-| 'isPlaying'
-| 'playMode'
-| 'volume'
-| 'currentTime'
-| 'duration'
-| 'isLoading'
-| 'error'
->;
-
-type LocalApiServiceState = 'pending' | 'starting' | 'installing' | 'ready' | 'error';
-
-type LocalApiProgressPayload = {
-  stage: string;
-  service?: 'netease' | 'qq';
-  message: string;
-  percent: number;
-  level?: 'info' | 'warn' | 'error';
-  timestamp?: number;
-};
-
-type BridgeApi = {
-  getAuthState: () => Promise<BridgeAuthState>;
-  neteaseQRCodeLogin: (
-    onQRCodeUrl: (url: string) => void,
-    onStatusChange?: (status: string) => void,
-    signal?: AbortSignal,
-  ) => Promise<LoginResult>;
-  qqQRCodeLogin: (
-    onQRCodeUrl: (url: string) => void,
-    onStatusChange?: (status: string) => void,
-    signal?: AbortSignal,
-  ) => Promise<LoginResult>;
-  neteaseCellphoneLogin: (phone: string, password: string, countryCode?: string) => Promise<LoginResult>;
-  qqCookieLogin: (cookie: string, nickname?: string) => Promise<LoginResult>;
-  verifyLogin: (platform: 'netease' | 'qq', cookie: string) => Promise<boolean>;
-  logoutPlatform: (platform: 'netease' | 'qq') => Promise<void>;
-  loadPlaylists: () => Promise<BridgePlaylistResult>;
-  loadPlaylistDetail: (playlist: UnifiedPlaylist) => Promise<BridgePlaylistDetailResult>;
-  searchSongs: (keyword: string, limit?: number) => Promise<BridgeSearchResult>;
-  loadDailyRecommendations: (limit?: number) => Promise<BridgeDailyResult>;
-  loadSongLyrics: (song: UnifiedSong) => Promise<BridgeLyricResult>;
-  likeSong: (song: UnifiedSong, like?: boolean) => Promise<BridgeLikeResult>;
-  playSongs: (songs: UnifiedSong[], startIndex?: number) => Promise<void>;
-  playAt: (index: number) => Promise<void>;
-  togglePlay: () => Promise<void>;
-  playNext: () => Promise<void>;
-  playPrevious: () => Promise<void>;
-  setVolume: (volumePercent: number) => Promise<void>;
-  seekTo: (ms: number) => Promise<void>;
-  retryCurrent: () => Promise<void>;
-  getPlayerState: () => Promise<BridgePlayerState>;
-  switchUiVersion: (next: UiVersion) => Promise<void>;
-  getUiVersion: () => Promise<UiVersion>;
-};
+import { UiVersionSwitcher } from '@/components/theme/ui-version-switcher';
+import { GlobalAlertModal } from '@/components/ui/alert-modal';
+import { TopToastViewport } from '@/components/ui/top-toast';
+import {
+  APP_THEME_CLASS_MAP,
+  BRIDGE_CACHE_UPDATED_EVENT,
+  LOCAL_API_READY_EVENT,
+  OPEN_UI_SWITCHER_EVENT,
+  UI_FRAME_SRC_MAP,
+  UI_FRAME_TITLE_MAP,
+} from '@/constants/app.constants';
+import type { LoginResult, UnifiedPlaylist } from '@/types';
+import type { BridgeCacheUpdatePayload, BridgeDailyResult, BridgeLoadOptions, BridgePlaylistDetailResult, BridgePlaylistResult } from '@/types/bridge.types';
+import { UI_VERSION_SWITCH_ENABLED, type UiVersion } from '@/stores/theme.store';
 
 declare global {
   interface Window {
-    __ALLMUSIC_BRIDGE__?: BridgeApi;
+    __ALLMUSIC_BRIDGE__?: unknown;
+    __ALLMUSIC_LOCAL_API_READY__?: boolean;
   }
 }
 
-function buildLibraryContext() {
-  const auth = useAuthStore.getState();
-  return {
-    neteaseUserId: auth.users.netease?.userId,
-    neteaseCookie: auth.cookies.netease,
-    qqUserId: auth.users.qq?.userId,
-    qqCookie: auth.cookies.qq,
-  };
+function isTransientPlayerStartupError(message: string): boolean {
+  return /本地播放服务未启动或端口不可达|failed to fetch|fetch failed|err_connection_refused|network error/i.test(
+    message,
+  );
 }
 
-function V4AudioEngine({
-  onSeekReady,
-  onRetryReady,
-}: {
-  onSeekReady: (fn: (ms: number) => void) => void;
-  onRetryReady: (fn: () => void) => void;
-}) {
-  const { seekTo, retryCurrent } = useAudioPlayer();
-
-  useEffect(() => {
-    onSeekReady(seekTo);
-    onRetryReady(retryCurrent);
-
-    return () => {
-      onSeekReady(() => undefined);
-      onRetryReady(() => undefined);
-    };
-  }, [onRetryReady, onSeekReady, retryCurrent, seekTo]);
-
-  return null;
-}
+const NOOP_SEEK = () => undefined;
+const NOOP_RETRY = () => undefined;
+const UI_SWITCH_RESTORE_INITIAL_DELAY_MS = 120;
+const UI_SWITCH_RESTORE_RETRY_DELAY_MS = 180;
+const UI_SWITCH_RESTORE_MAX_ATTEMPTS = 8;
 
 function App() {
-  const { users, loadStoredCredentials } = useAuthStore();
+  const { users, cookies, loadStoredCredentials } = useAuthStore();
+  const playerError = usePlayerStore((state) => state.error);
+  const setPlayerError = usePlayerStore((state) => state.setError);
+  const pushAlert = useAlertStore((state) => state.pushAlert);
+  const theme = useThemeStore((state) => state.theme);
+  const uiVersion = useThemeStore((state) => state.uiVersion);
+  const setUiVersion = useThemeStore((state) => state.setUiVersion);
   const [mounted, setMounted] = useState(false);
-  const [uiVersion, setUiVersion] = useState<UiVersion>(() => {
-    if (typeof window === 'undefined') {
-      return 'current';
-    }
-    return window.localStorage.getItem(UI_VERSION_STORAGE_KEY) === 'v4-glam' ? 'v4-glam' : 'current';
-  });
+  const [uiSwitching, setUiSwitching] = useState(false);
+  const [isUiFrameLoading, setIsUiFrameLoading] = useState(uiVersion !== 'current');
+  const [uiSwitcherOpen, setUiSwitcherOpen] = useState(false);
 
-  const seekRef = useRef<(ms: number) => void>(() => undefined);
-  const retryRef = useRef<() => void>(() => undefined);
-  const localApiBootstrappedRef = useRef(false);
-  const v4FrameRef = useRef<HTMLIFrameElement | null>(null);
-  const [localApiProgress, setLocalApiProgress] = useState<{
-    visible: boolean;
-    percent: number;
-    message: string;
-    logs: string[];
-    failed: boolean;
-    serviceState: Record<'netease' | 'qq', LocalApiServiceState>;
-  }>({
-    visible: false,
-    percent: 0,
-    message: '准备启动本地 API...',
-    logs: [],
-    failed: false,
-    serviceState: {
-      netease: 'pending',
-      qq: 'pending',
-    },
-  });
+  const seekRef = useRef<(ms: number) => void>(NOOP_SEEK);
+  const retryRef = useRef<() => void>(NOOP_RETRY);
+  const latestPlayerErrorRef = useRef<string | null>(null);
+  const uiSwitchRecoveryTimerRef = useRef<number | null>(null);
+  const uiFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const authFingerprintRef = useRef<string>(buildAuthFingerprint(useAuthStore.getState()));
+
+  // -- Thin glue callbacks that reference local refs / iframe --
 
   const handleSeekReady = useCallback((fn: (ms: number) => void) => {
     seekRef.current = fn;
@@ -178,260 +88,231 @@ function App() {
     return result;
   }, []);
 
-  const notifyLocalApiReady = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    window.dispatchEvent(new CustomEvent(LOCAL_API_READY_EVENT));
-    if (v4FrameRef.current?.contentWindow) {
-      v4FrameRef.current.contentWindow.postMessage({ type: LOCAL_API_READY_EVENT }, '*');
+  const emitBridgeCacheUpdated = useCallback((payload: Omit<BridgeCacheUpdatePayload, 'type'>) => {
+    if (typeof window === 'undefined') return;
+    const eventPayload: BridgeCacheUpdatePayload = { type: BRIDGE_CACHE_UPDATED_EVENT, ...payload };
+    window.dispatchEvent(new CustomEvent(BRIDGE_CACHE_UPDATED_EVENT, { detail: eventPayload }));
+    if (uiFrameRef.current?.contentWindow) {
+      uiFrameRef.current.contentWindow.postMessage(eventPayload, window.location.origin);
     }
   }, []);
 
-  const bootstrapLocalApis = useCallback(async () => {
-    if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime() || localApiBootstrappedRef.current) {
-      return;
+  const notifyLocalApiReady = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.__ALLMUSIC_LOCAL_API_READY__ = true;
+    window.dispatchEvent(new CustomEvent(LOCAL_API_READY_EVENT));
+    if (uiFrameRef.current?.contentWindow) {
+      uiFrameRef.current.contentWindow.postMessage({ type: LOCAL_API_READY_EVENT }, window.location.origin);
     }
+  }, []);
 
-    localApiBootstrappedRef.current = true;
-    setLocalApiProgress({
-      visible: true,
-      percent: 5,
-      message: '正在检查并启动本地 API...',
-      logs: [],
-      failed: false,
-      serviceState: {
-        netease: 'pending',
-        qq: 'pending',
-      },
-    });
+  const resolvePlaylistsWithBridgeCache = useCallback(
+    (options?: BridgeLoadOptions): Promise<BridgePlaylistResult> =>
+      resolvePlaylistsCached(options, emitBridgeCacheUpdated, pushAlert),
+    [emitBridgeCacheUpdated, pushAlert],
+  );
 
-    try {
-      const status = await invoke<string>('ensure_local_api_services');
-      console.info(`[ALLMusic] ${status}`);
-      setLocalApiProgress((prev) => ({
-        ...prev,
-        visible: true,
-        percent: 100,
-        failed: false,
-        message: '本地 API 已就绪',
-        serviceState: {
-          netease: 'ready',
-          qq: 'ready',
-        },
-        logs: [...prev.logs, status].slice(-10),
-      }));
-      notifyLocalApiReady();
+  const resolvePlaylistDetailWithBridgeCache = useCallback(
+    (playlist: UnifiedPlaylist, options?: BridgeLoadOptions): Promise<BridgePlaylistDetailResult> =>
+      resolveDetailCached(playlist, options, emitBridgeCacheUpdated, pushAlert),
+    [emitBridgeCacheUpdated, pushAlert],
+  );
 
-      window.setTimeout(() => {
-        setLocalApiProgress((prev) => ({ ...prev, visible: false }));
-      }, 650);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[ALLMusic] 本地 API 启动失败:', message);
-      setLocalApiProgress((prev) => ({
-        ...prev,
-        visible: true,
-        failed: true,
-        percent: Math.max(prev.percent, 100),
-        message: `本地 API 启动失败：${message}`,
-        logs: [...prev.logs, message].slice(-10),
-        serviceState: {
-          netease: prev.serviceState.netease === 'ready' ? 'ready' : 'error',
-          qq: prev.serviceState.qq === 'ready' ? 'ready' : 'error',
-        },
-      }));
-      localApiBootstrappedRef.current = false;
-    }
-  }, [notifyLocalApiReady]);
+  const resolveDailyRecommendationsWithBridgeCache = useCallback(
+    (options?: (BridgeLoadOptions & { limit?: number }) | number): Promise<BridgeDailyResult> =>
+      resolveDailyCached(options, emitBridgeCacheUpdated, pushAlert),
+    [emitBridgeCacheUpdated, pushAlert],
+  );
 
-  const handleRetryBootstrap = useCallback(() => {
-    localApiBootstrappedRef.current = false;
-    void bootstrapLocalApis();
-  }, [bootstrapLocalApis]);
+  // -- Extracted hooks --
+
+  const {
+    localApiProgress,
+    setLocalApiProgress,
+    isAutoFixingLocalApi,
+    bootstrapLocalApis,
+    handleRetryBootstrap,
+    handleAutoFixLocalApi,
+    localApiOverlayHideTimerRef,
+  } = useLocalApiBootstrap({ pushAlert, notifyLocalApiReady });
+
+  useAppEventListeners({
+    pushAlert,
+    notifyLocalApiReady,
+    setLocalApiProgress,
+    localApiOverlayHideTimerRef,
+  });
+
+  // 初始化 Windows 缩略图工具栏同步
+  useThumbnailToolbar();
+
+  useBridgeApi({
+    seekRef,
+    retryRef,
+    persistLoginResult,
+    resolvePlaylistsWithBridgeCache,
+    resolvePlaylistDetailWithBridgeCache,
+    resolveDailyRecommendationsWithBridgeCache,
+    captureUiSwitchPlaybackSnapshot,
+    setUiVersion,
+    setUiSwitcherOpen,
+    setUiSwitching,
+    setIsUiFrameLoading,
+    uiVersion,
+  });
+
+  // -- Remaining lifecycle effects --
 
   useEffect(() => {
-    if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime()) {
-      return;
-    }
-
-    let unlisten: (() => void) | null = null;
-    void listen<LocalApiProgressPayload>('local-api-progress', (event) => {
-      const payload = event.payload;
-      const stage = payload.stage || '';
-      const nextPercent = Number.isFinite(payload.percent) ? payload.percent : 0;
-      const nextMessage = payload.message || '正在启动本地 API...';
-      const isError = payload.level === 'error' || stage.endsWith('_error') || stage === 'error';
-      const nextLog = payload.service ? `[${payload.service}] ${nextMessage}` : nextMessage;
-
-      setLocalApiProgress((prev) => {
-        const nextServiceState = { ...prev.serviceState };
-        if (payload.service) {
-          if (stage.endsWith('_ready')) {
-            nextServiceState[payload.service] = 'ready';
-          } else if (isError) {
-            nextServiceState[payload.service] = 'error';
-          } else if (stage.includes('install')) {
-            nextServiceState[payload.service] = 'installing';
-          } else if (stage.includes('start') || stage.includes('wait') || stage.includes('log')) {
-            nextServiceState[payload.service] = 'starting';
-          }
-        }
-
-        return {
-          ...prev,
-          visible: true,
-          failed: prev.failed || isError,
-          percent: Math.max(prev.percent, Math.min(100, Math.max(0, nextPercent))),
-          message: nextMessage,
-          serviceState: nextServiceState,
-          logs: [...prev.logs, nextLog].slice(-10),
-        };
-      });
-
-      if (stage === 'ready' && !isError) {
-        notifyLocalApiReady();
-      }
-    }).then((fn) => {
-      unlisten = fn;
-    });
-
-    return () => {
-      if (unlisten) {
-        unlisten();
-      }
-    };
-  }, [notifyLocalApiReady]);
-
-  useEffect(() => {
-    const init = async () => {
-      await loadStoredCredentials();
-      if (window.localStorage.getItem(THEME_MODE_STORAGE_KEY) === 'day') {
-        document.body.classList.add('am-theme-day');
-      } else {
-        document.body.classList.remove('am-theme-day');
-      }
-      setMounted(true);
-    };
-
-    void init();
+    void loadStoredCredentials().then(() => setMounted(true));
   }, [loadStoredCredentials]);
 
   useEffect(() => {
-    if (!mounted) {
-      return;
-    }
+    const nextFingerprint = buildAuthFingerprint(useAuthStore.getState());
+    if (authFingerprintRef.current === nextFingerprint) return;
+    authFingerprintRef.current = nextFingerprint;
+    bridgeCacheStore.clear();
+    bridgeInFlightStore.clear();
+  }, [cookies.netease, cookies.qq, users.netease?.userId, users.qq?.userId]);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const body = document.body;
+    for (const cls of Object.values(APP_THEME_CLASS_MAP)) body.classList.remove(cls);
+    body.classList.add(APP_THEME_CLASS_MAP[theme]);
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const mobile = isMobile();
+    document.body.classList.toggle('is-mobile', mobile);
+    return () => { document.body.classList.remove('is-mobile'); };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const enabled = isDevLiteMode();
+    document.body.classList.toggle('am-dev-lite', enabled);
+    return () => { document.body.classList.remove('am-dev-lite'); };
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     void bootstrapLocalApis();
   }, [bootstrapLocalApis, mounted]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime()) return;
+    return () => { void invoke('shutdown_local_api_services').catch(() => undefined); };
+  }, []);
 
-    window.localStorage.setItem(UI_VERSION_STORAGE_KEY, uiVersion);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
     document.body.classList.toggle('am-ui-v4', uiVersion === 'v4-glam');
   }, [uiVersion]);
 
   useEffect(() => {
-    window.__ALLMUSIC_BRIDGE__ = {
-      getAuthState: async () => {
-        const auth = useAuthStore.getState();
-        return {
-          users: auth.users,
-          cookies: auth.cookies,
-          isAuthenticated: auth.isAuthenticated,
-          hasConnectedAllPlatforms: Boolean(auth.users.netease && auth.users.qq),
-        };
-      },
-      neteaseQRCodeLogin: async (onQRCodeUrl, onStatusChange, signal) => {
-        const result = await authService.neteaseQRCodeLogin(onQRCodeUrl, onStatusChange, signal);
-        return persistLoginResult(result);
-      },
-      qqQRCodeLogin: async (onQRCodeUrl, onStatusChange, signal) => {
-        const result = await authService.qqQRCodeLogin(onQRCodeUrl, onStatusChange, signal);
-        return persistLoginResult(result);
-      },
-      neteaseCellphoneLogin: async (phone, password, countryCode = '86') => {
-        const result = await authService.neteaseCellphoneLogin(phone, countryCode, password);
-        return persistLoginResult(result);
-      },
-      qqCookieLogin: async (cookie, nickname) => {
-        const result = await authService.qqMusicLogin(cookie, nickname);
-        return persistLoginResult(result);
-      },
-      verifyLogin: async (platform, cookie) => authService.verifyLogin(platform, cookie),
-      logoutPlatform: async (platform) => {
-        await useAuthStore.getState().removeUser(platform);
-      },
-      loadPlaylists: async () => libraryService.loadUnifiedPlaylists(buildLibraryContext()),
-      loadPlaylistDetail: async (playlist) => libraryService.loadPlaylistDetail(playlist, buildLibraryContext()),
-      searchSongs: async (keyword, limit = 30) => libraryService.searchUnifiedSongs(keyword, buildLibraryContext(), limit),
-      loadDailyRecommendations: async (limit = 30) => libraryService.loadDailyRecommendations(buildLibraryContext(), limit),
-      loadSongLyrics: async (song) => libraryService.loadSongLyrics(song, buildLibraryContext()),
-      likeSong: async (song, like = true) => libraryService.likeSong(song, buildLibraryContext(), like),
-      playSongs: async (songs, startIndex = 0) => {
-        const player = usePlayerStore.getState();
-        player.setQueue(songs, startIndex);
-        player.setIsPlaying(true);
-      },
-      playAt: async (index) => {
-        usePlayerStore.getState().playAt(index);
-      },
-      togglePlay: async () => {
-        usePlayerStore.getState().togglePlay();
-      },
-      playNext: async () => {
-        usePlayerStore.getState().playNext();
-      },
-      playPrevious: async () => {
-        usePlayerStore.getState().playPrevious();
-      },
-      setVolume: async (volumePercent) => {
-        const next = Math.max(0, Math.min(100, Number(volumePercent) || 0));
-        usePlayerStore.getState().setVolume(next / 100);
-      },
-      seekTo: async (ms) => {
-        seekRef.current(Math.max(0, Number(ms) || 0));
-      },
-      retryCurrent: async () => {
-        retryRef.current();
-      },
-      getPlayerState: async () => {
-        const player = usePlayerStore.getState();
-        return {
-          currentSong: player.currentSong,
-          queue: player.queue,
-          currentIndex: player.currentIndex,
-          isPlaying: player.isPlaying,
-          playMode: player.playMode,
-          volume: player.volume,
-          currentTime: player.currentTime,
-          duration: player.duration,
-          isLoading: player.isLoading,
-          error: player.error,
-        };
-      },
-      switchUiVersion: async (next) => {
-        if (next === uiVersion) {
-          return;
-        }
+    if (uiVersion === 'current') setIsUiFrameLoading(false);
+    if (uiSwitchRecoveryTimerRef.current !== null) {
+      window.clearTimeout(uiSwitchRecoveryTimerRef.current);
+      uiSwitchRecoveryTimerRef.current = null;
+    }
+    if (!uiSwitching) return;
 
-        // Prevent hidden UI audio from continuing after mode switch.
-        const player = usePlayerStore.getState();
-        player.setIsPlaying(false);
-        player.setIsLoading(false);
-        stopSharedAudioPlayback();
-        setUiVersion(next);
-      },
-      getUiVersion: async () => uiVersion,
+    let attempts = 0;
+    const attemptRestore = () => {
+      attempts += 1;
+      const result = restoreUiSwitchPlaybackSnapshot(seekRef.current);
+
+      // Stop immediately if no snapshot or invalid/expired/song_mismatch
+      if (!result.success && ['no_snapshot', 'invalid_snapshot', 'expired', 'song_mismatch'].includes(result.reason)) {
+        setUiSwitching(false);
+        uiSwitchRecoveryTimerRef.current = null;
+        return;
+      }
+
+      // Retry only for restore_failed
+      if (result.success || attempts >= UI_SWITCH_RESTORE_MAX_ATTEMPTS) {
+        setUiSwitching(false);
+        uiSwitchRecoveryTimerRef.current = null;
+        return;
+      }
+
+      uiSwitchRecoveryTimerRef.current = window.setTimeout(
+        attemptRestore,
+        UI_SWITCH_RESTORE_RETRY_DELAY_MS,
+      );
     };
 
+    uiSwitchRecoveryTimerRef.current = window.setTimeout(
+      attemptRestore,
+      UI_SWITCH_RESTORE_INITIAL_DELAY_MS,
+    );
+  }, [uiSwitching, uiVersion]);
+
+  useEffect(() => () => {
+    if (uiSwitchRecoveryTimerRef.current !== null) {
+      window.clearTimeout(uiSwitchRecoveryTimerRef.current);
+      uiSwitchRecoveryTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (localApiOverlayHideTimerRef.current !== null) {
+      window.clearTimeout(localApiOverlayHideTimerRef.current);
+      localApiOverlayHideTimerRef.current = null;
+    }
+  }, [localApiOverlayHideTimerRef]);
+
+  useEffect(() => {
+    if (!UI_VERSION_SWITCH_ENABLED) { setUiSwitcherOpen(false); return; }
+    const handleOpen = () => setUiSwitcherOpen(true);
+    const onMessage = (event: MessageEvent<unknown>) => {
+      const payload = event.data;
+      if (!payload || typeof payload !== 'object') return;
+      const frameWindow = uiFrameRef.current?.contentWindow;
+      if (frameWindow && event.source !== frameWindow) return;
+      if ((payload as { type?: string }).type === OPEN_UI_SWITCHER_EVENT) handleOpen();
+    };
+    window.addEventListener('message', onMessage);
+    window.addEventListener(OPEN_UI_SWITCHER_EVENT, handleOpen);
     return () => {
-      delete window.__ALLMUSIC_BRIDGE__;
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener(OPEN_UI_SWITCHER_EVENT, handleOpen);
     };
-  }, [persistLoginResult, uiVersion]);
+  }, []);
+
+  useEffect(() => {
+    if (!playerError) { latestPlayerErrorRef.current = null; return; }
+    const isBootstrapping = localApiProgress.visible && !localApiProgress.failed && localApiProgress.percent < 100;
+    if (isBootstrapping && isTransientPlayerStartupError(playerError)) {
+      setPlayerError(null);
+      latestPlayerErrorRef.current = null;
+      return;
+    }
+    if (latestPlayerErrorRef.current === playerError) return;
+    latestPlayerErrorRef.current = playerError;
+    pushAlert({
+      level: 'error',
+      title: '播放异常',
+      message: playerError,
+      source: 'player.engine',
+      actionLabel: '重试当前歌曲',
+      onAction: () => { retryRef.current(); },
+      dedupeKey: `player-error:${playerError}`,
+    });
+  }, [localApiProgress.failed, localApiProgress.percent, localApiProgress.visible, playerError, pushAlert, setPlayerError]);
+
+  const handleUiFrameLoad = useCallback(() => {
+    setIsUiFrameLoading(false);
+    const result = restoreUiSwitchPlaybackSnapshot(seekRef.current);
+    if (result.success) {
+      setUiSwitching(false);
+    }
+    notifyLocalApiReady();
+  }, [notifyLocalApiReady]);
+
+  // -- Render --
 
   if (!mounted) {
     return (
@@ -443,85 +324,52 @@ function App() {
 
   const hasConnectedAllPlatforms = Boolean(users.netease && users.qq);
   const appView = hasConnectedAllPlatforms ? <HomePage /> : <LoginPage />;
-  const isV4Glam = uiVersion === 'v4-glam';
+  const isIframeUi = uiVersion !== 'current';
+  const iframeUiVersion = isIframeUi ? uiVersion as Exclude<UiVersion, 'current'> : null;
+  const iframeSrc = iframeUiVersion ? UI_FRAME_SRC_MAP[iframeUiVersion] : null;
+  const iframeTitle = iframeUiVersion ? UI_FRAME_TITLE_MAP[iframeUiVersion] : 'ALLMusic UI Frame';
 
   return (
     <>
-      {isV4Glam ? (
+      {(isIframeUi || uiSwitching) && (
+        <BridgeAudioEngine onSeekReady={handleSeekReady} onRetryReady={handleRetryReady} />
+      )}
+      {isIframeUi ? (
         <>
-          <V4AudioEngine onSeekReady={handleSeekReady} onRetryReady={handleRetryReady} />
           <iframe
-            ref={v4FrameRef}
-            title="ALLMusic V4 Gemini Fusion UX Glam"
-            src="/v4-glam/index.html"
+            ref={uiFrameRef}
+            title={iframeTitle}
+            src={iframeSrc || undefined}
+            onLoad={handleUiFrameLoad}
             className="h-screen w-screen border-0 bg-transparent"
           />
+          {(uiSwitching || isUiFrameLoading) && (
+            <div className="fixed inset-0 z-[58] flex items-center justify-center bg-slate-950/55 backdrop-blur-sm">
+              <div className="rounded-xl border border-slate-600/60 bg-slate-900/85 px-4 py-3 text-sm text-slate-100 shadow-2xl">
+                正在切换 UI 版本...
+              </div>
+            </div>
+          )}
         </>
       ) : appView}
-      {localApiProgress.visible && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-4">
-          <div className="w-full max-w-xl rounded-2xl border border-white/20 bg-slate-900/95 p-5 text-slate-100 shadow-2xl backdrop-blur">
-            <div className="mb-3 flex items-center justify-between text-sm">
-              <span className="font-medium">本地 API 启动中</span>
-              <span className="text-xs text-slate-300">{localApiProgress.percent}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-700/80">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  localApiProgress.failed ? 'bg-rose-500' : 'bg-cyan-400'
-                }`}
-                style={{ width: `${localApiProgress.percent}%` }}
-              />
-            </div>
-            <p className={`mt-3 text-sm ${localApiProgress.failed ? 'text-rose-300' : 'text-slate-200'}`}>
-              {localApiProgress.message}
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              {(['netease', 'qq'] as const).map((service) => {
-                const state = localApiProgress.serviceState[service];
-                const labelMap: Record<LocalApiServiceState, string> = {
-                  pending: '等待中',
-                  starting: '启动中',
-                  installing: '安装依赖中',
-                  ready: '已就绪',
-                  error: '异常',
-                };
-                const colorMap: Record<LocalApiServiceState, string> = {
-                  pending: 'text-slate-300',
-                  starting: 'text-cyan-300',
-                  installing: 'text-amber-300',
-                  ready: 'text-emerald-300',
-                  error: 'text-rose-300',
-                };
-                return (
-                  <div key={service} className="rounded-lg border border-white/10 bg-slate-800/70 px-3 py-2">
-                    <div className="font-medium uppercase tracking-wide text-slate-200">{service}</div>
-                    <div className={`mt-1 ${colorMap[state]}`}>{labelMap[state]}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-3 max-h-28 overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
-              {localApiProgress.logs.length === 0 ? (
-                <div>等待日志输出...</div>
-              ) : (
-                localApiProgress.logs.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)
-              )}
-            </div>
-            {localApiProgress.failed && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleRetryBootstrap}
-                  className="rounded-lg bg-cyan-500 px-3 py-1.5 text-sm font-medium text-slate-950 transition hover:bg-cyan-400"
-                >
-                  重试启动
-                </button>
-              </div>
-            )}
-          </div>
+      {isIframeUi && UI_VERSION_SWITCH_ENABLED && (
+        <div className="am-global-ui-switcher-wrap">
+          <UiVersionSwitcher
+            align="right"
+            open={uiSwitcherOpen}
+            onOpenChange={setUiSwitcherOpen}
+            triggerLabel="切换主题"
+          />
         </div>
       )}
+      <LocalApiOverlay
+        {...localApiProgress}
+        isAutoFixing={isAutoFixingLocalApi}
+        onAutoFix={handleAutoFixLocalApi}
+        onRetry={handleRetryBootstrap}
+      />
+      <TopToastViewport />
+      <GlobalAlertModal />
     </>
   );
 }

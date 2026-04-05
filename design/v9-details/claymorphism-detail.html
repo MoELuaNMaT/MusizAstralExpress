@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic - Claymorphism Immersive Detail</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --clay-bg: #eef2ff;
+            --clay-accent: #6366f1;
+            --clay-card: #f8faff;
+        }
+
+        body {
+            background: linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%);
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            color: #475569;
+        }
+
+        .clay-panel {
+            background: var(--clay-card);
+            border-radius: 50px;
+            box-shadow: 20px 20px 40px #d1d9e6, -20px -20px 40px #ffffff;
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+
+        .clay-inset {
+            background: rgba(255,255,255,0.2);
+            border-radius: 32px;
+            box-shadow: inset 8px 8px 16px #d1d9e6, inset -8px -8px 16px #ffffff;
+        }
+
+        .clay-btn {
+            background: var(--clay-card);
+            border-radius: 30px;
+            box-shadow: 8px 8px 16px #d1d9e6, -8px -8px 16px #ffffff;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .clay-btn:active {
+            box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+            transform: scale(0.92);
+        }
+
+        /* 封面旋转 */
+        .cover-breath {
+            animation: rotate-breath 20s linear infinite;
+        }
+        @keyframes rotate-breath {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.05); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* 歌词滚动 */
+        .lyric-item {
+            transition: all 0.5s ease;
+            filter: blur(2px);
+            opacity: 0.3;
+        }
+        .lyric-item.active {
+            filter: blur(0);
+            opacity: 1;
+            transform: scale(1.2);
+            color: var(--clay-accent);
+            font-weight: 900;
+        }
+
+        .custom-scroll::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-12">
+
+    <!-- DESKTOP IMMERSIVE -->
+    <div class="w-full max-w-7xl h-full clay-panel flex overflow-hidden relative p-12 gap-12 bg-white/40 backdrop-blur-3xl">
+        
+        <!-- Background Orbs -->
+        <div class="absolute -top-20 -left-20 w-96 h-96 bg-purple-200/50 rounded-full blur-3xl animate-pulse"></div>
+        <div class="absolute -bottom-20 -right-20 w-96 h-96 bg-blue-200/50 rounded-full blur-3xl animate-pulse" style="animation-delay: -3s"></div>
+
+        <!-- Back Button -->
+        <button class="absolute top-10 left-10 w-16 h-16 clay-btn flex items-center justify-center text-2xl z-50">✕</button>
+
+        <!-- Left: Album & Info -->
+        <div class="flex-1 flex flex-col items-center justify-center relative">
+            <div class="w-[480px] h-[480px] clay-panel cover-breath p-8 bg-white/60">
+                <img src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=800" 
+                     class="w-full h-full rounded-[60px] object-cover shadow-2xl border-8 border-white">
+            </div>
+            
+            <div class="mt-12 text-center">
+                <h2 class="text-4xl font-black text-slate-800 tracking-tight">晴天 (Sunny Day)</h2>
+                <p class="text-xl text-indigo-500 font-bold mt-2">周杰伦</p>
+                <div class="flex gap-4 mt-6 justify-center">
+                    <span class="px-4 py-2 clay-inset text-xs font-black text-indigo-400">NETEASE LOSSLESS</span>
+                    <span class="px-4 py-2 clay-inset text-xs font-black text-indigo-400">44.1KHZ</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Lyrics -->
+        <div class="w-[500px] flex flex-col justify-center">
+            <div class="h-[600px] flex flex-col gap-10 overflow-y-auto no-scrollbar py-60 items-center">
+                <p class="lyric-item text-2xl">故事的小黄花</p>
+                <p class="lyric-item text-2xl">从出生那年就飘着</p>
+                <p class="lyric-item active text-3xl">童年的荡秋千</p>
+                <p class="lyric-item text-2xl">随记忆一直晃到现在</p>
+                <p class="lyric-item text-2xl">Re So So Si Do Si La</p>
+                <p class="lyric-item text-2xl">So La Si Si Si Si La Si La So</p>
+                <p class="lyric-item text-2xl">吹着前奏望着天空</p>
+                <p class="lyric-item text-2xl">我想起花瓣试着掉落</p>
+            </div>
+        </div>
+
+        <!-- Floating Controls -->
+        <footer class="absolute bottom-12 left-1/2 -translate-x-1/2 w-[800px] h-32 clay-panel flex flex-col p-6 px-12 gap-4">
+            <div class="flex-1 flex items-center justify-between">
+                <div class="flex gap-10">
+                    <button class="text-3xl text-slate-300 hover:text-indigo-400 transition-colors">🔁</button>
+                    <button class="text-4xl">⏮</button>
+                </div>
+                
+                <button class="w-20 h-20 clay-btn bg-indigo-500 text-white text-4xl flex items-center justify-center pl-2 shadow-indigo-200">▶</button>
+                
+                <div class="flex gap-10">
+                    <button class="text-4xl">⏭</button>
+                    <button class="text-3xl text-rose-400">♥</button>
+                </div>
+            </div>
+            
+            <div class="w-full flex items-center gap-4">
+                <span class="text-xs font-black text-slate-400">01:45</span>
+                <div class="flex-1 h-3 clay-inset relative overflow-hidden">
+                    <div class="absolute inset-y-0 left-0 w-[45%] bg-gradient-to-r from-indigo-400 to-pink-400 rounded-full"></div>
+                </div>
+                <span class="text-xs font-black text-slate-400">04:29</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- MOBILE IMMERSIVE -->
+    <div class="hidden xl:flex ml-12 w-[375px] h-[780px] clay-panel flex-col overflow-hidden relative p-8 border-[12px] border-white scale-90 origin-bottom">
+        <button class="w-12 h-12 clay-btn mb-12">✕</button>
+        
+        <div class="flex-1 flex flex-col items-center">
+            <img src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=400" 
+                 class="w-full aspect-square rounded-[40px] shadow-2xl border-4 border-white object-cover mb-10">
+            
+            <div class="text-center mb-12">
+                <h2 class="text-2xl font-black text-slate-800">晴天</h2>
+                <p class="text-slate-400 font-bold mt-1">周杰伦</p>
+            </div>
+
+            <div class="flex-1 w-full text-center space-y-6">
+                <p class="text-sm text-slate-300 font-bold">故事的小黄花</p>
+                <p class="text-lg text-indigo-500 font-black scale-110">从出生那年就飘着</p>
+                <p class="text-sm text-slate-300 font-bold">童年的荡秋千</p>
+            </div>
+        </div>
+
+        <div class="mt-auto space-y-8 pb-8">
+            <div class="h-4 clay-inset relative overflow-hidden">
+                <div class="absolute inset-y-0 left-0 w-1/3 bg-indigo-400"></div>
+            </div>
+            <div class="flex justify-between items-center px-4">
+                <button class="text-2xl">⏮</button>
+                <button class="w-20 h-20 clay-btn bg-indigo-500 text-white text-3xl flex items-center justify-center pl-2">▶</button>
+                <button class="text-2xl">⏭</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

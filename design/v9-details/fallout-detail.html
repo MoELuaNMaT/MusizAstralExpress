@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic - Pip-Boy Diagnostic Detail</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --pip-green: #18ff62;
+            --pip-green-dim: rgba(24, 255, 98, 0.15);
+            --pip-bg: #0c120c;
+        }
+
+        body {
+            background-color: #050805;
+            color: var(--pip-green);
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+            height: 100vh;
+            text-transform: uppercase;
+        }
+
+        /* CRT Effect */
+        .crt::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .screen-curve {
+            position: relative;
+            background: var(--pip-bg);
+            border: 20px solid #232723;
+            border-radius: 60px;
+            box-shadow: inset 0 0 100px #000, 0 0 50px rgba(0,255,65,0.2);
+        }
+
+        /* HOLOTAPE Animation */
+        .holotape {
+            width: 240px; height: 160px;
+            border: 4px solid var(--pip-green);
+            position: relative;
+            padding: 10px;
+            background: rgba(24, 255, 98, 0.05);
+        }
+        .reel {
+            width: 60px; height: 60px;
+            border: 2px solid var(--pip-green);
+            border-radius: 50%;
+            animation: spin 4s linear infinite;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* V.A.T.S. Scanning Effect */
+        .vats-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: var(--pip-green);
+            opacity: 0.3;
+            animation: vats-move 4s linear infinite;
+        }
+        @keyframes vats-move { from { top: 0; } to { top: 100%; } }
+
+        .lyric-log {
+            border-left: 2px solid var(--pip-green-dim);
+            padding-left: 20px;
+        }
+        .lyric-line.active {
+            background: var(--pip-green);
+            color: black;
+            box-shadow: 0 0 15px var(--pip-green);
+        }
+
+        /* 底部控制台 */
+        .tactical-btn {
+            border: 2px solid var(--pip-green);
+            padding: 10px 30px;
+            font-size: 24px;
+            transition: all 0.2s;
+        }
+        .tactical-btn:hover {
+            background: var(--pip-green);
+            color: black;
+            box-shadow: 0 0 20px var(--pip-green);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-10 crt">
+
+    <!-- DESKTOP DIAGNOSTIC MODE -->
+    <div class="w-full max-w-[1300px] h-full screen-curve flex flex-col p-12 relative overflow-hidden">
+        <div class="vats-line"></div>
+        
+        <!-- Top Status -->
+        <header class="flex justify-between items-start mb-12 border-b-4 border-[var(--pip-green-dim)] pb-6">
+            <div>
+                <h1 class="text-4xl font-bold tracking-widest text-shadow">>> AUDIO_DIAGNOSTIC_TERMINAL_V.3</h1>
+                <p class="text-lg opacity-60">LOC: VAULT-111 // USER: WANDERER</p>
+            </div>
+            <div class="text-right">
+                <p class="text-2xl" id="time">22:45:12</p>
+                <p class="text-sm opacity-60">RADS: 0.02/SEC</p>
+            </div>
+        </header>
+
+        <div class="flex-1 flex gap-16 overflow-hidden">
+            <!-- Left: Visual Hardware -->
+            <div class="w-[450px] flex flex-col gap-10">
+                <div class="flex justify-between items-center px-4">
+                    <span class="text-xl">MEDIA_LOADED:</span>
+                    <span class="text-xl">[ HOLOTAPE_012 ]</span>
+                </div>
+                
+                <div class="holotape mx-auto flex items-center justify-around">
+                    <div class="reel flex items-center justify-center">
+                        <div class="w-2 h-8 bg-[var(--pip-green)]"></div>
+                    </div>
+                    <div class="text-[10px] space-y-1">
+                        <p>BITRATE: 1411</p>
+                        <p>CODEC: WAV_9</p>
+                        <p>S/N: 94.2DB</p>
+                    </div>
+                    <div class="reel flex items-center justify-center">
+                        <div class="w-2 h-8 bg-[var(--pip-green)]"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-6 border-4 border-[var(--pip-green-dim)] flex flex-col gap-4">
+                    <h3 class="text-2xl border-b border-[var(--pip-green-dim)] pb-2">SPECTRAL_WAVEFORM</h3>
+                    <div class="h-32 flex items-end gap-1">
+                        <div class="flex-1 bg-[var(--pip-green)] h-[40%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] h-[70%] shadow-[0_0_10px_var(--pip-green)]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] h-[100%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] h-[80%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] h-[50%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] h-[90%]"></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto space-y-2">
+                    <p class="text-3xl font-bold">晴天 (SUNNY_DAY)</p>
+                    <p class="text-xl opacity-60">JAY_CHOU // YEH_HUI_MEI_2003</p>
+                </div>
+            </div>
+
+            <!-- Right: Lyric Logs -->
+            <div class="flex-1 flex flex-col gap-6 overflow-hidden">
+                <div class="text-xl border-b-2 border-[var(--pip-green-dim)] pb-2">LYRIC_DATA_STREAM:</div>
+                <div class="flex-1 lyric-log flex flex-col gap-8 text-2xl overflow-y-auto no-scrollbar py-40">
+                    <p class="lyric-line opacity-30">[01:12] 对这个世界如果你有太多的抱怨</p>
+                    <p class="lyric-line opacity-30">[01:25] 跌倒了 就不敢继续往前走</p>
+                    <p class="lyric-line active px-4 py-2">[01:32] >> 为什么 人要这么的脆弱 堕落</p>
+                    <p class="lyric-line opacity-80 font-bold">[01:36] 请你打开电视看看</p>
+                    <p class="lyric-line opacity-30">[01:40] 多少人为生命在努力勇敢地走下去</p>
+                    <p class="lyric-line opacity-30">[01:45] 我们是不是该知足</p>
+                    <p class="lyric-line opacity-30">[01:50] 珍惜一切 就算没有拥有</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <footer class="h-32 flex items-center justify-between border-t-4 border-[var(--pip-green-dim)] mt-10">
+            <div class="w-80 space-y-2">
+                <div class="flex justify-between text-sm">
+                    <span>SECTOR_PROG:</span>
+                    <span>42.5%</span>
+                </div>
+                <div class="h-6 border-2 border-[var(--pip-green)] p-1">
+                    <div class="h-full w-[42.5%] bg-[var(--pip-green)] shadow-[0_0_10px_var(--pip-green)]"></div>
+                </div>
+                <div class="flex justify-between text-xs opacity-50">
+                    <span>01:40</span>
+                    <span>03:43</span>
+                </div>
+            </div>
+
+            <div class="flex gap-10">
+                <button class="tactical-btn">[[ PREV ]]</button>
+                <button class="tactical-btn px-16 text-4xl font-black">[[ PAUSE ]]</button>
+                <button class="tactical-btn">[[ NEXT ]]</button>
+            </div>
+
+            <div class="w-80 flex flex-col items-end gap-2">
+                <div class="flex gap-4">
+                    <button class="tactical-btn py-1 text-sm">VOL</button>
+                    <button class="tactical-btn py-1 text-sm">LST</button>
+                    <button class="tactical-btn py-1 text-sm">MAP</button>
+                </div>
+                <p class="text-xs opacity-40">ENCRYPTION: VAULT-TEC_HIGH_FIDELITY</p>
+            </div>
+        </footer>
+    </div>
+
+</body>
+</html>

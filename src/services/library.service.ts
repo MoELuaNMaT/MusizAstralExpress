@@ -1,21 +1,15 @@
 ﻿import type { UnifiedPlaylist, UnifiedSong, PlaylistType } from '@/types';
 import { invoke } from '@tauri-apps/api/core';
-import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
+import { getNeteaseApiBaseUrl, getQQApiBaseUrl, resolveRuntimeTarget } from '@/config/platform.config';
+import { canUseTauriInvoke } from '@/lib/runtime';
+import { normalizeImageUrl } from '@/lib/image-url';
 
-const NETEASE_API_BASE_URL = getNeteaseApiBaseUrl();
-const QQ_API_BASE_URL = getQQApiBaseUrl();
 const DEFAULT_COVER = 'https://p.qlogo.cn/gh/0/0/100';
 const NETEASE_WEB_ORDER_CACHE_KEY = 'allmusic_netease_web_order_cache_v1';
 const NETEASE_WEB_ORDER_CACHE_LIMIT = 5000;
-
-function canUseTauriInvoke(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const tauriInternals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__;
-  return typeof tauriInternals?.invoke === 'function';
-}
+const LIBRARY_REQUEST_TIMEOUT_MS = 12_000;
+const LIKED_STATE_CACHE_TTL_MS = 30_000;
+const QQ_USER_ID_CACHE_TTL_MS = 5 * 60_000;
 
 export interface LibraryContext {
   neteaseUserId?: string | null;
@@ -74,16 +68,50 @@ type QQPlaylist = UnifiedPlaylist & {
   qqSonglistId?: string;
 };
 
+interface LikedStateCacheSnapshot {
+  expiresAt: number;
+  neteaseCookie: string;
+  qqCookie: string;
+  neteaseLikedIds: string[];
+  qqLikedSongIds: string[];
+  qqLikedSongMids: string[];
+}
+
+interface QQUserIdCacheSnapshot {
+  expiresAt: number;
+  cookie: string;
+  userId: string;
+}
+
 class LibraryService {
+  private likedStateCache: LikedStateCacheSnapshot | null = null;
+  private qqUserIdCache: QQUserIdCacheSnapshot | null = null;
+  private getConnectionIssueMessage(): string {
+    if (resolveRuntimeTarget() === 'tauri-mobile') {
+      return '\u68C0\u6D4B\u5230 Android \u7AEF\u672C\u5730 API \u4E0D\u53EF\u8FBE\uFF1A\u8BF7\u5148\u5728\u5BBF\u4E3B\u673A\u8FD0\u884C `npm run dev:services`\uFF08\u6216 `npm run android:dev`\uFF09\uFF0C\u5E76\u786E\u4FDD 10.0.2.2:3000/3001 \u53EF\u8BBF\u95EE\u3002';
+    }
+
+    return '\u672C\u5730 API \u670D\u52A1\u672A\u542F\u52A8\u6216\u7AEF\u53E3\u4E0D\u53EF\u8FBE\u3002';
+  }
+
   async loadUnifiedPlaylists(context: LibraryContext): Promise<PlaylistResult> {
-    const requests: Array<Promise<{ platform: 'netease' | 'qq'; playlists: UnifiedPlaylist[]; warning?: string }>> = [];
+    const requests: Array<{
+      platform: 'netease' | 'qq';
+      task: Promise<{ platform: 'netease' | 'qq'; playlists: UnifiedPlaylist[]; warning?: string }>;
+    }> = [];
 
     if (context.neteaseCookie) {
-      requests.push(this.fetchNeteasePlaylists(context.neteaseUserId || undefined, context.neteaseCookie));
+      requests.push({
+        platform: 'netease',
+        task: this.fetchNeteasePlaylists(context.neteaseUserId || undefined, context.neteaseCookie),
+      });
     }
 
     if (context.qqCookie) {
-      requests.push(this.fetchQQPlaylists(context.qqCookie, context.qqUserId || undefined));
+      requests.push({
+        platform: 'qq',
+        task: this.fetchQQPlaylists(context.qqCookie, context.qqUserId || undefined),
+      });
     }
 
     if (requests.length === 0) {
@@ -93,10 +121,11 @@ class LibraryService {
       };
     }
 
-    const results = await Promise.all(requests);
-    const warnings = results
+    const settled = await this.settlePlatformTasks(requests, 'playlists');
+    const warnings = [...settled.warnings, ...settled.results
       .map((item) => item.warning)
-      .filter((item): item is string => Boolean(item));
+      .filter((item): item is string => Boolean(item))];
+    const results = settled.results;
 
     const likedPlaylists = results
       .flatMap((item) => item.playlists)
@@ -136,7 +165,7 @@ class LibraryService {
     } else {
       return {
         songs: [],
-        warning: '?????????????',
+        warning: '暂不支持该平台的歌单详情。',
       };
     }
 
@@ -192,7 +221,30 @@ class LibraryService {
         );
 
         if (neteaseDetail.songs.length > 0) {
-          neteaseSongsOrdered = neteaseDetail.songs.map((song) => ({ ...song, isLiked: true }));
+          let neteaseLikedPlaylistId = this.toText(neteaseLikedPlaylist.originalId);
+          if (!neteaseLikedPlaylistId || neteaseLikedPlaylistId === '0') {
+            const resolvedUserId = await this.resolveNeteaseUserId(
+              context.neteaseCookie,
+              context.neteaseUserId || undefined,
+            );
+            if (resolvedUserId) {
+              const resolvedLikedPlaylistId = await this.resolveNeteaseLikedPlaylistId(
+                resolvedUserId,
+                context.neteaseCookie,
+                neteaseLikedPlaylistId,
+              );
+              if (resolvedLikedPlaylistId) {
+                neteaseLikedPlaylistId = resolvedLikedPlaylistId;
+              }
+            }
+          }
+
+          const trackAddedAtMap = await this.fetchNeteaseTrackAddedAtMap(
+            neteaseLikedPlaylistId,
+            context.neteaseCookie,
+          );
+          const neteaseSongsWithAddedAt = this.applyAddedAtMap(neteaseDetail.songs, trackAddedAtMap);
+          neteaseSongsOrdered = neteaseSongsWithAddedAt.map((song) => ({ ...song, isLiked: true }));
         } else if (neteaseDetail.warning) {
           warnings.push(`网易云：${neteaseDetail.warning}`);
         }
@@ -213,11 +265,15 @@ class LibraryService {
       }
     }
 
-    // Interleave NetEase/QQ liked songs to form a true mixed feed.
-    const songs = this.interleaveSongs([
+    const interleavedSongs = this.interleaveSongs([
       neteaseSongsOrdered,
       qqSongs,
     ]);
+    const songs = interleavedSongs;
+    const infoMessages: string[] = [];
+    if (infoMessage) {
+      infoMessages.push(infoMessage);
+    }
 
     if (songs.length === 0) {
       return {
@@ -229,7 +285,7 @@ class LibraryService {
     return {
       songs,
       warning: warnings.length > 0 ? warnings.join('；') : undefined,
-      info: infoMessage,
+      info: infoMessages.length > 0 ? infoMessages.join('；') : undefined,
     };
   }
 
@@ -282,7 +338,7 @@ class LibraryService {
         };
       }
 
-      const endpoint = `${QQ_API_BASE_URL}/playlist/like?id=${encodeURIComponent(identity.songId)}&like=${like ? '1' : '0'}&timestamp=${Date.now()}`;
+      const endpoint = `${getQQApiBaseUrl()}/playlist/like?id=${encodeURIComponent(identity.songId)}&like=${like ? '1' : '0'}&timestamp=${Date.now()}`;
       const response = await this.fetchJson<any>(endpoint, {
         method: 'POST',
         headers: this.buildQQAuthHeaders(cookie),
@@ -330,14 +386,23 @@ class LibraryService {
     const connectedPlatformCount = Number(Boolean(context.neteaseCookie)) + Number(Boolean(context.qqCookie));
     const perPlatformLimit = Math.max(10, Math.ceil(limit / Math.max(connectedPlatformCount, 1)));
 
-    const requests: Array<Promise<{ platform: 'netease' | 'qq'; songs: UnifiedSong[]; warning?: string }>> = [];
+    const requests: Array<{
+      platform: 'netease' | 'qq';
+      task: Promise<{ platform: 'netease' | 'qq'; songs: UnifiedSong[]; warning?: string }>;
+    }> = [];
 
     if (context.neteaseCookie) {
-      requests.push(this.searchNeteaseSongs(normalizedKeyword, perPlatformLimit, context.neteaseCookie));
+      requests.push({
+        platform: 'netease',
+        task: this.searchNeteaseSongs(normalizedKeyword, perPlatformLimit, context.neteaseCookie),
+      });
     }
 
     if (context.qqCookie) {
-      requests.push(this.searchQQSongs(normalizedKeyword, perPlatformLimit, context.qqCookie));
+      requests.push({
+        platform: 'qq',
+        task: this.searchQQSongs(normalizedKeyword, perPlatformLimit, context.qqCookie),
+      });
     }
 
     if (requests.length === 0) {
@@ -347,18 +412,19 @@ class LibraryService {
       };
     }
 
-    const results = await Promise.all(requests);
-    const warnings = results
+    const settled = await this.settlePlatformTasks(requests, 'search');
+    const warnings = [...settled.warnings, ...settled.results
       .map((item) => item.warning)
-      .filter((item): item is string => Boolean(item));
+      .filter((item): item is string => Boolean(item))];
+    const results = settled.results;
 
-    const rankedResults = results.map((item) => ({
-      ...item,
-      songs: this.rankAndDedupeSongs(item.songs, normalizedKeyword),
-    }));
-
-    const interleaved = this.interleaveSongs(rankedResults.map((item) => item.songs));
-    const limitedSongs = interleaved.slice(0, limit);
+    const mergedSongs = results.flatMap((item) => item.songs);
+    const rankedSongs = this.rankAndDedupeSongs(mergedSongs, normalizedKeyword);
+    const dedupedCount = Math.max(0, mergedSongs.length - rankedSongs.length);
+    if (dedupedCount > 0) {
+      warnings.push(`已跨平台去重 ${dedupedCount} 首重复歌曲，优先保留音质更优版本。`);
+    }
+    const limitedSongs = rankedSongs.slice(0, limit);
     const songs = await this.attachLikedState(limitedSongs, context);
 
     return {
@@ -368,14 +434,23 @@ class LibraryService {
   }
 
   async loadDailyRecommendations(context: LibraryContext, limit = 30): Promise<DailyRecommendResult> {
-    const requests: Array<Promise<{ platform: 'netease' | 'qq'; songs: UnifiedSong[]; warning?: string }>> = [];
+    const requests: Array<{
+      platform: 'netease' | 'qq';
+      task: Promise<{ platform: 'netease' | 'qq'; songs: UnifiedSong[]; warning?: string }>;
+    }> = [];
 
     if (context.neteaseCookie) {
-      requests.push(this.fetchNeteaseDailyRecommendations(limit, context.neteaseCookie));
+      requests.push({
+        platform: 'netease',
+        task: this.fetchNeteaseDailyRecommendations(limit, context.neteaseCookie),
+      });
     }
 
     if (context.qqCookie) {
-      requests.push(this.fetchQQDailyRecommendations(limit, context.qqCookie));
+      requests.push({
+        platform: 'qq',
+        task: this.fetchQQDailyRecommendations(limit, context.qqCookie),
+      });
     }
 
     if (requests.length === 0) {
@@ -385,10 +460,11 @@ class LibraryService {
       };
     }
 
-    const results = await Promise.all(requests);
-    const warnings = results
+    const settled = await this.settlePlatformTasks(requests, 'daily');
+    const warnings = [...settled.warnings, ...settled.results
       .map((item) => item.warning)
-      .filter((item): item is string => Boolean(item));
+      .filter((item): item is string => Boolean(item))];
+    const results = settled.results;
 
     const interleaved = this.interleaveSongs(results.map((item) => item.songs));
     const songs = await this.attachLikedState(interleaved.slice(0, limit), context);
@@ -409,6 +485,53 @@ class LibraryService {
       translatedLyric: '',
       warning: '暂不支持该平台歌词。',
     };
+  }
+
+  private async settlePlatformTasks<T extends { warning?: string }>(
+    requests: Array<{ platform: 'netease' | 'qq'; task: Promise<T> }>,
+    scene: 'playlists' | 'search' | 'daily',
+  ): Promise<{ results: T[]; warnings: string[] }> {
+    const settled = await Promise.allSettled(requests.map((item) => item.task));
+    const results: T[] = [];
+    const warnings: string[] = [];
+
+    settled.forEach((item, index) => {
+      const request = requests[index];
+      if (item.status === 'fulfilled') {
+        results.push(item.value);
+        return;
+      }
+
+      warnings.push(
+        this.buildSinglePlatformFallbackWarning(
+          request.platform,
+          scene,
+          this.normalizeUnknownError(item.reason),
+        ),
+      );
+    });
+
+    return { results, warnings };
+  }
+
+  private buildSinglePlatformFallbackWarning(
+    platform: 'netease' | 'qq',
+    scene: 'playlists' | 'search' | 'daily',
+    reason: string,
+  ): string {
+    const platformName = platform === 'netease' ? '网易云' : 'QQ 音乐';
+    const sceneLabelMap: Record<'playlists' | 'search' | 'daily', string> = {
+      playlists: '歌单',
+      search: '搜索',
+      daily: '推荐',
+    };
+    const sceneLabel = sceneLabelMap[scene];
+    const normalizedReason = this.toText(reason);
+
+    if (normalizedReason) {
+      return `${platformName}${sceneLabel}暂时不可用，已自动降级为单平台模式（${normalizedReason}）。`;
+    }
+    return `${platformName}${sceneLabel}暂时不可用，已自动降级为单平台模式。`;
   }
 
   private async fetchNeteasePlaylists(
@@ -507,7 +630,7 @@ class LibraryService {
       adapterParams.set('uin', inferredUserId);
     }
 
-    const adapterEndpoint = `${QQ_API_BASE_URL}/playlist/user?${adapterParams.toString()}`;
+    const adapterEndpoint = `${getQQApiBaseUrl()}/playlist/user?${adapterParams.toString()}`;
     const adapterResponse = await this.fetchJson<any>(adapterEndpoint, {
       headers: this.buildQQAuthHeaders(cookie),
       cache: 'no-store',
@@ -536,7 +659,7 @@ class LibraryService {
       };
     }
 
-    const legacyEndpoint = `${QQ_API_BASE_URL}/user/songlist?id=${encodeURIComponent(inferredUserId)}&pageNo=1&pageSize=200&timestamp=${Date.now()}`;
+    const legacyEndpoint = `${getQQApiBaseUrl()}/user/songlist?id=${encodeURIComponent(inferredUserId)}&pageNo=1&pageSize=200&timestamp=${Date.now()}`;
     const legacyResponse = await this.fetchJson<any>(legacyEndpoint, {
       headers: this.buildQQAuthHeaders(cookie),
       cache: 'no-store',
@@ -676,7 +799,7 @@ class LibraryService {
       adapterParams.set('dirid', playlist.qqDirId);
     }
 
-    const adapterEndpoint = `${QQ_API_BASE_URL}/playlist/detail?${adapterParams.toString()}`;
+    const adapterEndpoint = `${getQQApiBaseUrl()}/playlist/detail?${adapterParams.toString()}`;
     const adapterResponse = await this.fetchJson<any>(adapterEndpoint, {
       headers: cookie ? this.buildQQAuthHeaders(cookie) : undefined,
       cache: 'no-store',
@@ -706,7 +829,7 @@ class LibraryService {
       };
     }
 
-    const legacyEndpoint = `${QQ_API_BASE_URL}/songlist?id=${encodeURIComponent(legacyPlaylistId)}&timestamp=${Date.now()}`;
+    const legacyEndpoint = `${getQQApiBaseUrl()}/songlist?id=${encodeURIComponent(legacyPlaylistId)}&timestamp=${Date.now()}`;
     const legacyResponse = await this.fetchJson<any>(legacyEndpoint, {
       headers: cookie ? this.buildQQAuthHeaders(cookie) : undefined,
       cache: 'no-store',
@@ -770,7 +893,7 @@ class LibraryService {
     limit: number,
     cookie: string,
   ): Promise<{ platform: 'qq'; songs: UnifiedSong[]; warning?: string }> {
-    const adapterEndpoint = `${QQ_API_BASE_URL}/search/songs?keyword=${encodeURIComponent(keyword)}&limit=${limit}&timestamp=${Date.now()}`;
+    const adapterEndpoint = `${getQQApiBaseUrl()}/search/songs?keyword=${encodeURIComponent(keyword)}&limit=${limit}&timestamp=${Date.now()}`;
     const adapterResponse = await this.fetchJson<any>(adapterEndpoint, {
       headers: this.buildQQAuthHeaders(cookie),
       cache: 'no-store',
@@ -790,7 +913,7 @@ class LibraryService {
       return { platform: 'qq', songs };
     }
 
-    const legacyEndpoint = `${QQ_API_BASE_URL}/search?key=${encodeURIComponent(keyword)}&t=0&pageNo=1&pageSize=${limit}&timestamp=${Date.now()}`;
+    const legacyEndpoint = `${getQQApiBaseUrl()}/search?key=${encodeURIComponent(keyword)}&t=0&pageNo=1&pageSize=${limit}&timestamp=${Date.now()}`;
     const legacyResponse = await this.fetchJson<any>(legacyEndpoint, {
       headers: this.buildQQAuthHeaders(cookie),
       cache: 'no-store',
@@ -860,7 +983,7 @@ class LibraryService {
     limit: number,
     cookie: string,
   ): Promise<{ platform: 'qq'; songs: UnifiedSong[]; warning?: string }> {
-    const endpoint = `${QQ_API_BASE_URL}/recommend/daily?limit=${Math.max(1, limit)}&timestamp=${Date.now()}`;
+    const endpoint = `${getQQApiBaseUrl()}/recommend/daily?limit=${Math.max(1, limit)}&timestamp=${Date.now()}`;
     const response = await this.fetchJson<any>(endpoint, {
       headers: this.buildQQAuthHeaders(cookie),
       cache: 'no-store',
@@ -938,7 +1061,7 @@ class LibraryService {
       params.set('id', identity.songId);
     }
 
-    const endpoint = `${QQ_API_BASE_URL}/song/lyric?${params.toString()}`;
+    const endpoint = `${getQQApiBaseUrl()}/song/lyric?${params.toString()}`;
     const response = await this.fetchJson<any>(endpoint, {
       headers: cookie ? this.buildQQAuthHeaders(cookie) : undefined,
       cache: 'no-store',
@@ -986,7 +1109,9 @@ class LibraryService {
       originalId,
       type: this.detectNeteasePlaylistType(raw, currentUserId),
       name,
-      coverUrl: this.toText(raw?.coverImgUrl || raw?.coverUrl || raw?.cover) || DEFAULT_COVER,
+      coverUrl: normalizeImageUrl(
+        this.toText(raw?.coverImgUrl || raw?.coverUrl || raw?.cover) || DEFAULT_COVER,
+      ),
       songCount,
       creator: creatorName,
       description: this.toText(raw?.description),
@@ -1082,20 +1207,22 @@ class LibraryService {
       originalId,
       type: playlistType,
       name,
-      coverUrl: this.toText(
-        raw?.coverUrl
-        || raw?.cover_url_big
-        || raw?.cover_url_medium
-        || raw?.cover_url
-        || raw?.cover
-        || raw?.bigpicUrl
-        || raw?.picUrl
-        || raw?.imgurl
-        || raw?.logo
-        || raw?.diss_cover
-        || dirInfo?.cover_url
-        || dirInfo?.coverurl,
-      ) || DEFAULT_COVER,
+      coverUrl: normalizeImageUrl(
+        this.toText(
+          raw?.coverUrl
+          || raw?.cover_url_big
+          || raw?.cover_url_medium
+          || raw?.cover_url
+          || raw?.cover
+          || raw?.bigpicUrl
+          || raw?.picUrl
+          || raw?.imgurl
+          || raw?.logo
+          || raw?.diss_cover
+          || dirInfo?.cover_url
+          || dirInfo?.coverurl,
+        ) || DEFAULT_COVER,
+      ),
       songCount,
       creator: creatorName,
       description: this.toText(raw?.description || raw?.desc || raw?.diss_desc || dirInfo?.desc),
@@ -1121,13 +1248,20 @@ class LibraryService {
 
     const albumName = this.toText(raw?.al?.name || raw?.album?.name || raw?.albumName || raw?.album);
     const duration = this.toNumber(raw?.dt ?? raw?.duration ?? raw?.interval);
-    const coverUrl = this.toText(
-      raw?.al?.picUrl
-      || raw?.album?.picUrl
-      || raw?.album?.blurPicUrl
-      || raw?.picUrl
-      || raw?.coverUrl,
-    ) || DEFAULT_COVER;
+    const coverUrl = normalizeImageUrl(
+      this.toText(
+        raw?.al?.picUrl
+        || raw?.album?.picUrl
+        || raw?.album?.blurPicUrl
+        || raw?.picUrl
+        || raw?.coverUrl,
+      ) || DEFAULT_COVER,
+    );
+    const quality = this.detectNeteaseSongQuality(raw);
+    const rawAddedAt = this.toNumber(raw?.addedAt ?? raw?.at);
+    const addedAt = rawAddedAt > 0
+      ? Math.round(rawAddedAt >= 10_000_000_000 ? rawAddedAt : rawAddedAt * 1000)
+      : undefined;
 
     return {
       id: `netease_${originalId}`,
@@ -1138,6 +1272,8 @@ class LibraryService {
       album: albumName || '\u672a\u77e5\u4e13\u8f91',
       duration,
       coverUrl,
+      addedAt,
+      quality,
     };
   }
 
@@ -1159,6 +1295,21 @@ class LibraryService {
     const coverFromAlbumMid = albumMid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${albumMid}.jpg` : '';
 
     const interval = this.toNumber(raw?.interval);
+    const quality = this.detectQQSongQuality(raw);
+    const rawAddedAt = this.toNumber(
+      raw?.addedAt
+      ?? raw?.join_time
+      ?? raw?.joinTime
+      ?? raw?.add_time
+      ?? raw?.addTime
+      ?? raw?.addtime
+      ?? raw?.ctime
+      ?? raw?.create_time
+      ?? raw?.createTime,
+    );
+    const addedAt = rawAddedAt > 0
+      ? Math.round(rawAddedAt >= 10_000_000_000 ? rawAddedAt : rawAddedAt * 1000)
+      : undefined;
 
     return {
       id: `qq_${originalId}`,
@@ -1166,12 +1317,73 @@ class LibraryService {
       originalId,
       qqSongId: qqSongId || undefined,
       qqSongMid: qqSongMid || undefined,
-      name: this.toText(raw?.name || raw?.songname || raw?.title) || '????',
-      artist: singers || '????',
-      album: albumName || '????',
+      name: this.toText(raw?.name || raw?.songname || raw?.title) || '未知歌曲',
+      artist: singers || '未知歌手',
+      album: albumName || '未知专辑',
       duration: interval > 0 ? interval * 1000 : this.toNumber(raw?.duration),
-      coverUrl: this.toText(raw?.coverUrl || raw?.picurl || raw?.albumpic) || coverFromAlbumMid || DEFAULT_COVER,
+      coverUrl: normalizeImageUrl(
+        this.toText(raw?.coverUrl || raw?.picurl || raw?.albumpic) || coverFromAlbumMid || DEFAULT_COVER,
+      ),
+      addedAt,
+      quality,
     };
+  }
+
+  private detectNeteaseSongQuality(raw: any): UnifiedSong['quality'] | undefined {
+    const maxBr = this.toNumber(
+      raw?.privilege?.maxbr
+      ?? raw?.maxBr
+      ?? raw?.maxbr
+      ?? raw?.hMusic?.bitrate
+      ?? raw?.mMusic?.bitrate
+      ?? raw?.lMusic?.bitrate,
+    );
+
+    if (raw?.hr?.br || maxBr >= 999000) {
+      return 'hires';
+    }
+    if (raw?.sq?.br || maxBr >= 700000) {
+      return 'flac';
+    }
+    if (raw?.h?.br || maxBr >= 320000) {
+      return '320';
+    }
+    if (raw?.m?.br || raw?.l?.br || maxBr > 0) {
+      return '128';
+    }
+    return undefined;
+  }
+
+  private detectQQSongQuality(raw: any): UnifiedSong['quality'] | undefined {
+    const file = raw?.file || {};
+    const hiResSize = this.toNumber(file?.size_hires || file?.size_hires_24bit || file?.size_new);
+    const flacSize = this.toNumber(file?.size_flac || file?.flacsize || raw?.flacsize);
+    const size320 = this.toNumber(
+      file?.size_320mp3
+      || file?.size_ogg_320
+      || raw?.size320
+      || raw?.size_320,
+    );
+    const size128 = this.toNumber(
+      file?.size_128mp3
+      || file?.size_128
+      || raw?.size128
+      || raw?.size_128,
+    );
+
+    if (hiResSize > 0) {
+      return 'hires';
+    }
+    if (flacSize > 0 || this.toText(raw?.stream) === 'flac') {
+      return 'flac';
+    }
+    if (size320 > 0) {
+      return '320';
+    }
+    if (size128 > 0) {
+      return '128';
+    }
+    return undefined;
   }
 
 
@@ -1195,21 +1407,52 @@ class LibraryService {
       return songs;
     }
 
-    const deduped = new Map<string, { song: UnifiedSong; score: number; index: number }>();
+    const deduped = new Map<string, { song: UnifiedSong; score: number; qualityScore: number; index: number }>();
     const normalizedKeyword = this.normalizeSearchText(keyword);
 
     songs.forEach((song, index) => {
       const score = this.computeSearchScore(song, normalizedKeyword);
-      const dedupeKey = `${song.platform}|${this.normalizeSearchText(song.name)}|${this.normalizeSearchText(song.artist)}`;
+      const qualityScore = this.resolveSongQualityScore(song);
+      const normalizedName = this.normalizeSearchText(song.name);
+      const normalizedArtist = this.normalizeSearchText(song.artist);
+      const dedupeKey = normalizedName && normalizedArtist
+        ? `${normalizedName}|${normalizedArtist}`
+        : `${song.platform}|${song.id}`;
       const current = deduped.get(dedupeKey);
-      if (!current || score > current.score) {
-        deduped.set(dedupeKey, { song, score, index });
+      if (!current) {
+        deduped.set(dedupeKey, { song, score, qualityScore, index });
+        return;
+      }
+
+      const shouldReplace = (
+        score > current.score
+        || (score === current.score && qualityScore > current.qualityScore)
+        || (score === current.score && qualityScore === current.qualityScore && index < current.index)
+      );
+      if (shouldReplace) {
+        deduped.set(dedupeKey, { song, score, qualityScore, index });
       }
     });
 
     return Array.from(deduped.values())
-      .sort((a, b) => (b.score - a.score) || (a.index - b.index))
+      .sort((a, b) => (b.score - a.score) || (b.qualityScore - a.qualityScore) || (a.index - b.index))
       .map((item) => item.song);
+  }
+
+  private resolveSongQualityScore(song: UnifiedSong): number {
+    const qualityScoreMap: Record<NonNullable<UnifiedSong['quality']>, number> = {
+      '128': 1,
+      '320': 2,
+      flac: 3,
+      hires: 4,
+    };
+    const explicitQualityScore = song.quality ? qualityScoreMap[song.quality] || 0 : 0;
+    if (explicitQualityScore > 0) {
+      return explicitQualityScore * 10;
+    }
+
+    // Heuristic fallback: QQ search endpoint usually provides higher-quality candidates with cookie auth.
+    return song.platform === 'qq' ? 15 : 10;
   }
 
   private computeSearchScore(song: UnifiedSong, normalizedKeyword: string): number {
@@ -1271,6 +1514,58 @@ class LibraryService {
     return merged;
   }
 
+  private applyAddedAtMap(songs: UnifiedSong[], trackAddedAtMap: Map<string, number>): UnifiedSong[] {
+    if (trackAddedAtMap.size === 0) {
+      return songs;
+    }
+
+    return songs.map((song) => {
+      const mappedAddedAt = this.toNumber(trackAddedAtMap.get(song.originalId));
+      if (mappedAddedAt <= 0) {
+        return song;
+      }
+      return { ...song, addedAt: mappedAddedAt };
+    });
+  }
+
+  private async fetchNeteaseTrackAddedAtMap(
+    playlistId: string,
+    cookie?: string,
+  ): Promise<Map<string, number>> {
+    if (!playlistId) {
+      return new Map<string, number>();
+    }
+
+    const endpoint = this.buildNeteaseUrl('/playlist/detail', {
+      id: playlistId,
+      timestamp: String(Date.now()),
+    }, cookie);
+
+    const response = await this.fetchJson<any>(endpoint, {
+      cache: 'no-store',
+    });
+
+    if (!response.ok || !response.data || response.data.code !== 200) {
+      return new Map<string, number>();
+    }
+
+    const trackIds = Array.isArray(response.data.playlist?.trackIds)
+      ? response.data.playlist.trackIds
+      : [];
+    const trackAddedAtMap = new Map<string, number>();
+
+    for (const item of trackIds) {
+      const trackId = this.toText(item?.id);
+      const addedAt = this.toNumber(item?.at);
+      if (!trackId || addedAt <= 0) {
+        continue;
+      }
+      trackAddedAtMap.set(trackId, addedAt);
+    }
+
+    return trackAddedAtMap;
+  }
+
   private async attachLikedState(songs: UnifiedSong[], context: LibraryContext): Promise<UnifiedSong[]> {
     if (songs.length === 0) {
       return songs;
@@ -1279,21 +1574,45 @@ class LibraryService {
     const neteaseLikedSet = new Set<string>();
     const qqLikedSongIdSet = new Set<string>();
     const qqLikedSongMidSet = new Set<string>();
+    const normalizedNeteaseCookie = context.neteaseCookie?.trim() || '';
+    const normalizedQQCookie = context.qqCookie?.trim() || '';
+    const now = Date.now();
+    const canUseCache = Boolean(
+      this.likedStateCache
+      && this.likedStateCache.expiresAt > now
+      && this.likedStateCache.neteaseCookie === normalizedNeteaseCookie
+      && this.likedStateCache.qqCookie === normalizedQQCookie,
+    );
 
-    const hasNeteaseSongs = songs.some((song) => song.platform === 'netease');
-    if (hasNeteaseSongs && context.neteaseCookie) {
-      const neteaseUserId = await this.resolveNeteaseUserId(context.neteaseCookie, context.neteaseUserId || undefined);
-      if (neteaseUserId) {
-        const likedIds = await this.fetchNeteaseLikedSongIds(neteaseUserId, context.neteaseCookie);
-        likedIds.forEach((id) => neteaseLikedSet.add(id));
+    if (canUseCache && this.likedStateCache) {
+      this.likedStateCache.neteaseLikedIds.forEach((id) => neteaseLikedSet.add(id));
+      this.likedStateCache.qqLikedSongIds.forEach((id) => qqLikedSongIdSet.add(id));
+      this.likedStateCache.qqLikedSongMids.forEach((mid) => qqLikedSongMidSet.add(mid));
+    } else {
+      const hasNeteaseSongs = songs.some((song) => song.platform === 'netease');
+      if (hasNeteaseSongs && normalizedNeteaseCookie) {
+        const neteaseUserId = await this.resolveNeteaseUserId(normalizedNeteaseCookie, context.neteaseUserId || undefined);
+        if (neteaseUserId) {
+          const likedIds = await this.fetchNeteaseLikedSongIds(neteaseUserId, normalizedNeteaseCookie);
+          likedIds.forEach((id) => neteaseLikedSet.add(id));
+        }
       }
-    }
 
-    const hasQQSongs = songs.some((song) => song.platform === 'qq');
-    if (hasQQSongs && context.qqCookie) {
-      const likedLookup = await this.fetchQQLikedSongIds(context.qqCookie, context.qqUserId || undefined);
-      likedLookup.songIds.forEach((songId) => qqLikedSongIdSet.add(songId));
-      likedLookup.songMids.forEach((songMid) => qqLikedSongMidSet.add(songMid));
+      const hasQQSongs = songs.some((song) => song.platform === 'qq');
+      if (hasQQSongs && normalizedQQCookie) {
+        const likedLookup = await this.fetchQQLikedSongIds(normalizedQQCookie, context.qqUserId || undefined);
+        likedLookup.songIds.forEach((songId) => qqLikedSongIdSet.add(songId));
+        likedLookup.songMids.forEach((songMid) => qqLikedSongMidSet.add(songMid));
+      }
+
+      this.likedStateCache = {
+        expiresAt: now + LIKED_STATE_CACHE_TTL_MS,
+        neteaseCookie: normalizedNeteaseCookie,
+        qqCookie: normalizedQQCookie,
+        neteaseLikedIds: Array.from(neteaseLikedSet),
+        qqLikedSongIds: Array.from(qqLikedSongIdSet),
+        qqLikedSongMids: Array.from(qqLikedSongMidSet),
+      };
     }
 
     return songs.map((song) => {
@@ -1761,7 +2080,7 @@ class LibraryService {
     if (cookie?.trim()) {
       searchParams.set('cookie', cookie.trim());
     }
-    return `${NETEASE_API_BASE_URL}${path}?${searchParams.toString()}`;
+    return `${getNeteaseApiBaseUrl()}${path}?${searchParams.toString()}`;
   }
 
   private buildQQAuthHeaders(cookie?: string): Record<string, string> {
@@ -1777,12 +2096,26 @@ class LibraryService {
   }
 
   private async resolveQQUserId(cookie: string, userId?: string): Promise<string> {
+    const normalizedCookie = cookie.trim();
+    if (
+      this.qqUserIdCache
+      && this.qqUserIdCache.cookie === normalizedCookie
+      && this.qqUserIdCache.expiresAt > Date.now()
+    ) {
+      return this.qqUserIdCache.userId;
+    }
+
     const fromCookie = this.extractQQUserIdFromCookie(cookie);
     if (fromCookie) {
+      this.qqUserIdCache = {
+        cookie: normalizedCookie,
+        userId: fromCookie,
+        expiresAt: Date.now() + QQ_USER_ID_CACHE_TTL_MS,
+      };
       return fromCookie;
     }
 
-    const statusEndpoint = `${QQ_API_BASE_URL}/connect/status?timestamp=${Date.now()}`;
+    const statusEndpoint = `${getQQApiBaseUrl()}/connect/status?timestamp=${Date.now()}`;
     const statusResponse = await this.fetchJson<any>(statusEndpoint, {
       headers: this.buildQQAuthHeaders(cookie),
       cache: 'no-store',
@@ -1793,6 +2126,11 @@ class LibraryService {
         this.toText(statusResponse.data.data?.id ?? statusResponse.data.id),
       );
       if (statusId) {
+        this.qqUserIdCache = {
+          cookie: normalizedCookie,
+          userId: statusId,
+          expiresAt: Date.now() + QQ_USER_ID_CACHE_TTL_MS,
+        };
         return statusId;
       }
     }
@@ -1903,9 +2241,13 @@ class LibraryService {
   }
 
   private async fetchJson<T>(url: string, init: RequestInit = {}): Promise<{ ok: boolean; data?: T; error?: string }> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LIBRARY_REQUEST_TIMEOUT_MS);
+
     try {
       const response = await fetch(url, {
         ...init,
+        signal: init.signal ?? controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...(init.headers || {}),
@@ -1924,13 +2266,16 @@ class LibraryService {
       return { ok: true, data };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Network error';
+      const isAbort = error instanceof DOMException && error.name === 'AbortError';
       const isConnectionIssue = /failed to fetch|networkerror|err_connection_refused|fetch failed/i.test(message);
       return {
         ok: false,
-        error: isConnectionIssue
-          ? '本地 API 服务未启动或端口不可达。'
-          : message,
+        error: isAbort
+          ? `请求超时（${Math.floor(LIBRARY_REQUEST_TIMEOUT_MS / 1000)}s），请检查本地 API 状态。`
+          : (isConnectionIssue ? this.getConnectionIssueMessage() : message),
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
