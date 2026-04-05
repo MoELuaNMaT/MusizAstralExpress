@@ -435,7 +435,6 @@ class AuthService {
       { signal, cache: 'no-store' },
       true
     );
-    console.log('Raw QR check response:', response);
 
     if (response.success && response.data) {
       const data = response.data as any;
@@ -494,7 +493,6 @@ class AuthService {
     }
 
     const createResponse = await this.neteaseCreateQRCode(signal);
-    console.log('QR Code Response:', createResponse);
 
     if (!createResponse.success || !createResponse.data) {
       return {
@@ -504,8 +502,6 @@ class AuthService {
     }
 
     let { unikey, qrurl, qrimg } = createResponse.data;
-    console.log('QR Code URL:', qrurl);
-    console.log('QR Code IMG:', qrimg);
 
     // Use qrimg (base64) if available, otherwise use qrurl
     const displayUrl = qrimg || qrurl;
@@ -528,14 +524,12 @@ class AuthService {
       const checkResponse = await this.neteaseCheckQRCode(unikey, signal);
 
       if (!checkResponse.success || !checkResponse.data) {
-        console.log('Check failed, waiting 1s...');
         await this.delay(1000);
         attempts++;
         continue;
       }
 
-      const { code, cookie, message } = checkResponse.data;
-      console.log(`QR Status: ${code} (${code === 801 ? 'Waiting for scan' : code === 802 ? 'Scanned, waiting confirm' : code === 803 ? 'Confirmed!' : code === 800 ? 'Expired' : 'Unknown'})`, message || '');
+      const { code, cookie } = checkResponse.data;
 
       switch (code) {
         case 801:
@@ -569,7 +563,6 @@ class AuthService {
           };
         case 803:
           onStatusChange?.('已确认，正在登录...');
-          console.log('Login confirmed! Fetching user account info...');
 
           if (!cookie) {
             return {
@@ -593,7 +586,6 @@ class AuthService {
                 { signal },
                 true
               );
-              console.log('Account response:', accountResponse);
 
               if (accountResponse.success && accountResponse.data) {
                 const accountData = accountResponse.data as any;
@@ -627,7 +619,6 @@ class AuthService {
             error: '已确认登录，但获取用户信息失败，请重试。',
           };
         default:
-          console.log('Unknown code:', code);
       }
 
       await this.delay(1000);

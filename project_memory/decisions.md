@@ -8,3 +8,7 @@
 - 采用方案：先提交当前工作区，再执行 `main <- feat/mobile-android-bootstrap`。
 - 冲突决策：`auth` 冲突优先保留 main 上的登录稳定性修复（cookie/header/renew 逻辑），同时切换至 `platform.config` 与 `normalizeImageUrl`。
 - 推送策略：网络不稳定时先保留本地可恢复状态，不做破坏性回滚。
+
+## 2026-04-05（仓库治理决策）
+- 采用“最小修复”策略：不改业务逻辑，仅移除敏感日志并治理仓库产物入库。
+- 删除策略为 `git rm --cached`：保留本地产物用于调试，但不再进入版本库。

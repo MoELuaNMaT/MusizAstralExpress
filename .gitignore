@@ -55,3 +55,9 @@ src-tauri/gen/ios/build/
 
 # Local packaging output
 release/
+
+# Local temp/debug artifacts
+.tmp/
+dist-portable/
+artifacts/
+.codex_sdk_list.txt
