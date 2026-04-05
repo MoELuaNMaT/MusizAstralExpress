@@ -3,31 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ALLMusic Y2K AF - 导航</title>
+  <title>ALLMusic Y2K AF - Router</title>
   <link rel="stylesheet" href="./theme.css" />
+  <style>
+    .route-panel {
+      display: grid;
+      gap: 12px;
+    }
+    .route-toolbar {
+      display: grid;
+      gap: 10px;
+    }
+    .route-toolbar .btn {
+      min-width: 132px;
+    }
+    .route-toolbar .btn.active {
+      box-shadow: 0 0 0 2px #fff5;
+    }
+    .route-meta {
+      font-size: 12px;
+      color: #ffe9ff;
+      text-shadow: 0 1px 0 #0008;
+    }
+    .route-frame {
+      width: 100%;
+      height: min(720px, calc(100vh - 240px));
+      border: 1px solid #ffffff8c;
+      border-radius: 16px;
+      background: #fff;
+    }
+  </style>
 </head>
 <body>
   <div class="scene">
     <div class="scene-head">
-      <a class="badge-link" href="./index.html"><span class="dot"></span><span>ALLMusic Y2K (ArtFate Ref) / Navigation</span></a>
-      <div class="meta">基于你提供文章提炼：高饱和糖果色 + 金属/塑料反光 + 复古未来界面元素</div>
+      <a class="badge-link" href="#/desktop-login"><span class="dot"></span><span>ALLMusic Y2K (ArtFate Ref) / Router</span></a>
+      <div class="meta">已切换为 Hash Router：页面切换不再跳转到静态 HTML，而是统一由 index 路由分发。</div>
     </div>
 
-    <section class="win" style="max-width:920px">
-      <div class="win-header"><div class="win-title">页面导航</div><div class="win-actions"><span></span><span></span><span></span></div></div>
-      <div class="win-body">
-        <div class="toolbar">
-          <a class="btn primary" href="./desktop-login.html">桌面登录页</a>
-          <a class="btn" href="./desktop-home.html">桌面主界面</a>
-          <a class="btn" href="./desktop-player.html">桌面播放页</a>
+    <section class="win" style="max-width:1120px">
+      <div class="win-header"><div class="win-title">Y2K Router</div><div class="win-actions"><span></span><span></span><span></span></div></div>
+      <div class="win-body route-panel">
+        <div class="route-toolbar">
+          <div class="toolbar">
+            <button class="btn" type="button" data-route="desktop-login">桌面登录页</button>
+            <button class="btn" type="button" data-route="desktop-home">桌面主界面</button>
+            <button class="btn" type="button" data-route="desktop-player">桌面播放页</button>
+          </div>
+          <div class="toolbar">
+            <button class="btn" type="button" data-route="mobile-login">移动登录页</button>
+            <button class="btn" type="button" data-route="mobile-home">移动主界面</button>
+            <button class="btn" type="button" data-route="mobile-player">移动播放页</button>
+          </div>
         </div>
-        <div class="toolbar">
-          <a class="btn primary" href="./mobile-login.html">移动登录页</a>
-          <a class="btn" href="./mobile-home.html">移动主界面</a>
-          <a class="btn" href="./mobile-player.html">移动播放页</a>
-        </div>
+
+        <div id="route-meta" class="route-meta">Route: loading...</div>
+        <iframe id="route-frame" class="route-frame" title="ALLMusic Y2K AF Preview"></iframe>
       </div>
     </section>
   </div>
+
+  <script>
+    (function () {
+      const ROUTES = {
+        'desktop-login': { label: '桌面登录页', file: './desktop-login.html' },
+        'desktop-home': { label: '桌面主界面', file: './desktop-home.html' },
+        'desktop-player': { label: '桌面播放页', file: './desktop-player.html' },
+        'mobile-login': { label: '移动登录页', file: './mobile-login.html' },
+        'mobile-home': { label: '移动主界面', file: './mobile-home.html' },
+        'mobile-player': { label: '移动播放页', file: './mobile-player.html' },
+      };
+
+      const DEFAULT_ROUTE = 'desktop-login';
+      const buttons = Array.from(document.querySelectorAll('[data-route]'));
+      const frame = document.getElementById('route-frame');
+      const routeMeta = document.getElementById('route-meta');
+
+      function resolveRouteFromHash() {
+        const raw = String(window.location.hash || '').replace(/^#\/?/, '').trim();
+        return Object.prototype.hasOwnProperty.call(ROUTES, raw) ? raw : DEFAULT_ROUTE;
+      }
+
+      function renderRoute(route) {
+        const record = ROUTES[route] || ROUTES[DEFAULT_ROUTE];
+        if (!record || !frame || !routeMeta) {
+          return;
+        }
+
+        frame.src = record.file;
+        routeMeta.textContent = `Route: /${route} -> ${record.file}`;
+        document.title = `ALLMusic Y2K AF - ${record.label}`;
+
+        buttons.forEach((button) => {
+          const active = button.getAttribute('data-route') === route;
+          button.classList.toggle('active', active);
+          button.classList.toggle('primary', active);
+        });
+      }
+
+      function navigate(route) {
+        const next = Object.prototype.hasOwnProperty.call(ROUTES, route) ? route : DEFAULT_ROUTE;
+        const nextHash = `#/${next}`;
+        if (window.location.hash !== nextHash) {
+          window.location.hash = nextHash;
+          return;
+        }
+        renderRoute(next);
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const route = button.getAttribute('data-route') || DEFAULT_ROUTE;
+          navigate(route);
+        });
+      });
+
+      window.addEventListener('hashchange', () => {
+        renderRoute(resolveRouteFromHash());
+      });
+
+      navigate(resolveRouteFromHash());
+    })();
+  </script>
 </body>
 </html>

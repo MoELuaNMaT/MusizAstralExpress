@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic - Neo-Brutalism Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brutal-yellow: #f4f410;
+            --brutal-pink: #ff66cc;
+            --brutal-blue: #3333ff;
+            --brutal-green: #00ff66;
+            --brutal-border: #000000;
+        }
+
+        body {
+            background-color: #ffffff;
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--brutal-border);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        h1, h2, h3, .font-title { font-family: 'Unbounded', sans-serif; }
+
+        .brutal-box {
+            background: white;
+            border: 4px solid var(--brutal-border);
+            box-shadow: 8px 8px 0px var(--brutal-border);
+            transition: all 0.1s;
+        }
+        .brutal-box:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 12px 12px 0px var(--brutal-border);
+        }
+        .brutal-box:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px var(--brutal-border);
+        }
+
+        .brutal-btn {
+            padding: 12px 24px;
+            font-weight: 900;
+            text-transform: uppercase;
+            border: 4px solid var(--brutal-border);
+            box-shadow: 4px 4px 0px var(--brutal-border);
+            transition: all 0.1s;
+        }
+        .brutal-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px var(--brutal-border);
+        }
+        .brutal-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px var(--brutal-border);
+        }
+
+        .brutal-input {
+            border: 4px solid var(--brutal-border);
+            padding: 12px;
+            font-weight: 700;
+            outline: none;
+        }
+        .brutal-input:focus {
+            background: var(--brutal-yellow);
+        }
+
+        /* 旋转文字 */
+        .rotating-text {
+            animation: rotate 10s linear infinite;
+        }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* 斑马纹 */
+        .zebra {
+            background: repeating-linear-gradient(
+                45deg,
+                #eee,
+                #eee 10px,
+                #fff 10px,
+                #fff 20px
+            );
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center gap-12 p-8">
+
+    <!-- PC Desktop Layout (Neo-Brutalism) -->
+    <div class="w-[1100px] h-[750px] border-[6px] border-black flex flex-col relative bg-[#fdfdfd]">
+        <!-- Top Nav -->
+        <header class="h-24 border-b-[6px] border-black flex items-center px-10 justify-between bg-white">
+            <div class="flex items-center gap-6">
+                <h1 class="text-4xl font-black uppercase tracking-tighter bg-black text-white px-4 py-2 rotate-[-2deg]">ALLMusic</h1>
+                <div class="brutal-box bg-white px-4 py-2 font-bold rotate-[1deg]">V.7.0.0</div>
+            </div>
+            
+            <div class="flex-1 max-w-xl mx-20">
+                <input type="text" placeholder="SEARCH_FOR_NOISE..." class="w-full brutal-input text-xl uppercase">
+            </div>
+
+            <div class="flex gap-4">
+                <button class="brutal-btn bg-white">LOGIN</button>
+                <div class="w-14 h-14 border-4 border-black rounded-full overflow-hidden bg-black">
+                    <img src="https://i.pravatar.cc/100" class="w-full h-full object-cover">
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Sidebar -->
+            <aside class="w-72 border-r-[6px] border-black p-8 flex flex-col gap-6 zebra">
+                <div class="space-y-4">
+                    <button class="brutal-btn w-full bg-white hover:bg-[var(--brutal-yellow)]">Home</button>
+                    <button class="brutal-btn w-full bg-white hover:bg-[var(--brutal-pink)]">Playlists</button>
+                    <button class="brutal-btn w-full bg-white hover:bg-[var(--brutal-blue)] hover:text-white">Daily</button>
+                    <button class="brutal-btn w-full bg-white hover:bg-[var(--brutal-green)]">Search</button>
+                </div>
+
+                <div class="mt-12 brutal-box p-4 bg-[var(--brutal-yellow)]">
+                    <h3 class="font-black text-sm uppercase mb-2">System Status</h3>
+                    <p class="font-bold text-xs uppercase">Node: Connected</p>
+                    <p class="font-bold text-xs uppercase">Ping: 24ms</p>
+                </div>
+
+                <div class="mt-auto relative w-full aspect-square border-4 border-black flex items-center justify-center overflow-hidden bg-white">
+                    <div class="rotating-text font-black text-[10px] text-gray-300 absolute whitespace-nowrap">
+                        ALLMUSIC PROTOCOL // ALLMUSIC PROTOCOL // ALLMUSIC PROTOCOL
+                    </div>
+                    <span class="text-6xl z-10">💿</span>
+                </div>
+            </aside>
+
+            <!-- Main -->
+            <main class="flex-1 p-10 overflow-y-auto no-scrollbar bg-white">
+                <div class="flex justify-between items-end mb-10">
+                    <div>
+                        <span class="font-black text-xs uppercase bg-black text-white px-2 py-1">Featured_Stream</span>
+                        <h2 class="text-6xl font-black uppercase tracking-tighter mt-2">Latest<br>Archive</h2>
+                    </div>
+                    <button class="brutal-btn bg-[var(--brutal-green)] text-2xl font-black">EXPLORE_ALL</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-10">
+                    <div class="brutal-box p-6 bg-[var(--brutal-pink)]">
+                        <div class="w-full aspect-video border-4 border-black mb-4 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?auto=format&fit=crop&q=80&w=400" class="w-full h-full object-cover grayscale">
+                        </div>
+                        <h4 class="text-2xl font-black uppercase">Summer_Vibe_99</h4>
+                        <p class="font-bold mt-2 uppercase">128 Tracks in archive</p>
+                    </div>
+                    <div class="brutal-box p-6 bg-[var(--brutal-blue)] text-white">
+                        <div class="w-full aspect-video border-4 border-black mb-4 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=400" class="w-full h-full object-cover sepia">
+                        </div>
+                        <h4 class="text-2xl font-black uppercase">Heavy_Bass_Protocol</h4>
+                        <p class="font-bold mt-2 uppercase">Analysis complete</p>
+                    </div>
+                </div>
+
+                <div class="mt-16 space-y-4">
+                    <div class="flex items-center p-4 border-[4px] border-black bg-white hover:bg-[var(--brutal-yellow)] transition-colors cursor-pointer group">
+                        <span class="w-12 font-black text-xl">01</span>
+                        <div class="flex-1 min-w-0">
+                            <h5 class="text-xl font-black uppercase group-hover:italic transition-all">Supernova</h5>
+                            <p class="font-bold text-gray-500 uppercase">Aespa</p>
+                        </div>
+                        <div class="flex gap-4">
+                            <span class="border-2 border-black px-2 font-black text-xs uppercase bg-white">Netease</span>
+                            <span class="font-black">03:12</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center p-4 border-[4px] border-black bg-white hover:bg-[var(--brutal-pink)] transition-colors cursor-pointer group">
+                        <span class="w-12 font-black text-xl">02</span>
+                        <div class="flex-1 min-w-0">
+                            <h5 class="text-xl font-black uppercase group-hover:italic transition-all">Toxic</h5>
+                            <p class="font-bold text-gray-500 uppercase">Britney Spears</p>
+                        </div>
+                        <div class="flex gap-4">
+                            <span class="border-2 border-black px-2 font-black text-xs uppercase bg-white">QQ</span>
+                            <span class="font-black">03:19</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer Control -->
+        <footer class="h-32 border-t-[6px] border-black bg-white flex items-center px-10 gap-10">
+            <div class="w-80 flex items-center gap-4">
+                <div class="w-20 h-20 border-4 border-black bg-black shrink-0">
+                    <img src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=200" class="w-full h-full object-cover brightness-110">
+                </div>
+                <div class="min-w-0">
+                    <h5 class="text-xl font-black uppercase truncate">Supernova</h5>
+                    <p class="font-bold text-gray-500 uppercase">Aespa</p>
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col items-center gap-2">
+                <div class="flex gap-8">
+                    <button class="text-3xl font-black">PREV</button>
+                    <button class="brutal-btn bg-black text-white text-4xl px-10">PLAY</button>
+                    <button class="text-3xl font-black">NEXT</button>
+                </div>
+                <div class="w-full max-w-2xl h-6 border-4 border-black p-1 bg-white">
+                    <div class="h-full w-2/3 bg-black"></div>
+                </div>
+            </div>
+
+            <div class="w-80 flex justify-end gap-6 font-black uppercase italic text-2xl">
+                <button>Vol</button>
+                <button>Lyr</button>
+                <button>Lst</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Mobile Layout (Neo-Brutalism) -->
+    <div class="w-[375px] h-[780px] bg-white border-[6px] border-black flex flex-col relative shadow-2xl overflow-hidden">
+        <div class="h-10 border-b-4 border-black flex items-center px-6 font-black uppercase text-xs italic bg-[var(--brutal-yellow)]">
+            Status: Synchronized
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-6 pt-6 no-scrollbar pb-32">
+            <h2 class="text-4xl font-black uppercase leading-[0.9] mb-8">Audio<br>Terminal</h2>
+            
+            <div class="brutal-box p-4 bg-[var(--brutal-pink)] mb-8">
+                <div class="aspect-square border-4 border-black bg-black mb-4">
+                    <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=400" class="w-full h-full object-cover">
+                </div>
+                <h3 class="text-2xl font-black uppercase">Now_Playing</h3>
+                <p class="font-bold uppercase opacity-70 mt-1">Supernova / Aespa</p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex items-center gap-4 border-4 border-black p-3 bg-white">
+                    <div class="w-12 h-12 border-2 border-black bg-[var(--brutal-green)] flex items-center justify-center font-black">01</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black uppercase text-sm truncate">Toxic</p>
+                        <p class="text-[10px] font-bold uppercase text-gray-500">Britney Spears</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 border-4 border-black p-3 bg-white">
+                    <div class="w-12 h-12 border-2 border-black bg-[var(--brutal-blue)] text-white flex items-center justify-center font-black">02</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black uppercase text-sm truncate">Sandstorm</p>
+                        <p class="text-[10px] font-bold uppercase text-gray-500">Darude</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 left-0 right-0 p-6 bg-white border-t-[6px] border-black flex flex-col gap-4">
+            <div class="w-full h-8 border-4 border-black p-1">
+                <div class="h-full w-2/3 bg-black"></div>
+            </div>
+            <div class="flex justify-between items-center">
+                <button class="font-black uppercase">Prev</button>
+                <button class="brutal-btn bg-[var(--brutal-yellow)] px-10">Play</button>
+                <button class="font-black uppercase">Next</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

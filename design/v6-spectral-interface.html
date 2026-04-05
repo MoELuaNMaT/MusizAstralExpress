@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic V6 - Spectral Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syncopate:wght@400;700&family=Inter:wght@300;400;600;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #050506;
+            --accent-main: #00f2ff; /* 钴蓝/电磁青 */
+            --accent-dim: rgba(0, 242, 255, 0.2);
+            --border-tech: rgba(255, 255, 255, 0.08);
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-tech: 'Syncopate', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* 3D 栅格背景 */
+        .grid-bg {
+            position: fixed;
+            inset: -100px;
+            background-image: 
+                linear-gradient(var(--accent-dim) 1px, transparent 1px),
+                linear-gradient(90deg, var(--accent-dim) 1px, transparent 1px);
+            background-size: 80px 80px;
+            mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+            transform: perspective(1000px) rotateX(60deg) translateY(-200px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+            animation: grid-move 20s linear infinite;
+        }
+
+        @keyframes grid-move {
+            from { background-position: 0 0; }
+            to { background-position: 0 80px; }
+        }
+
+        /* 工业感切角面板 */
+        .tech-panel {
+            background: rgba(10, 10, 12, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-tech);
+            position: relative;
+        }
+
+        .tech-panel::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px;
+            width: 10px; height: 10px;
+            border-top: 2px solid var(--accent-main);
+            border-left: 2px solid var(--accent-main);
+        }
+
+        /* 霓虹发光文字 */
+        .neon-text {
+            color: var(--accent-main);
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+        }
+
+        .font-mono { font-family: var(--font-mono); }
+        .font-tech { font-family: var(--font-tech); }
+
+        /* 扫描线动画 */
+        .scanline {
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(to bottom, transparent, rgba(0, 242, 255, 0.05), transparent);
+            position: absolute;
+            top: -100px;
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            from { top: -100px; }
+            to { top: 100%; }
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 2px; }
+        ::-webkit-scrollbar-thumb { background: var(--accent-main); }
+
+        /* 歌曲行悬停 */
+        .song-row {
+            transition: all 0.2s ease;
+            border-left: 0 solid var(--accent-main);
+        }
+        .song-row:hover {
+            background: linear-gradient(90deg, rgba(0, 242, 255, 0.1) 0%, transparent 100%);
+            border-left-width: 4px;
+            padding-left: 1.5rem;
+        }
+
+        /* 旋钮/滑块风格 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.1);
+            height: 2px;
+        }
+        input[type="range"]::-webkit-scrollbar-thumb {
+            -webkit-appearance: none;
+            width: 8px; height: 8px;
+            background: var(--accent-main);
+            border-radius: 0;
+            box-shadow: 0 0 5px var(--accent-main);
+        }
+
+        /* 状态指示器 */
+        .status-dot {
+            width: 6px; height: 6px;
+            background: var(--accent-main);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-main);
+        }
+    </style>
+</head>
+<body class="flex p-6 gap-6 h-screen">
+
+    <div class="grid-bg"></div>
+
+    <!-- 侧边信息控制模块 -->
+    <aside class="w-72 flex flex-col gap-6 z-10">
+        
+        <!-- Logo 模块 -->
+        <div class="tech-panel p-6">
+            <div class="scanline"></div>
+            <div class="flex flex-col gap-1">
+                <span class="font-mono text-[10px] text-slate-500 uppercase tracking-tighter">System ID: AM-V6-SPEC</span>
+                <h1 class="font-tech text-2xl font-black tracking-tighter neon-text">ALLMUSIC</h1>
+            </div>
+            <div class="mt-6 flex flex-col gap-3">
+                <div class="flex items-center justify-between text-[10px] font-mono">
+                    <span class="text-slate-400">CORE STATUS:</span>
+                    <span class="text-emerald-400 flex items-center gap-2">
+                        <div class="status-dot !bg-emerald-400 !shadow-emerald-400/50"></div>
+                        SYNCHRONIZED
+                    </span>
+                </div>
+                <div class="w-full bg-white/5 h-1">
+                    <div class="w-2/3 h-full bg-cyan-400 shadow-[0_0_8px_rgba(0,242,255,0.4)]"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导航导航 -->
+        <div class="tech-panel flex-1 p-4 flex flex-col gap-2 overflow-hidden">
+            <div class="px-2 py-2 text-[10px] font-mono text-slate-600 border-b border-white/5 mb-2">MODULES_LIST</div>
+            
+            <a href="#" class="group flex items-center justify-between p-3 border border-transparent hover:border-cyan-500/30 transition-all">
+                <div class="flex items-center gap-3">
+                    <span class="font-mono text-xs text-slate-500 group-hover:text-cyan-400">01.</span>
+                    <span class="text-sm font-semibold tracking-wide">发现新维</span>
+                </div>
+                <div class="w-1 h-4 bg-slate-800 group-hover:bg-cyan-500"></div>
+            </a>
+
+            <a href="#" class="group flex items-center justify-between p-3 border border-cyan-500/50 bg-cyan-500/5">
+                <div class="flex items-center gap-3">
+                    <span class="font-mono text-xs text-cyan-400">02.</span>
+                    <span class="text-sm font-semibold tracking-wide text-cyan-100">聚合协议</span>
+                </div>
+                <div class="w-1 h-4 bg-cyan-400"></div>
+            </a>
+
+            <a href="#" class="group flex items-center justify-between p-3 border border-transparent hover:border-cyan-500/30 transition-all">
+                <div class="flex items-center gap-3">
+                    <span class="font-mono text-xs text-slate-500 group-hover:text-cyan-400">03.</span>
+                    <span class="text-sm font-semibold tracking-wide">历史存档</span>
+                </div>
+                <div class="w-1 h-4 bg-slate-800 group-hover:bg-cyan-500"></div>
+            </a>
+
+            <div class="mt-8 px-2 py-2 text-[10px] font-mono text-slate-600 border-b border-white/5 mb-2">AUTH_USER</div>
+            <div class="p-3 flex items-center gap-4">
+                <div class="w-12 h-12 border border-cyan-500/50 p-1">
+                    <img src="https://p.qlogo.cn/gh/0/0/100" class="w-full h-full object-cover grayscale opacity-70">
+                </div>
+                <div class="min-w-0">
+                    <p class="font-mono text-xs font-bold text-slate-200 truncate">BINARYIFY_OS</p>
+                    <p class="font-mono text-[9px] text-cyan-500/70 mt-1 uppercase">Level 4 Access</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主操作中心 -->
+    <main class="flex-1 flex flex-col gap-6 z-10">
+        
+        <!-- 搜索与状态标题 -->
+        <header class="h-20 flex items-center gap-6">
+            <div class="tech-panel flex-1 h-full flex items-center px-6 gap-4">
+                <span class="font-mono text-xs text-cyan-500 animate-pulse">SEARCH_PRTCL:</span>
+                <input type="text" class="flex-1 bg-transparent outline-none border-b border-white/10 focus:border-cyan-500 transition-all font-mono text-sm placeholder:text-slate-700" placeholder="INPUT_KEYWORD_FOR_ANALYSIS...">
+                <div class="flex gap-2">
+                    <div class="w-2 h-2 bg-rose-500/50"></div>
+                    <div class="w-2 h-2 bg-emerald-500/50"></div>
+                    <div class="w-2 h-2 bg-amber-500/50"></div>
+                </div>
+            </div>
+            
+            <div class="tech-panel w-48 h-full flex flex-col justify-center px-6">
+                <span class="font-mono text-[9px] text-slate-500 uppercase">Current Time</span>
+                <span class="font-mono text-xl neon-text" id="clock">14:32:05</span>
+            </div>
+        </header>
+
+        <!-- 内容区域：左右非对称 -->
+        <div class="flex-1 flex gap-6 overflow-hidden">
+            
+            <!-- 歌曲流处理区 -->
+            <section class="flex-[2] tech-panel flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                    <span class="font-mono text-[11px] tracking-widest text-slate-400">DATA_STREAM: TOP_RECOMMENDED</span>
+                    <div class="flex gap-4">
+                        <button class="font-mono text-[10px] text-slate-500 hover:text-cyan-400">[ REFRESH ]</button>
+                        <button class="font-mono text-[10px] text-slate-500 hover:text-cyan-400">[ FILTER_BY_PLATFORM ]</button>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                    <!-- 歌曲项 -->
+                    <div class="song-row group flex items-center p-3 cursor-pointer">
+                        <div class="w-12 font-mono text-xs text-slate-600">001</div>
+                        <div class="flex-1 flex flex-col">
+                            <span class="text-sm font-bold group-hover:text-cyan-400 transition-colors">晴天 (Sunny Day)</span>
+                            <span class="font-mono text-[10px] text-slate-500">周杰伦 - 叶惠美</span>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            <span class="font-mono text-[10px] text-rose-500/80 border border-rose-500/30 px-2">NETEASE_NODE_04</span>
+                            <span class="font-mono text-xs text-slate-500">04:29</span>
+                            <div class="flex gap-3 opacity-0 group-hover:opacity-100">
+                                <span class="text-cyan-400">▶</span>
+                                <span class="text-slate-400">✚</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="song-row group flex items-center p-3 cursor-pointer bg-cyan-500/5 border-l-4 border-cyan-500">
+                        <div class="w-12 font-mono text-xs text-cyan-500">002</div>
+                        <div class="flex-1 flex flex-col">
+                            <span class="text-sm font-bold text-cyan-100">稻香 (Rice Fragrance)</span>
+                            <span class="font-mono text-[10px] text-cyan-500/70">周杰伦 - 魔杰座</span>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            <span class="font-mono text-[10px] text-emerald-500/80 border border-emerald-500/30 px-2">QQ_MUSIC_NODE_01</span>
+                            <span class="font-mono text-xs text-cyan-500">03:43</span>
+                            <div class="flex gap-3">
+                                <span class="text-cyan-400">⏸</span>
+                                <span class="text-rose-400">❤️</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 更多歌曲行... -->
+                    <div class="song-row group flex items-center p-3 cursor-pointer">
+                        <div class="w-12 font-mono text-xs text-slate-600">003</div>
+                        <div class="flex-1 flex flex-col">
+                            <span class="text-sm font-bold group-hover:text-cyan-400 transition-colors">一路向北</span>
+                            <span class="font-mono text-[10px] text-slate-500">周杰伦 - Initial D</span>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            <span class="font-mono text-[10px] text-emerald-500/80 border border-emerald-500/30 px-2">QQ_MUSIC_NODE_01</span>
+                            <span class="font-mono text-xs text-slate-500">04:55</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 频谱/详情区 -->
+            <section class="flex-1 flex flex-col gap-6">
+                
+                <!-- 实时频谱 -->
+                <div class="tech-panel flex-1 flex flex-col p-6 items-center justify-center relative overflow-hidden">
+                    <div class="absolute inset-0 opacity-10 pointer-events-none">
+                        <div class="w-full h-full border-[20px] border-cyan-500 rounded-full scale-150 border-dotted animate-[spin_20s_linear_infinite]"></div>
+                    </div>
+                    <div class="flex items-end gap-[3px] h-32 w-full">
+                        <div class="flex-1 bg-cyan-400/50" style="height: 40%"></div>
+                        <div class="flex-1 bg-cyan-400/60" style="height: 60%"></div>
+                        <div class="flex-1 bg-cyan-400/70" style="height: 90%"></div>
+                        <div class="flex-1 bg-cyan-400/80 shadow-[0_0_15px_var(--accent-main)]" style="height: 100%"></div>
+                        <div class="flex-1 bg-cyan-400/70" style="height: 70%"></div>
+                        <div class="flex-1 bg-cyan-400/60" style="height: 40%"></div>
+                        <div class="flex-1 bg-cyan-400/50" style="height: 20%"></div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <span class="font-tech text-xs tracking-widest text-slate-500 uppercase">Spectrum Analysis</span>
+                        <div class="mt-2 font-mono text-[10px] text-cyan-500">FREQ: 44.1KHZ // BITRATE: 1411KBPS</div>
+                    </div>
+                </div>
+
+                <!-- 歌曲详情卡 -->
+                <div class="tech-panel h-48 p-6 flex gap-6 relative overflow-hidden">
+                    <div class="w-24 h-24 border border-cyan-500/50 relative p-1 shrink-0">
+                        <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=200" class="w-full h-full object-cover grayscale brightness-75">
+                        <div class="absolute inset-0 bg-cyan-500/10 mix-blend-overlay"></div>
+                    </div>
+                    <div class="flex flex-col justify-center min-w-0">
+                        <span class="font-mono text-[9px] text-cyan-500 mb-2">NOW_ANALYZING_FILE</span>
+                        <h4 class="text-xl font-black italic tracking-tighter truncate">稻香.mp3</h4>
+                        <p class="font-mono text-xs text-slate-500 mt-2">ALBUM_UID: MO_JIE_ZUO_2008</p>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+
+        <!-- 全局战术控制条 -->
+        <footer class="h-24 tech-panel flex items-center px-8 gap-10">
+            <!-- 播放信息 -->
+            <div class="w-64 flex flex-col gap-2">
+                <div class="flex justify-between font-mono text-[10px] text-slate-500">
+                    <span>PROGRESS_BAR</span>
+                    <span class="text-cyan-400">38%</span>
+                </div>
+                <div class="w-full bg-white/5 h-1 relative">
+                    <div class="w-[38%] h-full bg-cyan-400 shadow-[0_0_8px_rgba(0,242,255,0.6)]"></div>
+                    <div class="absolute top-1/2 left-[38%] -translate-y-1/2 w-1.5 h-4 bg-cyan-400"></div>
+                </div>
+                <div class="flex justify-between font-mono text-[9px] text-slate-600">
+                    <span>01:36</span>
+                    <span>03:43</span>
+                </div>
+            </div>
+
+            <!-- 核心按钮 -->
+            <div class="flex-1 flex items-center justify-center gap-12">
+                <button class="font-mono text-slate-500 hover:text-cyan-400 transition-colors">PREV_TRACK</button>
+                <button class="w-14 h-14 border-2 border-cyan-400 flex items-center justify-center text-cyan-400 hover:bg-cyan-400 hover:text-black transition-all shadow-[0_0_15px_rgba(0,242,255,0.3)]">
+                    <span class="text-xl">⏸</span>
+                </button>
+                <button class="font-mono text-slate-500 hover:text-cyan-400 transition-colors">NEXT_TRACK</button>
+            </div>
+
+            <!-- 系统参数 -->
+            <div class="w-64 flex items-center justify-end gap-6">
+                <div class="flex flex-col items-end gap-1">
+                    <span class="font-mono text-[9px] text-slate-600">VOLUME_LVL</span>
+                    <div class="flex gap-1">
+                        <div class="w-1 h-3 bg-cyan-400"></div>
+                        <div class="w-1 h-3 bg-cyan-400"></div>
+                        <div class="w-1 h-3 bg-cyan-400"></div>
+                        <div class="w-1 h-3 bg-slate-800"></div>
+                    </div>
+                </div>
+                <button class="w-10 h-10 border border-white/10 flex items-center justify-center hover:border-cyan-500 transition-colors">
+                    <span class="font-mono text-xs">LYR</span>
+                </button>
+                <button class="w-10 h-10 border border-white/10 flex items-center justify-center hover:border-cyan-500 transition-colors">
+                    <span class="font-mono text-xs">LST</span>
+                </button>
+            </div>
+        </footer>
+
+    </main>
+
+    <script>
+        // 时钟脚本
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+</body>
+</html>

@@ -1,32 +1,20 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuthStore } from '@/stores';
+﻿import { useEffect, useRef, useState } from 'react';
+import { useAlertStore, useAuthStore } from '@/stores';
 import { authService } from '@/services/auth.service';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import { UiVersionSwitcher } from '@/components/theme/ui-version-switcher';
+import { normalizeImageUrl } from '@/lib/image-url';
 
 type LoginTab = 'netease' | 'qq';
 type NeteaseMethod = 'email' | 'phone' | 'qrcode';
 type QQMethod = 'qrcode' | 'cookie';
-type UiVersion = 'current' | 'v4-glam';
-type UiBridge = {
-  switchUiVersion?: (next: UiVersion) => Promise<void>;
-};
-
-const UI_VERSION_STORAGE_KEY = 'allmusic_ui_version_v1';
-
-function resolveUiBridge(): UiBridge | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const bridge = (window as Window & { __ALLMUSIC_BRIDGE__?: UiBridge }).__ALLMUSIC_BRIDGE__;
-  return bridge || null;
-}
 
 export function LoginPage() {
   const { setUser, users } = useAuthStore();
+  const pushAlert = useAlertStore((state) => state.pushAlert);
 
   const [activeTab, setActiveTab] = useState<LoginTab>('netease');
   const [neteaseMethod, setNeteaseMethod] = useState<NeteaseMethod>('qrcode');
@@ -92,6 +80,20 @@ export function LoginPage() {
     setError(null);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    pushAlert({
+      level: 'error',
+      title: activeTab === 'netease' ? '网易云登录失败' : 'QQ 音乐登录失败',
+      message: error,
+      source: activeTab === 'netease' ? 'login.netease' : 'login.qq',
+      dedupeKey: `login:${activeTab}:${error}`,
+    });
+  }, [activeTab, error, pushAlert]);
+
   const handleNeteaseLogin = async () => {
     setIsLoading(true);
     setError(null);
@@ -110,10 +112,10 @@ export function LoginPage() {
       if (result.success && result.user && result.cookie) {
         await setUser('netease', result.user, result.cookie);
       } else {
-        setError(result.error || '鐧诲綍澶辫触');
+        setError(result.error || '登录失败');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '鐧诲綍澶辫触');
+      setError(err instanceof Error ? err.message : '登录失败');
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +133,7 @@ export function LoginPage() {
     if (!isRefreshing) {
       setQrCodeUrl(null);
     }
-    setQrStatus('姝ｅ湪鐢熸垚浜岀淮鐮?..');
+    setQrStatus('正在生成二维码...');
 
     try {
       const result = await authService.neteaseQRCodeLogin(
@@ -158,7 +160,7 @@ export function LoginPage() {
         const errorMessage = result.error || '二维码登录失败';
         setError(errorMessage);
 
-        const shouldDiscardPrevious = /expired|杩囨湡/i.test(errorMessage);
+        const shouldDiscardPrevious = /expired|过期/i.test(errorMessage);
         if (!isRefreshing || shouldDiscardPrevious) {
           setQrCodeUrl(null);
         } else {
@@ -172,7 +174,7 @@ export function LoginPage() {
       const errorMessage = err instanceof Error ? err.message : '二维码登录失败';
       setError(errorMessage);
 
-      const shouldDiscardPrevious = /expired|杩囨湡/i.test(errorMessage);
+      const shouldDiscardPrevious = /expired|过期/i.test(errorMessage);
       if (!isRefreshing || shouldDiscardPrevious) {
         setQrCodeUrl(null);
       } else {
@@ -198,10 +200,10 @@ export function LoginPage() {
       if (result.success && result.user && result.cookie) {
         await setUser('qq', result.user, result.cookie);
       } else {
-        setError(result.error || '鐧诲綍 QQ 闊充箰澶辫触');
+        setError(result.error || '登录 QQ 音乐失败');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '鐧诲綍 QQ 闊充箰澶辫触');
+      setError(err instanceof Error ? err.message : '登录 QQ 音乐失败');
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +221,7 @@ export function LoginPage() {
     if (!isRefreshing) {
       setQqQrCodeUrl(null);
     }
-    setQqQrStatus('姝ｅ湪鐢熸垚 QQ 浜岀淮鐮?..');
+    setQqQrStatus('正在生成 QQ 二维码...');
 
     try {
       const result = await authService.qqQRCodeLogin(
@@ -246,7 +248,7 @@ export function LoginPage() {
         const errorMessage = result.error || 'QQ 二维码登录失败';
         setError(errorMessage);
 
-        const shouldDiscardPrevious = /expired|杩囨湡/i.test(errorMessage);
+        const shouldDiscardPrevious = /expired|过期/i.test(errorMessage);
         if (!isRefreshing || shouldDiscardPrevious) {
           setQqQrCodeUrl(null);
         } else {
@@ -261,7 +263,7 @@ export function LoginPage() {
       const errorMessage = err instanceof Error ? err.message : 'QQ 二维码登录失败';
       setError(errorMessage);
 
-      const shouldDiscardPrevious = /expired|杩囨湡/i.test(errorMessage);
+      const shouldDiscardPrevious = /expired|过期/i.test(errorMessage);
       if (!isRefreshing || shouldDiscardPrevious) {
         setQqQrCodeUrl(null);
       } else {
@@ -282,22 +284,10 @@ export function LoginPage() {
     try {
       await useAuthStore.getState().removeUser(platform);
     } catch (err) {
-      console.error('Logout failed:', err);
+      const message = err instanceof Error ? err.message : '退出登录失败，请稍后重试。';
+      setError(message);
     }
   };
-
-  const handleSwitchToV4 = useCallback(async () => {
-    const bridge = resolveUiBridge();
-    if (bridge && typeof bridge.switchUiVersion === 'function') {
-      await bridge.switchUiVersion('v4-glam');
-      return;
-    }
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(UI_VERSION_STORAGE_KEY, 'v4-glam');
-      window.location.reload();
-    }
-  }, []);
 
   return (
     <div className="am-screen min-h-screen flex items-center justify-center p-4">
@@ -306,16 +296,9 @@ export function LoginPage() {
           <h1 className="am-title-gradient text-4xl font-bold mb-2">
             ALLMusic
           </h1>
-          <p className="text-slate-300">鐧诲綍浠ュ悓姝ヤ綘鐨勯煶涔愬簱</p>
-          <div className="mt-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void handleSwitchToV4()}
-              title="切换到 V4 UI"
-            >
-              ✨ 切换到 V4 UI
-            </Button>
+          <p className="text-slate-300">登录以同步你的音乐库</p>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <UiVersionSwitcher compact align="left" triggerLabel="切换主题" />
           </div>
         </div>
 
@@ -325,14 +308,14 @@ export function LoginPage() {
             className="flex-1"
             onClick={() => setActiveTab('netease')}
           >
-            缃戞槗浜戦煶涔?
+            网易云音乐
           </Button>
           <Button
             variant={activeTab === 'qq' ? 'primary' : 'ghost'}
             className="flex-1"
             onClick={() => setActiveTab('qq')}
           >
-            QQ 闊充箰
+            QQ 音乐
             <span className="ml-2 text-xs opacity-60">Beta</span>
           </Button>
         </div>
@@ -343,16 +326,16 @@ export function LoginPage() {
               {users.netease ? (
                 <div className="flex items-center gap-4">
                   <img
-                    src={users.netease.avatarUrl || 'https://p.qlogo.cn/gh/0/0/100'}
+                    src={normalizeImageUrl(users.netease.avatarUrl) || 'https://p.qlogo.cn/gh/0/0/100'}
                     alt={users.netease.nickname}
                     className="w-16 h-16 rounded-full"
                   />
                   <div className="flex-1">
                     <p className="font-semibold">{users.netease.nickname}</p>
-                    <p className="text-sm text-slate-400">宸茬櫥褰曠綉鏄撲簯闊充箰</p>
+                    <p className="text-sm text-slate-400">已登录网易云音乐</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => handleLogout('netease')}>
-                    閫€鍑?
+                    退出
                   </Button>
                 </div>
               ) : (
@@ -363,7 +346,7 @@ export function LoginPage() {
                     size="sm"
                     onClick={() => setNeteaseMethod('qrcode')}
                   >
-                    浜岀淮鐮?
+                    二维码
                   </Button>
                   <Button
                     variant={neteaseMethod === 'email' ? 'default' : 'ghost'}
@@ -371,7 +354,7 @@ export function LoginPage() {
                     size="sm"
                     onClick={() => setNeteaseMethod('email')}
                   >
-                    閭
+                    邮箱
                   </Button>
                   <Button
                     variant={neteaseMethod === 'phone' ? 'default' : 'ghost'}
@@ -379,7 +362,7 @@ export function LoginPage() {
                     size="sm"
                     onClick={() => setNeteaseMethod('phone')}
                   >
-                    鎵嬫満鍙?
+                    手机号
                   </Button>
                 </div>
               )}
@@ -414,7 +397,7 @@ export function LoginPage() {
                           onClick={handleQRCodeLogin}
                           disabled={isLoading}
                         >
-                          鍒锋柊浜岀淮鐮?
+                          刷新二维码
                         </Button>
                       </div>
                     ) : (
@@ -436,14 +419,14 @@ export function LoginPage() {
                   <div className="space-y-4">
                     <Input
                       type="email"
-                      placeholder="閭"
+                      placeholder="邮箱"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
                     />
                     <Input
                       type="password"
-                      placeholder="瀵嗙爜"
+                      placeholder="密码"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={isLoading}
@@ -455,7 +438,7 @@ export function LoginPage() {
                       onClick={handleNeteaseLogin}
                       disabled={isLoading || !email || !password}
                     >
-                      {isLoading ? <Spinner size="sm" /> : '鐧诲綍'}
+                      {isLoading ? <Spinner size="sm" /> : '登录'}
                     </Button>
                   </div>
                 )}
@@ -481,7 +464,7 @@ export function LoginPage() {
                     </div>
                     <Input
                       type="password"
-                      placeholder="瀵嗙爜"
+                      placeholder="密码"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={isLoading}
@@ -493,7 +476,7 @@ export function LoginPage() {
                       onClick={handleNeteaseLogin}
                       disabled={isLoading || !phone || !password}
                     >
-                      {isLoading ? <Spinner size="sm" /> : '鐧诲綍'}
+                      {isLoading ? <Spinner size="sm" /> : '登录'}
                     </Button>
                   </div>
                 )}
@@ -508,16 +491,16 @@ export function LoginPage() {
               {users.qq ? (
                 <div className="flex items-center gap-4">
                   <img
-                    src={users.qq.avatarUrl || 'https://p.qlogo.cn/gh/0/0/100'}
+                    src={normalizeImageUrl(users.qq.avatarUrl) || 'https://p.qlogo.cn/gh/0/0/100'}
                     alt={users.qq.nickname}
                     className="w-16 h-16 rounded-full"
                   />
                   <div className="flex-1">
                     <p className="font-semibold">{users.qq.nickname}</p>
-                    <p className="text-sm text-slate-400">宸茬櫥褰?QQ 闊充箰</p>
+                    <p className="text-sm text-slate-400">已登录 QQ 音乐</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => handleLogout('qq')}>
-                    閫€鍑?
+                    退出
                   </Button>
                 </div>
               ) : (
@@ -528,7 +511,7 @@ export function LoginPage() {
                     size="sm"
                     onClick={() => setQqMethod('qrcode')}
                   >
-                    浜岀淮鐮?
+                    二维码
                   </Button>
                   <Button
                     variant={qqMethod === 'cookie' ? 'default' : 'ghost'}
@@ -571,7 +554,7 @@ export function LoginPage() {
                           onClick={handleQQQRCodeLogin}
                           disabled={isLoading}
                         >
-                          鍒锋柊浜岀淮鐮?
+                          刷新二维码
                         </Button>
                       </div>
                     ) : (
@@ -591,20 +574,20 @@ export function LoginPage() {
                   <>
                     <Input
                       type="text"
-                      placeholder="QQ 鏄电О锛堝彲閫夛級"
+                      placeholder="QQ 昵称（可选）"
                       value={qqNickname}
                       onChange={(e) => setQqNickname(e.target.value)}
                       disabled={isLoading}
                     />
                     <Input
                       type="password"
-                      placeholder="绮樿创 QQ 闊充箰 Cookie"
+                      placeholder="粘贴 QQ 音乐 Cookie"
                       value={qqCookie}
                       onChange={(e) => setQqCookie(e.target.value)}
                       disabled={isLoading}
                     />
                     <p className="text-xs text-slate-500 text-left">
-                      闇€瑕佸寘鍚?uin / qqmusic_key / p_skey 绛夊瓧娈典箣涓€銆?
+                      需要包含 uin / qqmusic_key / p_skey 等字段之一。
                     </p>
                     <Button
                       variant="primary"
@@ -612,7 +595,7 @@ export function LoginPage() {
                       onClick={handleQQLogin}
                       disabled={isLoading || !qqCookie.trim()}
                     >
-                      {isLoading ? <Spinner size="sm" /> : '鐧诲綍 QQ 闊充箰'}
+                      {isLoading ? <Spinner size="sm" /> : '登录 QQ 音乐'}
                     </Button>
                   </>
                 )}

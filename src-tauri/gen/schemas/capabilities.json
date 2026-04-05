@@ -1,1 +1,1 @@
-{}
+{"default":{"identifier":"default","description":"Main window capability for ALLMusic runtime APIs.","local":true,"windows":["main"],"permissions":["core:default","shell:default","store:default","global-shortcut:default"]}}

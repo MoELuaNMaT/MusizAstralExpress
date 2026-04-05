@@ -2,9 +2,17 @@
 
 一个基于 **Tauri + React + TypeScript** 的桌面应用，用于聚合网易云音乐与 QQ 音乐账号，提供统一的登录、歌单浏览、搜索与收藏操作。
 
-## 当前状态（2026-02-12）
+## 当前状态（2026-02-23）
 
-- 前端构建可通过：`npm run build`
+- 前端构建可通过：`npm run build`（2026-02-23 已验证）
+- 服务最小链路可通过：`npm run smoke:services`（2026-02-23 已验证 3/3）
+- Android 环境检查可通过：`npm run android:check`（2026-02-23 已修复）
+- Android 工程已初始化：`npm run android:init`（已生成 `src-tauri/gen/android`）
+- Android 打包可通过：`npx tauri android build -v --target aarch64`（2026-02-23 已产出 APK/AAB）
+- Android Maven 下载稳定性已增强：`src-tauri/gen/android` 已增加可访问镜像仓库配置（优先阿里云镜像）
+- Android 运行时适配已完成首批：`isMobile` 检测 + 动态 `baseUrl`（按平台环境解析）+ 移动端 Safe Area / 44x44 触控目标
+- Android 真机/模拟器运行待验证：当前 `adb devices` 暂无在线设备，且本机 SDK 尚未安装 `emulator` / `system-images`
+- iOS 规划命令可用：`npm run ios:plan`
 - 桌面端本地存储使用 Tauri Store（`auth_store.json`）
 - 已支持每日推荐聚合（网易云 + QQ 个性化推荐）与歌曲详情歌词展示
 - 默认本地端口：

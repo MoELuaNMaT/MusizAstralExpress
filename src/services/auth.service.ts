@@ -9,8 +9,9 @@ import type {
   MusicPlatform,
   UnifiedUser,
 } from '@/types';
-import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/lib/api/endpoints';
+import { getNeteaseApiBaseUrl, getQQApiBaseUrl } from '@/config/platform.config';
 import { canUseTauriInvoke } from '@/lib/runtime';
+import { normalizeImageUrl } from '@/lib/image-url';
 
 /**
  * NetEase API endpoints configuration
@@ -311,7 +312,7 @@ class AuthService {
         platform: 'netease',
         userId: String(account.id),
         nickname: profile.nickname,
-        avatarUrl: profile.avatarUrl || '',
+        avatarUrl: normalizeImageUrl(profile.avatarUrl) || '',
         isLoggedIn: true,
       },
       cookie,
@@ -349,7 +350,7 @@ class AuthService {
         platform: 'netease',
         userId: String(account.id),
         nickname: profile.nickname,
-        avatarUrl: profile.avatarUrl || '',
+        avatarUrl: normalizeImageUrl(profile.avatarUrl) || '',
         isLoggedIn: true,
       },
       cookie,
@@ -965,7 +966,7 @@ class AuthService {
           return {
             userId: String(userId || this.extractQQUserId(cookie)),
             nickname: nickname || 'QQ \u97f3\u4e50\u7528\u6237',
-            avatarUrl: profile?.avatarUrl || profile?.avatar || profile?.headpic || '',
+            avatarUrl: normalizeImageUrl(profile?.avatarUrl || profile?.avatar || profile?.headpic) || '',
           };
         }
       } catch {
@@ -1087,7 +1088,7 @@ class AuthService {
           platform: 'qq',
           userId: profile.userId,
           nickname: profile.nickname,
-          avatarUrl: profile.avatarUrl,
+          avatarUrl: normalizeImageUrl(profile.avatarUrl) || '',
           isLoggedIn: true,
         };
       }

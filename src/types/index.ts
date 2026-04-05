@@ -6,4 +6,4 @@ export type { UnifiedSong, MusicPlatform, AudioQuality, SongSearchRequest, SongS
 export type { UnifiedPlaylist, PlaylistType, LikeSongRequest, PlatformPlaylist } from './playlist';
 export type { UnifiedUser, LoginCredentials, LoginMethod, LoginResult } from './user';
 export type { ApiResponse, MusicApiAdapter, PlatformConfig } from './api';
-export type { PlayerState, PlayMode } from './player';
+export type { PlayerState, PlayMode, PreferredQuality } from './player';

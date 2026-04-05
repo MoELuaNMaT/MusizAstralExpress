@@ -1,0 +1,73 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Y2K AF - 桌面播放页</title>
+  <link rel="stylesheet" href="./theme.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 6v12l10-6z"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M7 6v12"/><path d="m18 6-8 6 8 6z"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M17 6v12"/><path d="m6 6 8 6-8 6z"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.3A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></symbol>
+      <symbol id="i-lyric" viewBox="0 0 24 24"><path d="M5 6h14"/><path d="M5 11h10"/><path d="M5 16h14"/></symbol>
+      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 13c1.5 0 1.5-2 3-2s1.5 2 3 2 1.5-2 3-2 1.5 2 3 2 1.5-2 3-2 1.5 2 3 2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.2 6.5 20l1-6.2L3 9.5l6.2-.9z"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="scene-head">
+      <a class="badge-link" href="./desktop-player.html"><span class="dot"></span><span>ALLMusic Y2K (ArtFate Ref) / Desktop Player</span></a>
+      <div class="meta">页面：<a href="./desktop-login.html">登录页</a> · <a href="./desktop-home.html">主界面</a> · <a href="./mobile-player.html">移动端</a></div>
+    </div>
+
+    <div class="desktop">
+      <span class="float-decor a"></span><span class="float-decor b"></span>
+      <section class="win">
+        <div class="win-header">
+          <div class="win-title"><svg class="icon"><use href="#i-disc"/></svg><span>ALLMusic 千禧播放器（千千静听感）</span></div>
+          <div class="win-actions"><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="win-body">
+          <div class="hero">
+            <aside class="block">
+              <div class="album"></div>
+              <div class="star-row" style="margin-top:10px"><span class="star">Laser Gradient</span><span class="star">Chrome Bevel</span><span class="star">Lo-Fi UI</span></div>
+            </aside>
+
+            <main class="block">
+              <h3><svg class="icon"><use href="#i-wave"/></svg>播放信息</h3>
+              <h2 style="margin:0;font-size:1.45rem">晴天</h2>
+              <p style="margin:4px 0 0;color:var(--muted)">周杰伦 · 叶惠美 · 双平台音源</p>
+
+              <div class="progress" style="margin-top:12px"><span style="width:44%"></span></div>
+              <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:.82rem"><span>01:52</span><span>04:29</span></div>
+
+              <div class="toolbar" style="margin-top:10px">
+                <button class="icon-btn"><svg class="icon"><use href="#i-prev"/></svg></button>
+                <button class="btn primary"><svg class="icon"><use href="#i-play"/></svg>播放</button>
+                <button class="icon-btn"><svg class="icon"><use href="#i-next"/></svg></button>
+                <button class="icon-btn"><svg class="icon"><use href="#i-heart"/></svg></button>
+                <button class="icon-btn"><svg class="icon"><use href="#i-lyric"/></svg></button>
+              </div>
+
+              <div class="chips"><span class="chip ok"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>技术乌托邦色彩</span><span class="chip warn"><svg class="icon" style="width:12px;height:12px"><use href="#i-star"/></svg>复古未来主义</span></div>
+
+              <div class="block" style="margin-top:10px;background:var(--glass-soft)">
+                <h3><svg class="icon"><use href="#i-lyric"/></svg>歌词面板</h3>
+                <div style="font-size:.84rem;color:var(--muted)">故事的小黄花 从出生那年就飘着<br>童年的荡秋千 随记忆一直晃到现在<br><br>你说你会哭 不是因为在乎...</div>
+              </div>
+            </main>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

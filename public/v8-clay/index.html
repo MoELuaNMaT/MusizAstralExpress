@@ -1,0 +1,1755 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ALLMusic - V8 Clay UI</title>
+    <style>
+      :root {
+        --clay-bg: #f0f3ff;
+        --clay-primary: #6366f1;
+        --clay-secondary: #ec4899;
+        --clay-card: #f8faff;
+        --clay-ink: #475569;
+        --clay-muted: #64748b;
+        --clay-shadow-outer: 16px 16px 32px #d1d9e6, -16px -16px 32px #ffffff;
+        --clay-shadow-inner: inset 4px 4px 8px rgba(255, 255, 255, 0.6), inset -4px -4px 8px rgba(0, 0, 0, 0.05);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        background: var(--clay-bg);
+        color: var(--clay-ink);
+        font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+      }
+
+      .app {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        gap: 18px;
+      }
+
+      .desktop-shell {
+        width: min(1360px, calc(100vw - 32px));
+        height: min(800px, calc(100vh - 32px));
+        border-radius: 40px;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        background: var(--clay-card);
+        box-shadow: var(--clay-shadow-outer);
+        overflow: hidden;
+        display: flex;
+      }
+
+      .clay-inset {
+        background: var(--clay-bg);
+        border-radius: 20px;
+        box-shadow: inset 6px 6px 12px #d1d9e6, inset -6px -6px 12px #ffffff;
+      }
+
+      .clay-btn {
+        border: 0;
+        border-radius: 20px;
+        background: var(--clay-card);
+        color: var(--clay-ink);
+        box-shadow: 6px 6px 12px #d1d9e6, -6px -6px 12px #ffffff, var(--clay-shadow-inner);
+        font-weight: 800;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.2s ease;
+      }
+
+      .clay-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .clay-btn:active {
+        transform: scale(0.96);
+        box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+      }
+
+      .clay-btn-primary {
+        background: linear-gradient(135deg, var(--clay-primary), #8b5cf6);
+        color: #fff;
+        box-shadow: 6px 6px 12px rgba(99, 102, 241, 0.32), -6px -6px 12px #ffffff;
+      }
+
+      .sidebar {
+        width: 272px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 20px 18px;
+        background: rgba(255, 255, 255, 0.42);
+        border-right: 2px solid rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand-logo {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1, #ec4899);
+        box-shadow: 6px 6px 12px rgba(99, 102, 241, 0.35), -6px -6px 12px #ffffff;
+      }
+
+      .brand-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      .menu-group {
+        display: grid;
+        gap: 10px;
+      }
+
+      .menu-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #94a3b8;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0 6px;
+      }
+
+      .menu-btn {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0 14px;
+        gap: 8px;
+      }
+
+      .menu-btn.active {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #fff;
+      }
+
+      .account-card {
+        padding: 10px 12px;
+        display: grid;
+        gap: 8px;
+        border-radius: 16px;
+      }
+
+      .account-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+
+      .dot.red {
+        background: #ef4444;
+      }
+
+      .dot.green {
+        background: #22c55e;
+      }
+
+      .dot.gray {
+        background: #94a3b8;
+      }
+
+      .playlist-list {
+        display: grid;
+        gap: 8px;
+        overflow-y: auto;
+        max-height: 220px;
+        padding-right: 2px;
+      }
+
+      .playlist-item {
+        border: 0;
+        border-radius: 16px;
+        text-align: left;
+        padding: 9px 10px;
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--clay-ink);
+        box-shadow: 4px 4px 10px #d1d9e6, -4px -4px 10px #ffffff;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      .playlist-item.active {
+        background: #ffffff;
+        color: #4f46e5;
+        box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+      }
+
+      .user-chip {
+        margin-top: auto;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+      }
+
+      .user-chip:focus-visible {
+        outline: 2px solid rgba(99, 102, 241, 0.6);
+        outline-offset: 2px;
+      }
+
+      .user-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        border: 2px solid #fff;
+      }
+
+      .main {
+        flex: 1;
+        min-width: 0;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        height: 84px;
+        padding: 16px 24px 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .search-box {
+        flex: 1;
+        position: relative;
+      }
+
+      .search-input {
+        width: 100%;
+        height: 50px;
+        border: 0;
+        outline: none;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--clay-ink);
+        padding: 0 72px 0 42px;
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #64748b;
+      }
+
+      .tiny-btn {
+        border: 0;
+        border-radius: 10px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        color: #4f46e5;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 3px 3px 8px #d1d9e6, -3px -3px 8px #ffffff;
+      }
+
+      .head-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .head-actions .clay-btn {
+        width: 44px;
+        height: 44px;
+      }
+
+      .content {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        gap: 20px;
+        padding: 0 24px 124px;
+      }
+
+      .left {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .banner {
+        flex-shrink: 0;
+        height: 170px;
+        border-radius: 28px;
+        padding: 20px 24px;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6 58%, #ec4899);
+        box-shadow: 10px 10px 24px rgba(99, 102, 241, 0.34), -10px -10px 24px #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .banner::after {
+        content: '';
+        position: absolute;
+        right: -80px;
+        top: -80px;
+        width: 220px;
+        height: 220px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.13);
+        filter: blur(3px);
+      }
+
+      .banner h2 {
+        margin: 0;
+        font-size: 30px;
+        font-weight: 900;
+      }
+
+      .banner p {
+        margin: 6px 0 14px;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+
+      .songs-panel {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .songs-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .songs-head h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 900;
+        color: #1f2937;
+      }
+
+      .view-chip {
+        font-size: 11px;
+        color: #6366f1;
+        font-weight: 800;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 4px 4px 8px #d1d9e6, -4px -4px 8px #ffffff;
+        padding: 6px 10px;
+      }
+
+      .song-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 4px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .song-row {
+        border: 0;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.68);
+        box-shadow: 4px 4px 10px #d1d9e6, -4px -4px 10px #ffffff;
+        padding: 9px 12px;
+        text-align: left;
+        cursor: pointer;
+        color: inherit;
+        font-family: inherit;
+      }
+
+      .song-row:hover {
+        transform: translateY(-2px);
+      }
+
+      .song-row.active {
+        box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+        background: #fff;
+      }
+
+      .song-index {
+        width: 26px;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 900;
+        color: #94a3b8;
+      }
+
+      .song-cover {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        object-fit: cover;
+        border: 2px solid #fff;
+      }
+
+      .song-meta {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .song-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 900;
+        color: #334155;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .song-subtitle {
+        margin: 2px 0 0;
+        font-size: 11px;
+        font-weight: 700;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .song-extra {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #94a3b8;
+      }
+
+      .platform-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+      }
+
+      .platform-dot.netease {
+        background: #ef4444;
+      }
+
+      .platform-dot.qq {
+        background: #22c55e;
+      }
+
+      .platform-dot.merged {
+        background: #8b5cf6;
+      }
+
+      .status {
+        border-radius: 16px;
+        padding: 10px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 4px 4px 9px #d1d9e6, -4px -4px 9px #ffffff;
+      }
+
+      .lyric-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 22px;
+        background: rgba(16, 24, 40, 0.42);
+        backdrop-filter: blur(12px);
+      }
+
+      .lyric-overlay.open {
+        display: flex;
+      }
+
+      .lyric-overlay-panel {
+        width: min(840px, calc(100vw - 32px));
+        max-height: calc(100vh - 48px);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: 12px 12px 24px rgba(100, 116, 139, 0.35), -8px -8px 20px rgba(255, 255, 255, 0.75);
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .lyric-overlay-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .lyric-overlay-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 900;
+        color: #334155;
+      }
+
+      .lyric-overlay-subtitle {
+        margin: 4px 0 0;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+      }
+
+      .lyric-overlay-content {
+        overflow-y: auto;
+        display: grid;
+        gap: 8px;
+        padding: 4px 2px 8px;
+      }
+
+      .lyric-overlay-line {
+        margin: 0;
+        border-radius: 12px;
+        padding: 8px 10px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #64748b;
+        background: rgba(255, 255, 255, 0.55);
+      }
+
+      .lyric-overlay-line.active {
+        color: #3730a3;
+        background: rgba(99, 102, 241, 0.15);
+      }
+
+      .lyric-overlay-line-time {
+        display: inline-block;
+        min-width: 46px;
+        margin-right: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        color: #6366f1;
+      }
+
+      .player-bar {
+        position: absolute;
+        left: 24px;
+        right: 24px;
+        bottom: 20px;
+        height: 96px;
+        border-radius: 30px;
+        padding: 12px 18px;
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: 10px 10px 22px #d1d9e6, -10px -10px 22px #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .pb-song {
+        width: 248px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .pb-cover {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        object-fit: cover;
+        border: 2px solid #fff;
+      }
+
+      .pb-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 900;
+        color: #4f46e5;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pb-artist {
+        margin: 2px 0 0;
+        font-size: 11px;
+        color: #94a3b8;
+        font-weight: 700;
+      }
+
+      .pb-center {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 8px;
+      }
+
+      .pb-controls {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .round-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+      }
+
+      .round-btn.main {
+        width: 52px;
+        height: 52px;
+      }
+
+      .pb-progress {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .pb-time {
+        width: 44px;
+        font-size: 11px;
+        font-weight: 800;
+        color: #94a3b8;
+      }
+
+      .pb-time.end {
+        text-align: right;
+      }
+
+      .range {
+        width: 100%;
+      }
+
+      .pb-extra {
+        width: 226px;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mini-btn {
+        min-width: 42px;
+        height: 40px;
+        padding: 0 10px;
+        font-size: 12px;
+      }
+
+      @media (max-width: 1160px) {
+        .desktop-shell {
+          width: 100%;
+          height: 100%;
+          border-radius: 0;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .sidebar {
+          display: none;
+        }
+
+        .content {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .player-bar {
+          left: 16px;
+          right: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="desktop-shell">
+        <aside class="sidebar">
+          <div class="brand">
+            <div class="brand-logo">A</div>
+            <h1 class="brand-title">ALLMusic</h1>
+          </div>
+
+          <div class="menu-group">
+            <div class="menu-label">Menu</div>
+            <button class="clay-btn menu-btn active">🎵 发现音乐</button>
+            <button class="clay-btn menu-btn">📎 聚合歌单</button>
+            <button class="clay-btn menu-btn">❤️ 我喜欢</button>
+            <button class="clay-btn menu-btn">🕺 最近播放</button>
+          </div>
+
+          <div class="menu-group">
+            <div class="menu-label">Accounts</div>
+            <div class="clay-inset account-card">
+              <div class="account-item">
+                <span><span id="dot-ne" class="dot gray"></span> 网易云</span>
+                <span id="acc-ne">未连接</span>
+              </div>
+              <div class="account-item">
+                <span><span id="dot-qq" class="dot gray"></span> QQ 音乐</span>
+                <span id="acc-qq">未连接</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-group">
+            <div class="menu-label">Playlists</div>
+            <div id="playlist-list" class="playlist-list"></div>
+          </div>
+
+          <div id="user-chip" class="clay-btn user-chip" role="button" tabindex="0" title="点击重新登录">
+            <img id="user-avatar" class="user-avatar" src="https://p.qlogo.cn/gh/0/0/100" alt="avatar" />
+            <div>
+              <div id="user-name" style="font-size: 13px; font-weight: 900;">未登录</div>
+              <div id="user-role" style="font-size: 11px; color: #94a3b8; font-weight: 700;">请先登录平台</div>
+            </div>
+          </div>
+        </aside>
+
+        <main class="main">
+          <header class="header">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input id="search-input" class="search-input clay-inset" type="search" placeholder="搜索全平台歌曲，例如：晴天" />
+              <button id="search-btn" class="tiny-btn" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%);">搜索</button>
+            </div>
+            <div class="head-actions">
+              <button id="open-ui-switcher" class="clay-btn" title="打开主题中心">🎨 主题中心</button>
+            </div>
+          </header>
+
+          <div class="content">
+            <div class="left">
+              <section class="banner">
+                <div style="position: relative; z-index: 1;">
+                  <h2>每日推荐</h2>
+                  <p>根据双平台偏好合并推荐，点击即可从当前列表开始播放。</p>
+                  <button id="play-visible" class="clay-btn" style="height: 38px; padding: 0 16px; color: #4f46e5;">播放当前列表</button>
+                </div>
+                <div style="position: relative; z-index: 1; font-size: 54px;">📻</div>
+              </section>
+
+              <section class="songs-panel">
+                <div class="songs-head">
+                  <h3 id="songs-title">热门搜索结果</h3>
+                  <span id="view-chip" class="view-chip">数据源：歌单</span>
+                </div>
+                <div id="song-list" class="song-list"></div>
+              </section>
+            </div>
+
+          </div>
+          <section id="status-box" class="status" style="margin: 0 24px 112px;">正在初始化 UI...</section>
+
+          <footer class="player-bar">
+            <div class="pb-song">
+              <img id="pb-cover" class="pb-cover" src="https://p.qlogo.cn/gh/0/0/100" alt="cover" style="cursor: pointer;" title="点击查看全屏歌词" />
+              <div style="min-width: 0;">
+                <p id="pb-title" class="pb-title">未播放</p>
+                <p id="pb-artist" class="pb-artist">--</p>
+              </div>
+            </div>
+
+            <div class="pb-center">
+              <div class="pb-controls">
+                <button id="btn-prev" class="clay-btn round-btn">鈴?/button>
+                <button id="btn-toggle" class="clay-btn clay-btn-primary round-btn main">鈻?/button>
+                <button id="btn-next" class="clay-btn round-btn">鈴?/button>
+              </div>
+              <div class="pb-progress">
+                <span id="time-current" class="pb-time">00:00</span>
+                <input id="progress" class="range" type="range" min="0" max="0" value="0" />
+                <span id="time-total" class="pb-time end">00:00</span>
+              </div>
+            </div>
+
+            <div class="pb-extra">
+              <input id="volume" style="width: 90px;" class="range" type="range" min="0" max="100" value="80" />
+              <button class="clay-btn mini-btn" id="btn-refresh">刷新</button>
+              <button class="clay-btn mini-btn" id="btn-quality">HQ</button>
+            </div>
+          </footer>
+          <div id="lyric-overlay" class="lyric-overlay" aria-hidden="true">
+            <section class="lyric-overlay-panel">
+              <header class="lyric-overlay-head">
+                <div>
+                  <p id="lyric-overlay-title" class="lyric-overlay-title">全屏歌词</p>
+                  <p id="lyric-overlay-subtitle" class="lyric-overlay-subtitle">点击封面可随时打开/关闭</p>
+                </div>
+                <button id="lyric-overlay-close" class="clay-btn mini-btn" type="button">关闭</button>
+              </header>
+              <div id="lyric-overlay-content" class="lyric-overlay-content"></div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const BRIDGE_WAIT_TIMEOUT = 8000;
+        const PLAYER_SYNC_INTERVAL = 800;
+        const DEFAULT_COVER = 'https://p.qlogo.cn/gh/0/0/100';
+        const LOCAL_API_READY_EVENT = 'allmusic:local-api-ready';
+        const BRIDGE_CACHE_UPDATED_EVENT = 'allmusic:bridge-cache-updated';
+        const OPEN_UI_SWITCHER_EVENT = 'allmusic:open-ui-switcher';
+
+        const els = {
+          dotNe: document.getElementById('dot-ne'),
+          dotQq: document.getElementById('dot-qq'),
+          accNe: document.getElementById('acc-ne'),
+          accQq: document.getElementById('acc-qq'),
+          userChip: document.getElementById('user-chip'),
+          userAvatar: document.getElementById('user-avatar'),
+          userName: document.getElementById('user-name'),
+          userRole: document.getElementById('user-role'),
+          playlistList: document.getElementById('playlist-list'),
+          searchInput: document.getElementById('search-input'),
+          searchBtn: document.getElementById('search-btn'),
+          songsTitle: document.getElementById('songs-title'),
+          viewChip: document.getElementById('view-chip'),
+          songList: document.getElementById('song-list'),
+          statusBox: document.getElementById('status-box'),
+          pbCover: document.getElementById('pb-cover'),
+          pbTitle: document.getElementById('pb-title'),
+          pbArtist: document.getElementById('pb-artist'),
+          lyricOverlay: document.getElementById('lyric-overlay'),
+          lyricOverlayTitle: document.getElementById('lyric-overlay-title'),
+          lyricOverlaySubtitle: document.getElementById('lyric-overlay-subtitle'),
+          lyricOverlayContent: document.getElementById('lyric-overlay-content'),
+          lyricOverlayClose: document.getElementById('lyric-overlay-close'),
+          btnPrev: document.getElementById('btn-prev'),
+          btnToggle: document.getElementById('btn-toggle'),
+          btnNext: document.getElementById('btn-next'),
+          progress: document.getElementById('progress'),
+          timeCurrent: document.getElementById('time-current'),
+          timeTotal: document.getElementById('time-total'),
+          volume: document.getElementById('volume'),
+          playVisible: document.getElementById('play-visible'),
+          openUiSwitcher: document.getElementById('open-ui-switcher'),
+          btnRefresh: document.getElementById('btn-refresh'),
+          btnQuality: document.getElementById('btn-quality'),
+        };
+
+        const state = {
+          playlists: [],
+          selectedPlaylistId: '',
+          songs: [],
+          mode: 'playlist',
+          syncingPlayer: false,
+          isSeeking: false,
+          lyricCache: Object.create(null),
+          currentSongId: '',
+          currentTime: 0,
+          lyricRenderSignature: '',
+          lastBridgeCacheRefreshAt: 0,
+          preferredQuality: '320',
+          lyricOverlayOpen: false,
+          lyricOverlaySignature: '',
+        };
+
+        function resolveBridge() {
+          if (window.parent && window.parent !== window && window.parent.__ALLMUSIC_BRIDGE__) {
+            return window.parent.__ALLMUSIC_BRIDGE__;
+          }
+          if (window.__ALLMUSIC_BRIDGE__) {
+            return window.__ALLMUSIC_BRIDGE__;
+          }
+          return null;
+        }
+
+        function normalizePreferredQuality(quality) {
+          return quality === 'flac' ? 'flac' : '320';
+        }
+
+        function qualityButtonLabel(quality) {
+          return quality === 'flac' ? 'FLAC' : 'HQ';
+        }
+
+        function updateQualityButton() {
+          if (!els.btnQuality) {
+            return;
+          }
+          els.btnQuality.textContent = qualityButtonLabel(state.preferredQuality);
+          els.btnQuality.title = state.preferredQuality === 'flac' ? '当前 FLAC，点击切回 HQ' : '当前 HQ，点击切换 FLAC';
+        }
+
+        function wait(ms) {
+          return new Promise((resolve) => window.setTimeout(resolve, ms));
+        }
+
+        async function waitForBridge(timeoutMs) {
+          const startAt = Date.now();
+          while (Date.now() - startAt < timeoutMs) {
+            if (resolveBridge()) {
+              return true;
+            }
+            await wait(120);
+          }
+          return false;
+        }
+
+        function setStatus(message, isError) {
+          if (!els.statusBox) {
+            return;
+          }
+          els.statusBox.textContent = message || '';
+          els.statusBox.style.color = isError ? '#be123c' : '#64748b';
+        }
+
+        function escapeHtml(value) {
+          return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('\"', '&quot;')
+            .replaceAll("'", '&#39;');
+        }
+
+        function formatMs(ms) {
+          const safe = Math.max(0, Number(ms) || 0);
+          const sec = Math.floor(safe / 1000);
+          const minute = Math.floor(sec / 60);
+          const second = sec % 60;
+          return String(minute).padStart(2, '0') + ':' + String(second).padStart(2, '0');
+        }
+
+        function parseLyric(rawLyric) {
+          const source = String(rawLyric || '').trim();
+          if (!source) {
+            return [];
+          }
+
+          const timeTag = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
+          const lines = [];
+          source.split(/\r?\n/).forEach((rawLine) => {
+            const line = rawLine.trim();
+            if (!line) {
+              return;
+            }
+            const tags = Array.from(line.matchAll(timeTag));
+            const text = line.replace(timeTag, '').trim();
+            if (!tags.length || !text) {
+              return;
+            }
+            tags.forEach((match) => {
+              const minute = Number(match[1]);
+              const second = Number(match[2]);
+              const decimal = match[3] || '0';
+              const millis = Number(decimal.padEnd(3, '0').slice(0, 3));
+              lines.push({ timeMs: minute * 60000 + second * 1000 + millis, text: text });
+            });
+          });
+
+          return lines.sort((a, b) => a.timeMs - b.timeMs);
+        }
+
+        function resolveLyricWindow(lines, currentTimeMs) {
+          if (!lines.length) {
+            return [
+              { text: '暂无歌词', active: true },
+              { text: '可切换到 V4 页面查看完整歌词模式', active: false },
+            ];
+          }
+
+          let activeIndex = 0;
+          for (let i = 0; i < lines.length; i += 1) {
+            const next = lines[i + 1];
+            if (!next || currentTimeMs < next.timeMs) {
+              activeIndex = i;
+              break;
+            }
+          }
+
+          const windowStart = Math.max(0, activeIndex - 1);
+          const windowEnd = Math.min(lines.length, activeIndex + 3);
+          const result = [];
+          for (let i = windowStart; i < windowEnd; i += 1) {
+            result.push({ text: lines[i].text, active: i === activeIndex });
+          }
+          return result;
+        }
+
+        function resolveLyricOverlayWindow(lines, currentTimeMs) {
+          if (!lines.length) {
+            return [{ text: '暂无歌词，换一首试试。', time: '--:--', active: true }];
+          }
+
+          let activeIndex = 0;
+          for (let i = 0; i < lines.length; i += 1) {
+            const next = lines[i + 1];
+            if (!next || currentTimeMs < next.timeMs) {
+              activeIndex = i;
+              break;
+            }
+          }
+
+          const windowStart = Math.max(0, activeIndex - 5);
+          const windowEnd = Math.min(lines.length, activeIndex + 6);
+          const result = [];
+          for (let i = windowStart; i < windowEnd; i += 1) {
+            result.push({
+              text: lines[i].text,
+              time: formatMs(lines[i].timeMs),
+              active: i === activeIndex,
+            });
+          }
+          return result;
+        }
+
+        async function renderLyricOverlay(player) {
+          if (!state.lyricOverlayOpen || !els.lyricOverlayContent) {
+            return;
+          }
+
+          const song = player && player.currentSong ? player.currentSong : null;
+          if (!song) {
+            const emptySignature = '__EMPTY_SONG__';
+            if (state.lyricOverlaySignature === emptySignature) {
+              return;
+            }
+            state.lyricOverlaySignature = emptySignature;
+            if (els.lyricOverlayTitle) {
+              els.lyricOverlayTitle.textContent = '全屏歌词';
+            }
+            if (els.lyricOverlaySubtitle) {
+              els.lyricOverlaySubtitle.textContent = '暂无播放歌曲';
+            }
+            els.lyricOverlayContent.innerHTML = '<p class=\"lyric-overlay-line active\"><span class=\"lyric-overlay-line-time\">--:--</span>暂无播放歌曲</p>';
+            return;
+          }
+
+          if (els.lyricOverlayTitle) {
+            els.lyricOverlayTitle.textContent = song.name || '未知歌曲';
+          }
+          if (els.lyricOverlaySubtitle) {
+            els.lyricOverlaySubtitle.textContent = `${song.artist || '未知歌手'} · ${song.album || '未知专辑'}`;
+          }
+
+          const lines = await loadLyrics(song);
+          const overlayLines = resolveLyricOverlayWindow(lines, Number(player.currentTime) || 0);
+          const signature = overlayLines.map((line) => `${line.active ? '1' : '0'}:${line.time}:${line.text}`).join('|');
+          if (signature === state.lyricOverlaySignature) {
+            return;
+          }
+          state.lyricOverlaySignature = signature;
+          els.lyricOverlayContent.innerHTML = overlayLines.map((line) => (
+            `<p class=\"lyric-overlay-line${line.active ? ' active' : ''}\"><span class=\"lyric-overlay-line-time\">${escapeHtml(line.time)}</span>${escapeHtml(line.text)}</p>`
+          )).join('');
+        }
+
+        function openLyricOverlay() {
+          if (!els.lyricOverlay) {
+            return;
+          }
+          state.lyricOverlayOpen = true;
+          state.lyricOverlaySignature = '';
+          els.lyricOverlay.classList.add('open');
+          els.lyricOverlay.setAttribute('aria-hidden', 'false');
+          void syncPlayerState();
+        }
+
+        function closeLyricOverlay() {
+          if (!els.lyricOverlay) {
+            return;
+          }
+          state.lyricOverlayOpen = false;
+          els.lyricOverlay.classList.remove('open');
+          els.lyricOverlay.setAttribute('aria-hidden', 'true');
+        }
+
+        async function requestOpenUiSwitcher() {
+          const bridge = resolveBridge();
+          if (bridge && typeof bridge.openUiSwitcher === 'function') {
+            await bridge.openUiSwitcher();
+            return;
+          }
+
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: OPEN_UI_SWITCHER_EVENT }, '*');
+            return;
+          }
+          window.dispatchEvent(new CustomEvent(OPEN_UI_SWITCHER_EVENT));
+        }
+
+        async function requestRelogin() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.switchUiVersion !== 'function') {
+            setStatus('当前桥接不支持跳转登录，请切换到 Current UI 手动登录。', true);
+            return;
+          }
+
+          setStatus('正在跳转到 Current UI 登录页...');
+          await bridge.switchUiVersion('current');
+        }
+
+        async function refreshAuthState() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.getAuthState !== 'function') {
+            return null;
+          }
+
+          const auth = await bridge.getAuthState();
+          const ne = auth.users && auth.users.netease ? auth.users.netease : null;
+          const qq = auth.users && auth.users.qq ? auth.users.qq : null;
+          if (els.dotNe) {
+            els.dotNe.className = 'dot ' + (ne ? 'red' : 'gray');
+          }
+          if (els.dotQq) {
+            els.dotQq.className = 'dot ' + (qq ? 'green' : 'gray');
+          }
+          if (els.accNe) {
+            els.accNe.textContent = ne ? '已连接' : '未连接';
+          }
+          if (els.accQq) {
+            els.accQq.textContent = qq ? '已连接' : '未连接';
+          }
+
+          const user = ne || qq;
+          if (user) {
+            if (els.userAvatar) {
+              els.userAvatar.src = user.avatarUrl || DEFAULT_COVER;
+            }
+            if (els.userName) {
+              els.userName.textContent = user.nickname || '已登录用户';
+            }
+            if (els.userRole) {
+              els.userRole.textContent = auth.hasConnectedAllPlatforms ? '双平台已连接 · 点击重新登录' : '单平台连接 · 点击重新登录';
+            }
+          } else if (els.userRole) {
+            els.userRole.textContent = '请先登录平台（点击重新登录）';
+          }
+
+          return auth;
+        }
+
+        function renderPlaylists() {
+          if (!els.playlistList) {
+            return;
+          }
+
+          const html = state.playlists.map((playlist) => {
+            const active = playlist.id === state.selectedPlaylistId ? ' active' : '';
+            const count = Number(playlist.songCount) || 0;
+            const platformText = playlist.platform === 'netease' ? '网易云' : playlist.platform === 'qq' ? 'QQ 音乐' : '双平台';
+            return `<button class="playlist-item${active}" data-playlist-id="${playlist.id}">
+              <div style="font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${playlist.name || '未命名歌单'}</div>
+              <div style="margin-top:2px;font-size:11px;color:#94a3b8;font-weight:700;">${platformText} · ${count} 首</div>
+            </button>`;
+          }).join('');
+
+          els.playlistList.innerHTML = html || '<div style="font-size:12px;color:#94a3b8;padding:8px;">暂无可用歌单</div>';
+        }
+
+        function platformDotClass(platform) {
+          if (platform === 'netease') {
+            return 'netease';
+          }
+          if (platform === 'qq') {
+            return 'qq';
+          }
+          return 'merged';
+        }
+
+        function renderSongs() {
+          if (!els.songList) {
+            return;
+          }
+
+          const html = state.songs.map((song, index) => {
+            const isActive = song.id === state.currentSongId;
+            return `<button class="song-row${isActive ? ' active' : ''}" data-song-index="${index}">
+              <span class="song-index">${String(index + 1).padStart(2, '0')}</span>
+              <img class="song-cover" src="${song.coverUrl || DEFAULT_COVER}" alt="cover" />
+              <div class="song-meta">
+                <p class="song-title">${song.name || '未知歌曲'}</p>
+                <p class="song-subtitle">${song.artist || '未知歌手'} · ${song.album || '未知专辑'}</p>
+              </div>
+              <div class="song-extra">
+                <span class="platform-dot ${platformDotClass(song.platform)}"></span>
+                <span>${formatMs(song.duration || 0)}</span>
+              </div>
+            </button>`;
+          }).join('');
+
+          els.songList.innerHTML = html || '<div style="font-size:12px;color:#94a3b8;padding:8px;">暂无歌曲</div>';
+        }
+
+        async function selectPlaylistById(playlistId, options) {
+          const silent = Boolean(options && options.silent);
+          const forceRefresh = Boolean(options && options.forceRefresh);
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.loadPlaylistDetail !== 'function') {
+            return;
+          }
+
+          const playlist = state.playlists.find((item) => item.id === playlistId);
+          if (!playlist) {
+            return;
+          }
+
+          try {
+            if (!silent) {
+              setStatus('正在加载歌单详情...');
+            }
+            const detail = await bridge.loadPlaylistDetail(playlist, { silent, forceRefresh });
+            state.mode = 'playlist';
+            state.selectedPlaylistId = playlistId;
+            state.songs = Array.isArray(detail.songs) ? detail.songs : [];
+            if (els.songsTitle) {
+              els.songsTitle.textContent = playlist.name || '歌单详情';
+            }
+            if (els.viewChip) {
+              els.viewChip.textContent = `数据源：歌单（${state.songs.length} 首）`;
+            }
+            renderPlaylists();
+            renderSongs();
+            if (!silent) {
+              setStatus('歌单加载完成');
+            }
+          } catch (error) {
+            if (!silent) {
+              setStatus(error instanceof Error ? error.message : '歌单加载失败', true);
+            } else {
+              console.warn('[ALLMusic][V8Clay] playlist detail silent refresh failed:', error);
+            }
+          }
+        }
+
+        async function loadPlaylists(options) {
+          const silent = Boolean(options && options.silent);
+          const forceRefresh = Boolean(options && options.forceRefresh);
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.loadPlaylists !== 'function') {
+            return;
+          }
+
+          try {
+            if (!silent) {
+              setStatus('正在加载歌单...');
+            }
+            const result = await bridge.loadPlaylists({ silent, forceRefresh });
+            state.playlists = Array.isArray(result.playlists) ? result.playlists : [];
+            renderPlaylists();
+            if (state.playlists.length) {
+              const preferredId = state.playlists.some((item) => item.id === state.selectedPlaylistId)
+                ? state.selectedPlaylistId
+                : state.playlists[0].id;
+              await selectPlaylistById(preferredId, { silent, forceRefresh });
+            } else {
+              state.songs = [];
+              renderSongs();
+              if (!silent) {
+                setStatus('暂无可展示歌单');
+              }
+            }
+          } catch (error) {
+            if (!silent) {
+              setStatus(error instanceof Error ? error.message : '歌单加载失败', true);
+            } else {
+              console.warn('[ALLMusic][V8Clay] playlists silent refresh failed:', error);
+            }
+          }
+        }
+
+        async function searchSongs() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.searchSongs !== 'function' || !els.searchInput) {
+            return;
+          }
+
+          const keyword = els.searchInput.value.trim();
+          if (!keyword) {
+            setStatus('请输入关键词后再搜索');
+            return;
+          }
+
+          try {
+            setStatus('正在搜索...');
+            const result = await bridge.searchSongs(keyword, 30);
+            state.mode = 'search';
+            state.selectedPlaylistId = '';
+            state.songs = Array.isArray(result.songs) ? result.songs : [];
+            if (els.songsTitle) {
+              els.songsTitle.textContent = `搜索结果：${keyword}`;
+            }
+            if (els.viewChip) {
+              els.viewChip.textContent = `数据源：搜索（${state.songs.length} 首）`;
+            }
+            renderPlaylists();
+            renderSongs();
+            setStatus(`搜索完成：${state.songs.length} 首`);
+          } catch (error) {
+            setStatus(error instanceof Error ? error.message : '搜索失败', true);
+          }
+        }
+
+        async function clearSearch() {
+          if (els.searchInput) {
+            els.searchInput.value = '';
+          }
+          state.mode = 'playlist';
+          if (state.playlists.length) {
+            await selectPlaylistById(state.selectedPlaylistId || state.playlists[0].id);
+          } else {
+            state.songs = [];
+            renderSongs();
+          }
+        }
+
+        async function playSongAt(index) {
+          const bridge = resolveBridge();
+          if (!bridge) {
+            return;
+          }
+
+          if (typeof bridge.playSongs === 'function') {
+            await bridge.playSongs(state.songs, index);
+            await syncPlayerState();
+          }
+        }
+
+        async function loadLyrics(song) {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.loadSongLyrics !== 'function' || !song) {
+            return [];
+          }
+
+          if (state.lyricCache[song.id]) {
+            return state.lyricCache[song.id];
+          }
+
+          try {
+            const lyricResult = await bridge.loadSongLyrics(song);
+            const lines = parseLyric(lyricResult && lyricResult.lyric);
+            state.lyricCache[song.id] = lines;
+            return lines;
+          } catch {
+            state.lyricCache[song.id] = [];
+            return [];
+          }
+        }
+
+        async function renderNowPlaying(player) {
+          const song = player && player.currentSong ? player.currentSong : null;
+          const cover = song && song.coverUrl ? song.coverUrl : DEFAULT_COVER;
+          const title = song ? song.name || '未知歌曲' : '暂无播放';
+          const artist = song ? song.artist || '未知歌手' : '等待选择歌曲';
+
+          if (els.npCover && els.npCover.src !== cover) {
+            els.npCover.src = cover;
+          }
+          if (els.pbCover && els.pbCover.src !== cover) {
+            els.pbCover.src = cover;
+          }
+          if (els.npTitle && els.npTitle.textContent !== title) {
+            els.npTitle.textContent = title;
+          }
+          if (els.pbTitle && els.pbTitle.textContent !== title) {
+            els.pbTitle.textContent = title;
+          }
+          if (els.npArtist && els.npArtist.textContent !== artist) {
+            els.npArtist.textContent = artist;
+          }
+          if (els.pbArtist && els.pbArtist.textContent !== artist) {
+            els.pbArtist.textContent = artist;
+          }
+
+          if (!song || !els.lyricBox) {
+            if (els.lyricBox) {
+              const emptySignature = '__EMPTY__';
+              if (state.lyricRenderSignature !== emptySignature) {
+                els.lyricBox.innerHTML = '<p class="lyric-line active">暂无歌词</p>';
+                state.lyricRenderSignature = emptySignature;
+              }
+            }
+            return;
+          }
+
+          const lines = await loadLyrics(song);
+          const preview = resolveLyricWindow(lines, Number(player.currentTime) || 0);
+          const nextSignature = preview.map((line) => `${line.active ? '1' : '0'}:${line.text}`).join('|');
+          if (nextSignature === state.lyricRenderSignature) {
+            return;
+          }
+          els.lyricBox.innerHTML = preview.map((line) => (
+            `<p class="lyric-line${line.active ? ' active' : ''}">${line.text}</p>`
+          )).join('');
+          state.lyricRenderSignature = nextSignature;
+        }
+
+        async function syncPlayerState() {
+          if (state.syncingPlayer) {
+            return;
+          }
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.getPlayerState !== 'function') {
+            return;
+          }
+
+          state.syncingPlayer = true;
+          try {
+            const player = await bridge.getPlayerState();
+            const current = Number(player.currentTime) || 0;
+            const total = Number(player.duration) || 0;
+            const previousSongId = state.currentSongId;
+            const nextSongId = player.currentSong ? player.currentSong.id : '';
+            const songChanged = previousSongId !== nextSongId;
+            state.currentSongId = nextSongId;
+            state.currentTime = current;
+
+            if (els.timeCurrent) {
+              els.timeCurrent.textContent = formatMs(current);
+            }
+            if (els.timeTotal) {
+              els.timeTotal.textContent = formatMs(total);
+            }
+            if (els.progress && !state.isSeeking) {
+              const maxSec = Math.max(0, Math.floor(total / 1000));
+              const curSec = Math.max(0, Math.floor(current / 1000));
+              els.progress.max = String(maxSec);
+              els.progress.value = String(Math.min(curSec, maxSec));
+            }
+
+            if (els.btnToggle) {
+              els.btnToggle.textContent = player.isPlaying ? '⏸' : '▶';
+            }
+            if (els.volume && !state.isSeeking) {
+              els.volume.value = String(Math.round((Number(player.volume) || 0) * 100));
+            }
+            state.preferredQuality = normalizePreferredQuality(player.preferredQuality);
+            updateQualityButton();
+
+            if (songChanged) {
+              renderSongs();
+            }
+            await renderNowPlaying(player);
+            await renderLyricOverlay(player);
+          } catch (error) {
+            setStatus(error instanceof Error ? error.message : '同步播放器状态失败', true);
+          } finally {
+            state.syncingPlayer = false;
+          }
+        }
+
+        async function playVisibleSongs() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.playSongs !== 'function') {
+            return;
+          }
+          if (!state.songs.length) {
+            setStatus('当前列表没有歌曲');
+            return;
+          }
+          await bridge.playSongs(state.songs, 0);
+          await syncPlayerState();
+        }
+
+        async function handleBridgeCacheUpdated(payload) {
+          if (!payload || payload.type !== BRIDGE_CACHE_UPDATED_EVENT) {
+            return;
+          }
+
+          const now = Date.now();
+          if (now - state.lastBridgeCacheRefreshAt < 400) {
+            return;
+          }
+          state.lastBridgeCacheRefreshAt = now;
+
+          if (payload.resource === 'playlists') {
+            if (state.mode !== 'playlist') {
+              return;
+            }
+            await loadPlaylists({ silent: true });
+            return;
+          }
+
+          if (payload.resource === 'playlist-detail' && state.mode === 'playlist' && state.selectedPlaylistId) {
+            await selectPlaylistById(state.selectedPlaylistId, { silent: true });
+          }
+        }
+
+        function bindEvents() {
+          if (els.playlistList) {
+            els.playlistList.addEventListener('click', (event) => {
+              const target = event.target;
+              if (!(target instanceof Element)) {
+                return;
+              }
+              const button = target.closest('[data-playlist-id]');
+              if (!(button instanceof HTMLElement)) {
+                return;
+              }
+              const nextId = button.getAttribute('data-playlist-id');
+              if (nextId) {
+                void selectPlaylistById(nextId);
+              }
+            });
+          }
+          if (els.songList) {
+            els.songList.addEventListener('click', (event) => {
+              const target = event.target;
+              if (!(target instanceof Element)) {
+                return;
+              }
+              const button = target.closest('[data-song-index]');
+              if (!(button instanceof HTMLElement)) {
+                return;
+              }
+              const index = Number(button.getAttribute('data-song-index'));
+              if (Number.isFinite(index)) {
+                void playSongAt(index);
+              }
+            });
+          }
+          if (els.searchBtn) {
+            els.searchBtn.addEventListener('click', () => {
+              void searchSongs();
+            });
+          }
+          if (els.searchInput) {
+            els.searchInput.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void searchSongs();
+              }
+            });
+            els.searchInput.addEventListener('search', () => {
+              if (!els.searchInput || els.searchInput.value.trim()) {
+                return;
+              }
+              void clearSearch();
+            });
+          }
+          if (els.userChip) {
+            els.userChip.addEventListener('click', () => {
+              void requestRelogin();
+            });
+            els.userChip.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                void requestRelogin();
+              }
+            });
+          }
+          if (els.pbCover) {
+            els.pbCover.addEventListener('click', () => {
+              openLyricOverlay();
+            });
+          }
+          if (els.lyricOverlayClose) {
+            els.lyricOverlayClose.addEventListener('click', () => {
+              closeLyricOverlay();
+            });
+          }
+          if (els.lyricOverlay) {
+            els.lyricOverlay.addEventListener('click', (event) => {
+              if (event.target === els.lyricOverlay) {
+                closeLyricOverlay();
+              }
+            });
+          }
+          window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && state.lyricOverlayOpen) {
+              closeLyricOverlay();
+            }
+          });
+
+          if (els.btnPrev) {
+            els.btnPrev.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.playPrevious === 'function') {
+                await bridge.playPrevious();
+                await syncPlayerState();
+              }
+            });
+          }
+          if (els.btnToggle) {
+            els.btnToggle.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.togglePlay === 'function') {
+                await bridge.togglePlay();
+                await syncPlayerState();
+              }
+            });
+          }
+          if (els.btnNext) {
+            els.btnNext.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.playNext === 'function') {
+                await bridge.playNext();
+                await syncPlayerState();
+              }
+            });
+          }
+
+          if (els.progress) {
+            els.progress.addEventListener('input', () => {
+              state.isSeeking = true;
+              const sec = Number(els.progress.value) || 0;
+              if (els.timeCurrent) {
+                els.timeCurrent.textContent = formatMs(sec * 1000);
+              }
+            });
+            els.progress.addEventListener('change', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.seekTo === 'function') {
+                const sec = Number(els.progress.value) || 0;
+                await bridge.seekTo(sec * 1000);
+              }
+              state.isSeeking = false;
+              await syncPlayerState();
+            });
+          }
+
+          if (els.volume) {
+            els.volume.addEventListener('change', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.setVolume === 'function') {
+                await bridge.setVolume(Number(els.volume.value) || 0);
+              }
+            });
+          }
+
+          if (els.playVisible) {
+            els.playVisible.addEventListener('click', () => {
+              void playVisibleSongs();
+            });
+          }
+
+          if (els.btnRefresh) {
+            els.btnRefresh.addEventListener('click', () => {
+              void loadPlaylists();
+            });
+          }
+          if (els.btnQuality) {
+            els.btnQuality.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (!bridge || typeof bridge.setQuality !== 'function') {
+                setStatus('当前桥接不支持音质切换', true);
+                return;
+              }
+
+              const nextQuality = state.preferredQuality === 'flac' ? '320' : 'flac';
+              try {
+                const applied = await bridge.setQuality(nextQuality);
+                state.preferredQuality = normalizePreferredQuality(applied || nextQuality);
+                updateQualityButton();
+                setStatus(state.preferredQuality === 'flac' ? '已切换至 FLAC 音质' : '已切换至 HQ 音质');
+              } catch (error) {
+                setStatus(error instanceof Error ? error.message : '切换音质失败', true);
+              }
+            });
+          }
+
+          if (els.openUiSwitcher) {
+            els.openUiSwitcher.addEventListener('click', () => {
+              void requestOpenUiSwitcher();
+            });
+          }
+        }
+
+        async function init() {
+          bindEvents();
+          updateQualityButton();
+          setStatus('等待桥接连接...');
+
+          const ready = await waitForBridge(BRIDGE_WAIT_TIMEOUT);
+          if (!ready) {
+            setStatus('Bridge 初始化超时，请刷新页面重试', true);
+            return;
+          }
+
+          setStatus('桥接连接成功，正在同步数据...');
+          const auth = await refreshAuthState();
+          if (!auth || !auth.isAuthenticated) {
+            setStatus('未登录：请先在 Current/V4 页面完成登录', true);
+            renderSongs();
+            return;
+          }
+
+          await loadPlaylists();
+          await syncPlayerState();
+          setStatus('V8 Clay 已就绪');
+        }
+
+        window.addEventListener(LOCAL_API_READY_EVENT, () => {
+          void loadPlaylists({ forceRefresh: true });
+        });
+
+        window.addEventListener('message', (event) => {
+          if (window.parent && event.source !== window.parent) {
+            return;
+          }
+          const payload = event.data;
+          if (!payload || typeof payload !== 'object') {
+            return;
+          }
+          if (payload.type === LOCAL_API_READY_EVENT) {
+            void loadPlaylists({ forceRefresh: true });
+            return;
+          }
+          if (payload.type === BRIDGE_CACHE_UPDATED_EVENT) {
+            void handleBridgeCacheUpdated(payload);
+          }
+        });
+
+        window.addEventListener(BRIDGE_CACHE_UPDATED_EVENT, (event) => {
+          if (event instanceof CustomEvent) {
+            void handleBridgeCacheUpdated(event.detail);
+          }
+        });
+
+        void init();
+        window.setInterval(() => {
+          void syncPlayerState();
+        }, PLAYER_SYNC_INTERVAL);
+      })();
+    </script>
+  </body>
+</html>
+

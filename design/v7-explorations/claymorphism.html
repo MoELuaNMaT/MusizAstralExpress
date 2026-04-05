@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic - Claymorphism Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #eef2ff;
+            --clay-bg: #f3f7ff;
+            --primary: #6366f1;
+            --accent: #ec4899;
+            --text: #4b5563;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+        }
+
+        /* Claymorphism CSS Generator Logic */
+        .clay-card {
+            background: var(--clay-bg);
+            border-radius: 32px;
+            box-shadow: 
+                35px 35px 70px #c5c9d6,
+                -35px -35px 70px #ffffff,
+                inset 10px 10px 20px rgba(255,255,255,0.5),
+                inset -5px -5px 15px rgba(0,0,0,0.05);
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+
+        .clay-card-sm {
+            background: var(--clay-bg);
+            border-radius: 20px;
+            box-shadow: 
+                8px 8px 16px #d1d5db,
+                -8px -8px 16px #ffffff,
+                inset 2px 2px 4px rgba(255,255,255,0.8);
+        }
+
+        .clay-button {
+            background: var(--primary);
+            color: white;
+            border-radius: 50px;
+            box-shadow: 
+                8px 8px 16px rgba(99, 102, 241, 0.4),
+                -8px -8px 16px rgba(255,255,255, 0.8),
+                inset 4px 4px 8px rgba(255,255,255,0.2),
+                inset -4px -4px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .clay-button:active {
+            transform: scale(0.95);
+            box-shadow: 
+                inset 6px 6px 12px rgba(0,0,0,0.2),
+                inset -6px -6px 12px rgba(255,255,255,0.2);
+        }
+
+        .clay-button-secondary {
+            background: #ffffff;
+            color: var(--primary);
+            border-radius: 50px;
+            box-shadow: 
+                6px 6px 12px #d1d5db,
+                -6px -6px 12px #ffffff;
+        }
+
+        .clay-input {
+            background: #eef2ff;
+            border-radius: 20px;
+            box-shadow: 
+                inset 5px 5px 10px #dbeafe,
+                inset -5px -5px 10px #ffffff;
+            border: none;
+        }
+
+        .clay-img {
+            border-radius: 24px;
+            box-shadow: 
+                10px 10px 20px rgba(0,0,0,0.1),
+                -10px -10px 20px rgba(255,255,255,0.8);
+            border: 4px solid white;
+        }
+
+        .floating-bubble {
+            position: absolute;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 50%;
+            backdrop-filter: blur(5px);
+            z-index: -1;
+            animation: float 10s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-20px) scale(1.05); }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen gap-10 p-10 bg-[#eef2ff]">
+
+    <!-- 背景装饰 -->
+    <div class="floating-bubble w-64 h-64 top-10 left-10 bg-purple-200"></div>
+    <div class="floating-bubble w-96 h-96 bottom-10 right-10 bg-blue-200" style="animation-delay: -2s"></div>
+
+    <!-- PC Desktop Layout -->
+    <div class="w-[1000px] h-[700px] clay-card flex overflow-hidden relative z-10 scale-90 origin-right">
+        <!-- Sidebar -->
+        <aside class="w-64 p-6 flex flex-col gap-6 bg-white/30 backdrop-blur-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-black text-xl shadow-lg">A</div>
+                <h1 class="text-2xl font-black text-slate-700 tracking-tight">ALLMusic</h1>
+            </div>
+
+            <nav class="flex-1 space-y-3">
+                <button class="w-full flex items-center gap-3 px-4 py-3 clay-button text-sm font-bold shadow-lg shadow-indigo-200">
+                    <span>🏠</span> 发现
+                </button>
+                <button class="w-full flex items-center gap-3 px-4 py-3 clay-button-secondary text-slate-500 font-bold hover:scale-105 transition-transform">
+                    <span>🎵</span> 歌单
+                </button>
+                <button class="w-full flex items-center gap-3 px-4 py-3 clay-button-secondary text-slate-500 font-bold hover:scale-105 transition-transform">
+                    <span>❤️</span> 我喜欢
+                </button>
+            </nav>
+
+            <div class="clay-card-sm p-4 flex items-center gap-3 bg-white">
+                <img src="https://i.pravatar.cc/100?img=3" class="w-10 h-10 rounded-full border-2 border-white shadow-md">
+                <div>
+                    <p class="text-xs font-bold text-slate-700">User_01</p>
+                    <p class="text-[10px] text-green-500 font-bold">● 在线</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col bg-white/20">
+            <header class="h-20 flex items-center px-8 gap-4 justify-between">
+                <div class="flex-1 max-w-md relative">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                    <input type="text" placeholder="搜索胖嘟嘟的音乐..." class="w-full h-12 clay-input pl-10 pr-4 outline-none text-slate-600 font-bold placeholder:text-slate-400">
+                </div>
+                <div class="flex gap-2">
+                    <button class="w-10 h-10 rounded-full clay-button-secondary flex items-center justify-center shadow-sm">🔔</button>
+                    <button class="w-10 h-10 rounded-full clay-button-secondary flex items-center justify-center shadow-sm">⚙️</button>
+                </div>
+            </header>
+
+            <div class="flex-1 p-8 overflow-y-auto no-scrollbar">
+                <!-- Banner -->
+                <div class="w-full h-48 clay-img bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center justify-between px-10 text-white mb-8 relative overflow-hidden">
+                    <div class="relative z-10">
+                        <span class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md mb-2 inline-block">今日心情</span>
+                        <h2 class="text-3xl font-black mb-4 drop-shadow-md">像棉花糖一样<br>柔软的旋律</h2>
+                        <button class="clay-button bg-white text-indigo-600 px-6 py-2 font-bold shadow-none">立即播放</button>
+                    </div>
+                    <div class="text-9xl absolute right-4 -bottom-4 opacity-30 select-none">☁️</div>
+                </div>
+
+                <h3 class="text-xl font-black text-slate-700 mb-4">推荐歌单</h3>
+                <div class="grid grid-cols-3 gap-6">
+                    <!-- Cards -->
+                    <div class="clay-card-sm p-3 hover:-translate-y-2 transition-transform cursor-pointer">
+                        <div class="w-full h-32 rounded-2xl bg-orange-200 mb-3 overflow-hidden shadow-inner">
+                            <img src="https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?auto=format&fit=crop&q=80&w=300" class="w-full h-full object-cover mix-blend-overlay opacity-80">
+                        </div>
+                        <p class="font-bold text-slate-700 px-1">元气满满早晨</p>
+                        <p class="text-xs text-slate-400 px-1 mt-1">128 首歌曲</p>
+                    </div>
+                    <div class="clay-card-sm p-3 hover:-translate-y-2 transition-transform cursor-pointer">
+                        <div class="w-full h-32 rounded-2xl bg-blue-200 mb-3 overflow-hidden shadow-inner">
+                            <img src="https://images.unsplash.com/photo-1459749411177-042180ce673c?auto=format&fit=crop&q=80&w=300" class="w-full h-full object-cover mix-blend-overlay opacity-80">
+                        </div>
+                        <p class="font-bold text-slate-700 px-1">云端漫步</p>
+                        <p class="text-xs text-slate-400 px-1 mt-1">混合推荐</p>
+                    </div>
+                    <div class="clay-card-sm p-3 hover:-translate-y-2 transition-transform cursor-pointer">
+                        <div class="w-full h-32 rounded-2xl bg-pink-200 mb-3 overflow-hidden shadow-inner">
+                            <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=300" class="w-full h-full object-cover mix-blend-overlay opacity-80">
+                        </div>
+                        <p class="font-bold text-slate-700 px-1">甜蜜派对</p>
+                        <p class="text-xs text-slate-400 px-1 mt-1">QQ 音乐热歌</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Bar -->
+            <div class="h-24 bg-white/40 backdrop-blur-md border-t border-white flex items-center px-8 justify-between">
+                <div class="flex items-center gap-4">
+                    <img src="https://images.unsplash.com/photo-1514525253361-bee8718a7439?auto=format&fit=crop&q=80&w=100" class="w-14 h-14 clay-img shadow-sm">
+                    <div>
+                        <p class="font-bold text-slate-700">Honey (甜心)</p>
+                        <p class="text-xs text-slate-500">王心凌</p>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center gap-2 flex-1 max-w-lg">
+                    <div class="flex items-center gap-6">
+                        <button class="text-2xl text-slate-400 hover:text-indigo-500 transition-colors">⏮</button>
+                        <button class="w-12 h-12 clay-button rounded-full text-xl pl-1">▶</button>
+                        <button class="text-2xl text-slate-400 hover:text-indigo-500 transition-colors">⏭</button>
+                    </div>
+                    <div class="w-full h-2 clay-input rounded-full relative overflow-hidden">
+                        <div class="w-1/3 h-full bg-indigo-500 rounded-full shadow-[2px_0_5px_rgba(99,102,241,0.5)]"></div>
+                    </div>
+                </div>
+                <div class="w-32 flex items-center gap-2">
+                    <span class="text-slate-400">🔊</span>
+                    <div class="h-2 clay-input flex-1 rounded-full relative">
+                        <div class="w-2/3 h-full bg-slate-400 rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Layout -->
+    <div class="w-[375px] h-[760px] clay-card flex flex-col overflow-hidden relative z-20 shadow-2xl scale-95 border-8 border-white">
+        <!-- Status Bar Fake -->
+        <div class="h-12 w-full flex justify-between px-6 items-center text-xs font-bold text-slate-400">
+            <span>9:41</span>
+            <div class="flex gap-1">
+                <div class="w-4 h-4 rounded-full bg-slate-300"></div>
+                <div class="w-4 h-4 rounded-full bg-slate-300"></div>
+            </div>
+        </div>
+
+        <!-- Mobile Header -->
+        <div class="px-6 py-2 flex items-center justify-between">
+            <h1 class="text-xl font-black text-indigo-500">ALLMusic</h1>
+            <div class="w-10 h-10 rounded-full clay-button-secondary flex items-center justify-center">🔍</div>
+        </div>
+
+        <!-- Mobile Content -->
+        <div class="flex-1 overflow-y-auto px-6 pb-24 pt-4 no-scrollbar">
+            <!-- Now Playing Card Big -->
+            <div class="w-full aspect-square clay-img bg-slate-100 relative overflow-hidden mb-8 group">
+                <img src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=400" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+            </div>
+
+            <div class="text-center mb-8">
+                <h2 class="text-2xl font-black text-slate-700">Levitating</h2>
+                <p class="text-slate-500 font-bold mt-1">Dua Lipa</p>
+                <div class="inline-block mt-3 px-3 py-1 clay-input rounded-full text-xs font-bold text-indigo-400">
+                    网易云音乐
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div class="mb-8">
+                <div class="w-full h-4 clay-input rounded-full relative overflow-hidden">
+                    <div class="w-2/3 h-full bg-gradient-to-r from-indigo-400 to-pink-400 rounded-full shadow-sm"></div>
+                </div>
+                <div class="flex justify-between text-xs font-bold text-slate-400 mt-3 px-1">
+                    <span>2:14</span>
+                    <span>3:23</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center justify-center gap-8">
+                <button class="w-14 h-14 rounded-full clay-button-secondary text-2xl text-slate-400">⏮</button>
+                <button class="w-20 h-20 rounded-full clay-button text-4xl shadow-xl flex items-center justify-center pl-2">▶</button>
+                <button class="w-14 h-14 rounded-full clay-button-secondary text-2xl text-slate-400">⏭</button>
+            </div>
+        </div>
+
+        <!-- Mobile Nav -->
+        <div class="absolute bottom-6 left-6 right-6 h-16 clay-card-sm flex items-center justify-around z-30 bg-white/90 backdrop-blur">
+            <button class="text-xl text-indigo-500 grayscale opacity-50">🏠</button>
+            <button class="text-xl text-indigo-500">🎵</button>
+            <button class="text-xl text-indigo-500 grayscale opacity-50">👤</button>
+        </div>
+    </div>
+
+</body>
+</html>

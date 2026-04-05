@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALLMusic - Pip-Boy Spectral Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --pip-green: #18ff62;
+            --pip-green-dim: rgba(24, 255, 98, 0.2);
+            --pip-bg: #0c120c;
+            --pip-border: #2a3a2a;
+            --pip-font: 'VT323', monospace;
+        }
+
+        body {
+            background-color: #050805;
+            color: var(--pip-green);
+            font-family: var(--pip-font);
+            overflow: hidden;
+            height: 100vh;
+            text-transform: uppercase;
+        }
+
+        /* CRT 扫描线和闪烁 */
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+        }
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            100% { opacity: 1; }
+        }
+
+        /* 辐射风格外壳 */
+        .vault-case {
+            background: #232723;
+            border: 10px solid #1a1d1a;
+            box-shadow: 
+                inset 0 0 100px rgba(0,0,0,0.5),
+                0 20px 50px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        .vault-screen {
+            background: var(--pip-bg);
+            border: 4px solid #333;
+            box-shadow: inset 0 0 40px #000;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 菜单选项卡 */
+        .pip-tab {
+            border-bottom: 2px solid var(--pip-green-dim);
+            padding: 8px 16px;
+            transition: all 0.2s;
+            cursor: pointer;
+            font-size: 24px;
+        }
+        .pip-tab.active {
+            border-bottom: 4px solid var(--pip-green);
+            background: var(--pip-green-dim);
+            text-shadow: 0 0 10px var(--pip-green);
+        }
+
+        /* 按钮 */
+        .pip-btn {
+            border: 2px solid var(--pip-green);
+            background: transparent;
+            padding: 4px 12px;
+            font-size: 20px;
+            transition: all 0.2s;
+        }
+        .pip-btn:hover {
+            background: var(--pip-green);
+            color: black;
+            box-shadow: 0 0 15px var(--pip-green);
+        }
+        .pip-btn:active {
+            transform: translateY(2px);
+        }
+
+        /* 列表项 */
+        .pip-list-item {
+            padding: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .pip-list-item:hover {
+            background: var(--pip-green-dim);
+        }
+        .pip-list-item.active {
+            background: var(--pip-green);
+            color: black;
+            font-weight: bold;
+        }
+
+        /* 进度条 */
+        .pip-progress-bg {
+            height: 8px;
+            background: var(--pip-green-dim);
+            position: relative;
+        }
+        .pip-progress-bar {
+            height: 100%;
+            background: var(--pip-green);
+            box-shadow: 0 0 10px var(--pip-green);
+        }
+
+        /* 真空管/LED 装饰 */
+        .vacuum-tube {
+            width: 20px; height: 40px;
+            background: linear-gradient(90deg, #333, #555, #333);
+            border-radius: 10px 10px 0 0;
+            position: relative;
+        }
+        .vacuum-tube::after {
+            content: '';
+            position: absolute;
+            top: 10px; left: 50%; transform: translateX(-50%);
+            width: 8px; height: 15px;
+            background: orange;
+            border-radius: 50%;
+            filter: blur(4px);
+            opacity: 0.6;
+            animation: glow 2s infinite alternate;
+        }
+
+        @keyframes glow {
+            from { opacity: 0.3; }
+            to { opacity: 0.8; }
+        }
+
+        /* 旋转磁带/光盘效果 */
+        .spinning-cd {
+            border: 2px dashed var(--pip-green);
+            animation: spin 10s linear infinite;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* 扫描线动画 */
+        .scanline-move {
+            width: 100%;
+            height: 4px;
+            background: var(--pip-green);
+            opacity: 0.1;
+            position: absolute;
+            top: 0;
+            animation: scan 6s linear infinite;
+            z-index: 50;
+        }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
+    </style>
+</head>
+<body class="flex items-center justify-center p-6 gap-10">
+
+    <div class="crt-overlay"></div>
+
+    <!-- PC DESKTOP: VAULT-TEC TERMINAL -->
+    <div class="w-[1100px] h-[750px] vault-case p-8 rounded-[40px] flex flex-col gap-6 crt-flicker">
+        
+        <!-- Top Branding / Screws -->
+        <div class="flex justify-between items-center px-4">
+            <div class="flex gap-2">
+                <div class="w-4 h-4 bg-[#1a1d1a] rounded-full shadow-inner border border-gray-700"></div>
+                <div class="w-4 h-4 bg-[#1a1d1a] rounded-full shadow-inner border border-gray-700"></div>
+            </div>
+            <div class="text-center">
+                <h1 class="text-2xl font-bold tracking-widest text-[#4a504a]">VAULT-TEC</h1>
+                <p class="text-[10px] text-[#4a504a]">Property of Vault 111 - Audio Terminal Model 3000</p>
+            </div>
+            <div class="flex gap-2">
+                <div class="w-4 h-4 bg-[#1a1d1a] rounded-full shadow-inner border border-gray-700"></div>
+                <div class="w-4 h-4 bg-[#1a1d1a] rounded-full shadow-inner border border-gray-700"></div>
+            </div>
+        </div>
+
+        <!-- Main Terminal Screen -->
+        <div class="vault-screen flex-1 rounded-2xl flex flex-col relative">
+            <div class="scanline-move"></div>
+
+            <!-- Header Tabs -->
+            <header class="h-16 flex items-end px-10 gap-2 border-b border-white/5">
+                <div class="pip-tab active">DISCOVER</div>
+                <div class="pip-tab">LIBRARY</div>
+                <div class="pip-tab">DATA</div>
+                <div class="pip-tab">MAP_MIX</div>
+                <div class="pip-tab">RADIO</div>
+                <div class="ml-auto pb-2 text-sm opacity-60">V.1.2.6 // ONLINE</div>
+            </header>
+
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Left Nav / Status -->
+                <aside class="w-64 border-r border-white/5 p-6 flex flex-col gap-8">
+                    <div class="space-y-4">
+                        <div class="text-sm border-b border-white/10 pb-1">:: ACCOUNTS ::</div>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-between items-center text-xs">
+                                <span>NETEASE_ID:</span>
+                                <span class="text-emerald-400">[CONNECTED]</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs">
+                                <span>QQ_MUSIC_ID:</span>
+                                <span class="text-emerald-400">[CONNECTED]</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="text-sm border-b border-white/10 pb-1">:: SUB-SYSTEMS ::</div>
+                        <div class="flex flex-col gap-2">
+                            <button class="pip-btn text-left">>> DAILY_RECOM</button>
+                            <button class="pip-btn text-left">>> MY_FAVORITES</button>
+                            <button class="pip-btn text-left">>> ARCHIVE_LST</button>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto flex items-center gap-3 grayscale opacity-70">
+                        <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM2F0ZGx0eXJndXlsN25scHJ4Y3J3dzR5bmN4Znl4Znl4Znl4Znl4Znl4Znl4JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/fXpOO6H8sO7o19Qf70/giphy.gif" class="w-12 h-12 border border-white/20">
+                        <div class="text-[10px]">
+                            <p>USER: WANDERER</p>
+                            <p>LVL: 42 // S.P.E.C.I.A.L</p>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Center: Song Stream -->
+                <main class="flex-1 flex flex-col p-8 overflow-hidden">
+                    <div class="flex items-center gap-4 mb-8">
+                        <span class="text-xl">>> SEARCH:</span>
+                        <input type="text" class="flex-1 bg-transparent border-b-2 border-white/10 outline-none text-2xl text-[var(--pip-green)] placeholder:text-white/10" placeholder="INPUT_TARGET_SONG_NAME...">
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto custom-scroll space-y-1">
+                        <!-- List Header -->
+                        <div class="flex px-4 py-2 text-xs opacity-40 border-b border-white/5">
+                            <span class="w-12">#</span>
+                            <span class="flex-1">DESIGNATION</span>
+                            <span class="w-32">SOURCE</span>
+                            <span class="w-20">DUR</span>
+                        </div>
+                        
+                        <!-- List Items -->
+                        <div class="pip-list-item flex items-center">
+                            <span class="w-12 opacity-50">001</span>
+                            <div class="flex-1 flex flex-col">
+                                <span class="text-lg">晴天 (SUNNY_DAY.MP3)</span>
+                                <span class="text-xs opacity-60">JAY_CHOU // YEH_HUI_MEI</span>
+                            </div>
+                            <span class="w-32 text-xs">NODE:NETEASE</span>
+                            <span class="w-20 font-mono">04:29</span>
+                        </div>
+
+                        <div class="pip-list-item active flex items-center">
+                            <span class="w-12">>>></span>
+                            <div class="flex-1 flex flex-col">
+                                <span class="text-lg">稻香 (RICE_FIELD.WAV)</span>
+                                <span class="text-xs">JAY_CHOU // CAPRICORN</span>
+                            </div>
+                            <span class="w-32 text-xs">NODE:QQ_MUSIC</span>
+                            <span class="w-20 font-mono">03:43</span>
+                        </div>
+
+                        <div class="pip-list-item flex items-center">
+                            <span class="w-12 opacity-50">003</span>
+                            <div class="flex-1 flex flex-col">
+                                <span class="text-lg">一路向北 (NORTH_BOUND.OGG)</span>
+                                <span class="text-xs opacity-60">JAY_CHOU // INITIAL_D</span>
+                            </div>
+                            <span class="w-32 text-xs">NODE:QQ_MUSIC</span>
+                            <span class="w-20 font-mono">04:55</span>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Right: Visual Analysis -->
+                <aside class="w-80 border-l border-white/5 p-6 flex flex-col gap-6">
+                    <div class="text-sm border-b border-white/10 pb-1">:: FREQUENCY_ANALYSIS ::</div>
+                    <div class="h-32 flex items-end gap-1 px-4">
+                        <div class="flex-1 bg-[var(--pip-green)] opacity-20 h-[30%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] opacity-40 h-[60%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] h-[90%] shadow-[0_0_10px_var(--pip-green)]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] opacity-50 h-[40%]"></div>
+                        <div class="flex-1 bg-[var(--pip-green)] opacity-20 h-[20%]"></div>
+                    </div>
+
+                    <div class="text-sm border-b border-white/10 pb-1 mt-4">:: LYRIC_DECODER ::</div>
+                    <div class="flex-1 flex flex-col gap-4 text-xs opacity-60">
+                        <p>[01:32] 对这个世界如果你有太多的抱怨</p>
+                        <p class="text-[var(--pip-green)] opacity-100 font-bold">[01:36] >> 跌倒了 就不敢继续往前走</p>
+                        <p>[01:40] 为什么 人要这么的脆弱 堕落</p>
+                        <p>[01:44] 请你打开电视看看</p>
+                    </div>
+
+                    <div class="p-4 border border-white/10 text-center">
+                        <div class="w-24 h-24 rounded-full spinning-cd mx-auto mb-4 flex items-center justify-center">
+                            <div class="w-2 h-2 bg-[var(--pip-green)] rounded-full"></div>
+                        </div>
+                        <p class="text-[10px]">BITRATE: 1411KBPS</p>
+                        <p class="text-[10px]">ENCODING: LOSSLESS</p>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- Footer: Tactical Control -->
+            <footer class="h-24 border-t-2 border-[var(--pip-green-dim)] flex items-center px-10 gap-10 bg-black/40">
+                <div class="w-72 flex flex-col gap-2">
+                    <div class="flex justify-between text-xs">
+                        <span>PROG: RICE_FIELD.WAV</span>
+                        <span>38%</span>
+                    </div>
+                    <div class="pip-progress-bg">
+                        <div class="pip-progress-bar w-[38%]"></div>
+                        <!-- Current point -->
+                        <div class="absolute top-0 left-[38%] w-2 h-full bg-white shadow-white shadow-sm"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] opacity-60">
+                        <span>01:36</span>
+                        <span>03:43</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex justify-center items-center gap-12">
+                    <button class="pip-btn">|&lt; PREV</button>
+                    <button class="pip-btn px-10 py-2 text-2xl font-bold">[[ PAUSE ]]</button>
+                    <button class="pip-btn">NEXT &gt;|</button>
+                </div>
+
+                <div class="w-72 flex items-center justify-end gap-6">
+                    <div class="flex flex-col items-end">
+                        <span class="text-[10px] mb-1">VOL_LVL: 75%</span>
+                        <div class="flex gap-1">
+                            <div class="w-1.5 h-4 bg-[var(--pip-green)]"></div>
+                            <div class="w-1.5 h-4 bg-[var(--pip-green)]"></div>
+                            <div class="w-1.5 h-4 bg-[var(--pip-green)]"></div>
+                            <div class="w-1.5 h-4 bg-white/10"></div>
+                        </div>
+                    </div>
+                    <button class="pip-btn">HQ_FLAC</button>
+                    <button class="pip-btn">QUEUE</button>
+                </div>
+            </footer>
+        </div>
+
+        <!-- Physical Knobs / LEDs at bottom -->
+        <div class="flex justify-between px-10 mt-2">
+            <div class="flex gap-6">
+                <div class="flex flex-col items-center gap-1">
+                    <div class="w-8 h-8 rounded-full bg-black border-2 border-[#333] shadow-inner relative"><div class="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-3 bg-white/20"></div></div>
+                    <span class="text-[8px] text-[#4a504a]">BASS</span>
+                </div>
+                <div class="flex flex-col items-center gap-1">
+                    <div class="w-8 h-8 rounded-full bg-black border-2 border-[#333] shadow-inner relative"><div class="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-3 bg-white/20"></div></div>
+                    <span class="text-[8px] text-[#4a504a]">TREBLE</span>
+                </div>
+            </div>
+            <div class="flex gap-4 items-end pb-2">
+                <div class="vacuum-tube"></div>
+                <div class="vacuum-tube"></div>
+                <div class="vacuum-tube"></div>
+            </div>
+            <div class="flex flex-col items-end gap-1">
+                <div class="flex gap-1">
+                    <div class="w-2 h-2 rounded-full bg-red-900/50"></div>
+                    <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(24,255,98,0.8)]"></div>
+                </div>
+                <span class="text-[8px] text-[#4a504a]">SYSTEM_LOAD: STABLE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE PIP-BOY 3000 -->
+    <div class="w-[380px] h-[780px] vault-case rounded-[60px] p-6 flex flex-col border-[15px] border-[#1a1d1a] shadow-2xl relative scale-95 origin-right">
+        <!-- Speaker Grill -->
+        <div class="h-6 w-full flex justify-center gap-1 mb-2">
+            <div class="w-16 h-1.5 bg-[#1a1d1a] rounded-full"></div>
+        </div>
+
+        <!-- Screen -->
+        <div class="vault-screen flex-1 rounded-[30px] flex flex-col p-4">
+            <div class="scanline-move"></div>
+
+            <!-- Header -->
+            <div class="flex justify-between items-end border-b border-[var(--pip-green-dim)] pb-2 mb-4">
+                <span class="text-2xl font-bold">STAT</span>
+                <span class="text-2xl font-bold opacity-30">INV</span>
+                <span class="text-2xl font-bold opacity-30">DATA</span>
+            </div>
+
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <!-- Visualizer Mini -->
+                <div class="h-12 border border-[var(--pip-green-dim)] flex items-center justify-around mb-4 bg-green-500/5">
+                    <div class="w-1 h-8 bg-[var(--pip-green)] opacity-40"></div>
+                    <div class="w-1 h-6 bg-[var(--pip-green)] opacity-40"></div>
+                    <div class="w-1 h-10 bg-[var(--pip-green)]"></div>
+                    <div class="w-1 h-4 bg-[var(--pip-green)] opacity-40"></div>
+                </div>
+
+                <!-- Now Playing Mobile -->
+                <div class="text-center mb-6">
+                    <p class="text-[10px] mb-1">>> AUDIO_TERMINAL_V.7</p>
+                    <div class="w-48 h-48 border-2 border-[var(--pip-green)] mx-auto flex items-center justify-center p-2 relative">
+                        <img src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=400" class="w-full h-full object-cover grayscale brightness-75">
+                        <div class="absolute inset-0 border-2 border-dashed border-[var(--pip-green)] m-4 animate-[spin_20s_linear_infinite]"></div>
+                    </div>
+                    <h2 class="text-2xl font-bold mt-4">稻香 (RICE_FIELD)</h2>
+                    <p class="text-sm opacity-60">JAY_CHOU</p>
+                </div>
+
+                <!-- Mobile Progress -->
+                <div class="space-y-2 mb-8 px-4">
+                    <div class="pip-progress-bg">
+                        <div class="pip-progress-bar w-1/2"></div>
+                    </div>
+                    <div class="flex justify-between text-xs font-mono">
+                        <span>01:40</span>
+                        <span>03:43</span>
+                    </div>
+                </div>
+
+                <!-- Control Buttons Mobile -->
+                <div class="flex items-center justify-center gap-6">
+                    <button class="pip-btn">PREV</button>
+                    <button class="pip-btn text-2xl px-6 py-2">PLAY</button>
+                    <button class="pip-btn">NEXT</button>
+                </div>
+
+                <div class="mt-8 border-t border-white/5 pt-4">
+                    <button class="w-full pip-btn text-sm">>> SHOW_LYRICS_TERMINAL</button>
+                </div>
+            </div>
+
+            <!-- Bottom Nav Mobile -->
+            <div class="h-16 flex justify-around items-center border-t border-[var(--pip-green-dim)] mt-4">
+                <span class="text-xl">📻</span>
+                <span class="text-xl">💾</span>
+                <span class="text-xl">⚙️</span>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

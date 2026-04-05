@@ -120,6 +120,14 @@ QQ_LIKED_VERIFY_DELAYS = (0.0, 0.35, 0.8, 1.4, 2.2)
 QQ_LIKED_VERIFY_PAGE_SIZE = 200
 QQ_LIKED_VERIFY_MAX_PAGES = 8
 
+# Performance optimization caches
+DAILY_PLAYLIST_CACHE_TTL_SECONDS = 600
+SONG_MID_CACHE_TTL_SECONDS = 6 * 60 * 60
+_DAILY_PLAYLIST_CACHE: dict[str, tuple[str, str, float]] = {}
+_SONG_MID_CACHE: dict[int, tuple[str, float]] = {}
+_HTTPX_CLIENT: httpx.AsyncClient | None = None
+_CACHE_LOCK = Lock()
+
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
@@ -152,6 +160,17 @@ def _cleanup_expired_qr() -> None:
         expired_keys = [k for k, item in _QR_CACHE.items() if item.created_at < deadline]
         for key in expired_keys:
             _QR_CACHE.pop(key, None)
+
+
+def _cleanup_expired_local_cache() -> None:
+    now = time.time()
+    with _CACHE_LOCK:
+        expired_daily = [k for k, (_, _, expires_at) in _DAILY_PLAYLIST_CACHE.items() if expires_at <= now]
+        for key in expired_daily:
+            _DAILY_PLAYLIST_CACHE.pop(key, None)
+        expired_mid = [k for k, (_, expires_at) in _SONG_MID_CACHE.items() if expires_at <= now]
+        for song_id in expired_mid:
+            _SONG_MID_CACHE.pop(song_id, None)
 
 
 def _parse_json_payload(raw_payload: str) -> dict[str, Any] | None:
@@ -206,6 +225,65 @@ def _parse_cookie_header(raw_cookie: str) -> dict[str, str]:
         key, value = segment.split('=', 1)
         parsed[key.strip()] = value.strip()
     return parsed
+
+
+def _cache_owner_key(raw_cookie: str, credential: Credential | None) -> str:
+    """Generate cache key from cookie/credential."""
+    owner = ''
+    if credential:
+        owner = str(getattr(credential, 'str_musicid', '') or getattr(credential, 'musicid', ''))
+    if not owner:
+        owner = _extract_uin(raw_cookie) or 'anonymous'
+    return owner
+
+
+def _read_daily_playlist_cache(owner_key: str) -> tuple[str, str] | None:
+    """Read cached daily playlist (playlist_id, title)."""
+    _cleanup_expired_local_cache()
+    with _CACHE_LOCK:
+        cached = _DAILY_PLAYLIST_CACHE.get(owner_key)
+    if cached is None:
+        return None
+    playlist_id, title, _ = cached
+    return playlist_id, title
+
+
+def _write_daily_playlist_cache(owner_key: str, playlist_id: str, title: str) -> None:
+    """Write daily playlist to cache."""
+    expires_at = time.time() + DAILY_PLAYLIST_CACHE_TTL_SECONDS
+    with _CACHE_LOCK:
+        _DAILY_PLAYLIST_CACHE[owner_key] = (playlist_id, title, expires_at)
+
+
+def _read_song_mid_cache(song_id: int) -> str:
+    """Read cached song mid."""
+    _cleanup_expired_local_cache()
+    with _CACHE_LOCK:
+        cached = _SONG_MID_CACHE.get(song_id)
+    if cached is None:
+        return ''
+    mid, _ = cached
+    return mid
+
+
+def _write_song_mid_cache(song_id: int, song_mid: str) -> None:
+    """Write song mid to cache."""
+    if song_id <= 0 or not song_mid:
+        return
+    expires_at = time.time() + SONG_MID_CACHE_TTL_SECONDS
+    with _CACHE_LOCK:
+        _SONG_MID_CACHE[song_id] = (song_mid, expires_at)
+
+
+def _get_httpx_client() -> httpx.AsyncClient:
+    """Get or create shared httpx client."""
+    global _HTTPX_CLIENT
+    if httpx is None:
+        raise RuntimeError('httpx is unavailable')
+    with _CACHE_LOCK:
+        if _HTTPX_CLIENT is None:
+            _HTTPX_CLIENT = httpx.AsyncClient(follow_redirects=True, timeout=12)
+        return _HTTPX_CLIENT
 
 
 def _extract_raw_cookie(request: Request) -> str:
@@ -293,11 +371,11 @@ async def _fetch_qq_mac_homepage(raw_cookie: str, credential: Credential | None)
     }
 
     if httpx is not None:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=12) as client:
-            resp = await client.get(
-                'https://c.y.qq.com/node/musicmac/v6/index.html',
-                headers=headers,
-            )
+        client = _get_httpx_client()
+        resp = await client.get(
+            'https://c.y.qq.com/node/musicmac/v6/index.html',
+            headers=headers,
+        )
         resp.raise_for_status()
         return resp.text
 
@@ -343,6 +421,18 @@ def _to_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _to_timestamp_ms(value: Any) -> int:
+    raw = _to_int(value, default=0)
+    if raw <= 0:
+        return 0
+
+    # Treat 10-digit values as seconds and 13-digit values as milliseconds.
+    if raw < 10_000_000_000:
+        return raw * 1000
+
+    return raw
 
 
 def _pick_text(*candidates: Any) -> str:
@@ -747,6 +837,17 @@ def _normalize_song(raw: dict[str, Any]) -> dict[str, Any]:
 
     duration_seconds = _to_int(raw.get('interval'))
     duration_ms = duration_seconds * 1000 if duration_seconds > 0 else _to_int(raw.get('duration'))
+    added_at_ms = _to_timestamp_ms(
+        raw.get('addedAt')
+        or raw.get('join_time')
+        or raw.get('joinTime')
+        or raw.get('add_time')
+        or raw.get('addTime')
+        or raw.get('addtime')
+        or raw.get('ctime')
+        or raw.get('create_time')
+        or raw.get('createTime')
+    )
 
     return {
         'id': song_id or song_mid,
@@ -756,7 +857,20 @@ def _normalize_song(raw: dict[str, Any]) -> dict[str, Any]:
         'album': album_name,
         'duration': duration_ms,
         'coverUrl': cover_url,
+        'addedAt': added_at_ms,
     }
+
+
+@app.on_event('shutdown')
+async def _shutdown_httpx_client() -> None:
+    """Close shared httpx client on shutdown."""
+    global _HTTPX_CLIENT
+    client: httpx.AsyncClient | None = None
+    with _CACHE_LOCK:
+        client = _HTTPX_CLIENT
+        _HTTPX_CLIENT = None
+    if client is not None:
+        await client.aclose()
 
 
 @app.get('/health')
@@ -1247,12 +1361,17 @@ async def song_url(
     normalized_mid = _pick_text(mid)
     normalized_song_id = _to_int(_extract_digits(id), default=0) if id else 0
 
+    if not normalized_mid and normalized_song_id > 0:
+        normalized_mid = _read_song_mid_cache(normalized_song_id)
+
     if not normalized_mid and normalized_song_id > 0 and get_song_detail is not None:
         try:
             song_detail = await get_song_detail(normalized_song_id)
             track_info = song_detail.get('track_info', {}) if isinstance(song_detail, dict) else {}
             if isinstance(track_info, dict):
                 normalized_mid = _pick_text(track_info.get('mid'))
+            if normalized_mid:
+                _write_song_mid_cache(normalized_song_id, normalized_mid)
         except Exception:
             normalized_mid = ''
 
@@ -1355,16 +1474,23 @@ async def recommend_daily(
     if credential is None:
         return _error(-1, 'Invalid auth cookie.', status_code=401)
 
-    try:
-        homepage_html = await _fetch_qq_mac_homepage(raw_cookie, credential)
-    except Exception as exc:  # pragma: no cover - upstream errors
-        return _error(-1, f'Failed to load QQ personalized recommendation source: {exc}', status_code=500)
+    cache_key = _cache_owner_key(raw_cookie, credential)
+    cached_playlist = _read_daily_playlist_cache(cache_key)
 
-    resolved = _extract_personal_daily_playlist(homepage_html)
-    if not resolved:
-        return _error(-1, 'QQ personalized daily playlist is not available.', status_code=404)
+    if cached_playlist is None:
+        try:
+            homepage_html = await _fetch_qq_mac_homepage(raw_cookie, credential)
+        except Exception as exc:  # pragma: no cover - upstream errors
+            return _error(-1, f'Failed to load QQ personalized recommendation source: {exc}', status_code=500)
 
-    playlist_id, playlist_title = resolved
+        resolved = _extract_personal_daily_playlist(homepage_html)
+        if not resolved:
+            return _error(-1, 'QQ personalized daily playlist is not available.', status_code=404)
+
+        playlist_id, playlist_title = resolved
+        _write_daily_playlist_cache(cache_key, playlist_id, playlist_title)
+    else:
+        playlist_id, playlist_title = cached_playlist
     songlist_id = _to_int(playlist_id)
     if songlist_id <= 0:
         return _error(-1, 'QQ personalized daily playlist id is invalid.', status_code=500)

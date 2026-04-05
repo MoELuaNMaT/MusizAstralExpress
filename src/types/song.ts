@@ -22,6 +22,8 @@ export interface UnifiedSong {
   duration: number;
   /** Cover image URL */
   coverUrl: string;
+  /** Song added-to-playlist time in milliseconds */
+  addedAt?: number;
   /** Playable audio URL (lazy loaded) */
   playUrl?: string;
   /** Audio quality */

@@ -23,7 +23,13 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://*.qlogo.cn https://*.music.126.net https://*.qq.com https://*.gtimg.cn https://*.qpic.cn data: blob:; media-src 'self' http://localhost:3000 http://localhost:3001 http://10.0.2.2:3000 http://10.0.2.2:3001 https:; connect-src 'self' http://localhost:3000 http://localhost:3001 http://10.0.2.2:3000 http://10.0.2.2:3001; font-src 'self' data:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPCACHE/cover-cache/**"
+        ]
+      }
     }
   },
   "bundle": {

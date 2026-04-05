@@ -1,0 +1,1860 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ALLMusic - V8 Fallout UI</title>
+    <style>
+      :root {
+        --pip-bg: #0c120c;
+        --pip-green: #18ff62;
+        --pip-green-soft: rgba(24, 255, 98, 0.72);
+        --pip-green-dim: #2a3a2a;
+        --pip-green-dark: #0f2012;
+        --pip-ink: #b8ffc9;
+        --pip-muted: rgba(184, 255, 201, 0.62);
+        --pip-shadow: 0 0 24px rgba(24, 255, 98, 0.2);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        color: var(--pip-ink);
+        background: radial-gradient(circle at 20% 10%, #102113 0%, #070b07 42%, #040604 100%);
+        font-family: 'VT323', 'Courier New', monospace;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      button,
+      input {
+        font-family: inherit;
+      }
+
+      .page {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+      }
+
+      .console {
+        position: relative;
+        width: min(1320px, calc(100vw - 28px));
+        height: min(860px, calc(100vh - 28px));
+        border-radius: 30px;
+        border: 5px solid #2f3530;
+        background: linear-gradient(180deg, #1a1d1a, #111511);
+        box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.04), inset 0 -22px 28px rgba(0, 0, 0, 0.4), 0 18px 45px rgba(0, 0, 0, 0.55);
+        padding: 14px;
+      }
+
+      .console::before {
+        content: '';
+        position: absolute;
+        inset: -7px;
+        border-radius: 34px;
+        pointer-events: none;
+        border: 2px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border: 2px solid var(--pip-green-dim);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(7, 15, 8, 0.98), rgba(4, 9, 4, 0.96));
+        box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.65), inset 0 0 20px rgba(24, 255, 98, 0.05), var(--pip-shadow);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .screen::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+        background:
+          linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.32) 50%),
+          linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.025), rgba(0, 0, 255, 0.04));
+        background-size: 100% 2px, 3px 100%;
+        opacity: 0.22;
+      }
+
+      .screen::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+        background: radial-gradient(circle at center, rgba(24, 255, 98, 0.07) 0, transparent 65%);
+        animation: screen-flicker 2.7s steps(2, jump-none) infinite;
+      }
+
+      @keyframes screen-flicker {
+        0%,
+        100% {
+          opacity: 0.2;
+        }
+        45% {
+          opacity: 0.26;
+        }
+        55% {
+          opacity: 0.17;
+        }
+      }
+
+      .chrome-strip {
+        height: 36px;
+        border-bottom: 1px solid rgba(24, 255, 98, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        color: rgba(106, 138, 108, 0.85);
+        font-size: 13px;
+      }
+
+      .chrome-lights {
+        display: flex;
+        gap: 6px;
+      }
+
+      .chrome-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: 1px solid #3f4740;
+        background: #1a1d1a;
+        box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.9);
+      }
+
+      .topbar {
+        position: relative;
+        z-index: 3;
+        min-height: 66px;
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 10px 14px 8px;
+        border-bottom: 1px solid rgba(24, 255, 98, 0.2);
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        min-width: 86px;
+        height: 34px;
+        border-radius: 6px 6px 0 0;
+        border: 1px solid rgba(24, 255, 98, 0.25);
+        border-bottom: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--pip-muted);
+        padding: 0 10px;
+        font-size: 17px;
+        background: linear-gradient(180deg, rgba(24, 255, 98, 0.04), rgba(24, 255, 98, 0));
+      }
+
+      .tab.active {
+        color: var(--pip-green);
+        background: linear-gradient(180deg, rgba(24, 255, 98, 0.2), rgba(24, 255, 98, 0.04));
+        box-shadow: inset 0 -2px 0 var(--pip-green);
+      }
+
+      .top-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--pip-muted);
+        font-size: 16px;
+      }
+
+      .switch-row {
+        display: flex;
+        gap: 7px;
+      }
+
+      .tactic-btn {
+        border: 1px solid rgba(24, 255, 98, 0.55);
+        background: rgba(7, 15, 8, 0.92);
+        color: var(--pip-ink);
+        border-radius: 4px;
+        padding: 5px 10px;
+        min-height: 34px;
+        font-size: 18px;
+        cursor: pointer;
+        letter-spacing: 0.03em;
+        transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+      }
+
+      .tactic-btn:hover {
+        background: rgba(24, 255, 98, 0.15);
+      }
+
+      .tactic-btn:active {
+        transform: translateY(1px);
+      }
+
+      .tactic-btn.primary {
+        background: rgba(24, 255, 98, 0.8);
+        color: #041006;
+        border-color: rgba(24, 255, 98, 0.95);
+        box-shadow: 0 0 10px rgba(24, 255, 98, 0.3);
+      }
+
+      .main {
+        position: relative;
+        z-index: 3;
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 248px minmax(0, 1fr) 310px;
+      }
+
+      .left,
+      .center,
+      .right {
+        min-height: 0;
+      }
+
+      .left {
+        border-right: 1px solid rgba(24, 255, 98, 0.16);
+        padding: 14px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .right {
+        border-left: 1px solid rgba(24, 255, 98, 0.16);
+        padding: 14px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .center {
+        padding: 14px 14px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .panel {
+        border: 1px solid rgba(24, 255, 98, 0.28);
+        background: rgba(8, 15, 8, 0.88);
+        box-shadow: inset 0 0 10px rgba(24, 255, 98, 0.04);
+      }
+
+      .panel-title {
+        border-bottom: 1px solid rgba(24, 255, 98, 0.2);
+        color: var(--pip-green-soft);
+        font-size: 18px;
+        padding: 7px 10px;
+      }
+
+      .account-panel {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        font-size: 18px;
+      }
+
+      .account-panel[role='button'] {
+        cursor: pointer;
+      }
+
+      .account-panel[role='button']:focus-visible {
+        outline: 1px solid rgba(24, 255, 98, 0.85);
+        outline-offset: 2px;
+      }
+
+      .account-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        display: inline-block;
+        box-shadow: 0 0 5px currentColor;
+      }
+
+      .dot.gray {
+        color: #5f7161;
+        background: #5f7161;
+      }
+
+      .dot.red {
+        color: #ef4444;
+        background: #ef4444;
+      }
+
+      .dot.green {
+        color: #22c55e;
+        background: #22c55e;
+      }
+
+      .playlist-list {
+        min-height: 120px;
+        max-height: 290px;
+        overflow-y: auto;
+        padding: 8px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .playlist-item {
+        border: 1px solid rgba(24, 255, 98, 0.3);
+        background: rgba(8, 14, 8, 0.84);
+        color: var(--pip-ink);
+        text-align: left;
+        border-radius: 3px;
+        padding: 6px 8px;
+        cursor: pointer;
+      }
+
+      .playlist-item:hover {
+        background: rgba(24, 255, 98, 0.11);
+      }
+
+      .playlist-item.active {
+        background: rgba(24, 255, 98, 0.2);
+        color: #d3ffe2;
+        box-shadow: inset 0 0 10px rgba(24, 255, 98, 0.2);
+      }
+
+      .subsystem {
+        display: grid;
+        gap: 7px;
+        padding: 10px;
+      }
+
+      .search-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+        gap: 8px;
+      }
+
+      .search-input {
+        height: 40px;
+        border: 1px solid rgba(24, 255, 98, 0.4);
+        background: rgba(4, 10, 4, 0.78);
+        color: var(--pip-ink);
+        font-size: 20px;
+        padding: 0 10px;
+        outline: none;
+      }
+
+      .search-input::placeholder {
+        color: rgba(184, 255, 201, 0.34);
+      }
+
+      .songs-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 18px;
+        color: var(--pip-muted);
+      }
+
+      .songs-title {
+        font-size: 22px;
+        color: var(--pip-green);
+      }
+
+      .songs-meta {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .chip {
+        padding: 2px 7px;
+        border: 1px solid rgba(24, 255, 98, 0.3);
+        border-radius: 2px;
+      }
+
+      .song-list {
+        flex: 1;
+        min-height: 0;
+        border: 1px solid rgba(24, 255, 98, 0.22);
+        overflow-y: auto;
+        background: rgba(7, 12, 7, 0.8);
+      }
+
+      .song-header,
+      .song-row {
+        display: grid;
+        grid-template-columns: 62px minmax(0, 1fr) 138px 72px;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+      }
+
+      .song-header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        border-bottom: 1px solid rgba(24, 255, 98, 0.16);
+        background: rgba(8, 15, 8, 0.96);
+        color: rgba(184, 255, 201, 0.6);
+        font-size: 16px;
+      }
+
+      .song-row {
+        border-bottom: 1px solid rgba(24, 255, 98, 0.08);
+        background: rgba(8, 15, 8, 0.6);
+        color: var(--pip-ink);
+        border-left: 0;
+        border-right: 0;
+        border-top: 0;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .song-row:hover {
+        background: rgba(24, 255, 98, 0.11);
+      }
+
+      .song-row.active {
+        background: rgba(24, 255, 98, 0.22);
+        box-shadow: inset 2px 0 0 var(--pip-green);
+      }
+
+      .song-index {
+        color: rgba(184, 255, 201, 0.55);
+        font-size: 18px;
+      }
+
+      .song-meta {
+        min-width: 0;
+      }
+
+      .song-title {
+        font-size: 21px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .song-subtitle {
+        font-size: 16px;
+        color: rgba(184, 255, 201, 0.55);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .song-source,
+      .song-duration {
+        font-size: 18px;
+        color: rgba(184, 255, 201, 0.7);
+      }
+
+      .lyric-box {
+        flex: 1;
+        min-height: 120px;
+        overflow-y: auto;
+        padding: 10px;
+        display: grid;
+        gap: 7px;
+        color: rgba(184, 255, 201, 0.52);
+      }
+
+      .lyric-line {
+        font-size: 18px;
+      }
+
+      .lyric-line.active {
+        color: var(--pip-green);
+        text-shadow: 0 0 9px rgba(24, 255, 98, 0.42);
+      }
+
+      .lyric-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(2, 8, 3, 0.72);
+        backdrop-filter: blur(7px);
+      }
+
+      .lyric-overlay.open {
+        display: flex;
+      }
+
+      .lyric-overlay-panel {
+        width: min(920px, calc(100vw - 32px));
+        max-height: calc(100vh - 40px);
+        border: 1px solid rgba(24, 255, 98, 0.45);
+        background: rgba(4, 14, 7, 0.9);
+        box-shadow: inset 0 0 18px rgba(24, 255, 98, 0.08), 0 0 28px rgba(24, 255, 98, 0.16);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 14px;
+      }
+
+      .lyric-overlay-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .lyric-overlay-title {
+        margin: 0;
+        font-size: 22px;
+        color: var(--pip-green);
+      }
+
+      .lyric-overlay-subtitle {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: rgba(184, 255, 201, 0.66);
+      }
+
+      .lyric-overlay-content {
+        overflow-y: auto;
+        display: grid;
+        gap: 8px;
+        padding-right: 2px;
+      }
+
+      .lyric-overlay-line {
+        margin: 0;
+        padding: 7px 8px;
+        border-left: 2px solid rgba(24, 255, 98, 0.26);
+        color: rgba(184, 255, 201, 0.72);
+        font-size: 18px;
+      }
+
+      .lyric-overlay-line.active {
+        color: var(--pip-green);
+        border-left-color: rgba(24, 255, 98, 0.9);
+        background: rgba(24, 255, 98, 0.08);
+      }
+
+      .lyric-overlay-line-time {
+        display: inline-block;
+        min-width: 54px;
+        margin-right: 8px;
+        color: rgba(184, 255, 201, 0.55);
+        font-size: 14px;
+      }
+
+      .now-playing {
+        display: grid;
+        gap: 8px;
+        justify-items: center;
+        text-align: center;
+        padding: 10px;
+      }
+
+      .cover-box {
+        width: 132px;
+        height: 132px;
+        border: 2px solid rgba(24, 255, 98, 0.38);
+        border-radius: 999px;
+        padding: 9px;
+        display: grid;
+        place-items: center;
+        animation: spin 18s linear infinite;
+        box-shadow: 0 0 16px rgba(24, 255, 98, 0.17);
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .cover {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 999px;
+        filter: contrast(1.08) saturate(0.8) brightness(0.78);
+      }
+
+      .np-title {
+        font-size: 24px;
+        color: var(--pip-green);
+      }
+
+      .np-artist {
+        font-size: 18px;
+        color: var(--pip-muted);
+      }
+
+      .status-box {
+        border: 1px dashed rgba(24, 255, 98, 0.3);
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        font-size: 16px;
+        color: var(--pip-muted);
+      }
+
+      .footer {
+        position: relative;
+        z-index: 3;
+        min-height: 100px;
+        border-top: 1px solid rgba(24, 255, 98, 0.23);
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr) 300px;
+        gap: 10px;
+        padding: 9px 14px;
+        background: rgba(0, 0, 0, 0.33);
+      }
+
+      .footer-left,
+      .footer-center,
+      .footer-right {
+        min-width: 0;
+      }
+
+      .footer-left {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+      }
+
+      .pb-title {
+        font-size: 22px;
+        color: var(--pip-green);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pb-artist {
+        font-size: 16px;
+        color: var(--pip-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .footer-center {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .seek-row {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr) 56px;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        color: var(--pip-muted);
+      }
+
+      input[type='range'] {
+        accent-color: var(--pip-green);
+      }
+
+      .progress {
+        width: 100%;
+        background: rgba(24, 255, 98, 0.08);
+      }
+
+      .footer-right {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      .volume-box {
+        min-width: 120px;
+        display: grid;
+        gap: 2px;
+        text-align: right;
+      }
+
+      .volume {
+        width: 100%;
+      }
+
+      .empty {
+        color: rgba(184, 255, 201, 0.6);
+        font-size: 18px;
+        padding: 12px;
+      }
+
+      @media (max-width: 1240px) {
+        .main {
+          grid-template-columns: 220px minmax(0, 1fr) 270px;
+        }
+
+        .footer {
+          grid-template-columns: 240px minmax(0, 1fr) 240px;
+        }
+      }
+
+      @media (max-width: 1080px) {
+        .main {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+
+        .right {
+          display: none;
+        }
+
+        .footer {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+
+        .footer-right {
+          display: none;
+        }
+      }
+
+      @media (max-width: 840px) {
+        .main {
+          grid-template-columns: 1fr;
+        }
+
+        .left {
+          display: none;
+        }
+
+        .footer {
+          grid-template-columns: 1fr;
+        }
+
+        .footer-left,
+        .footer-right {
+          display: none;
+        }
+
+        .topbar {
+          align-items: stretch;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .top-right {
+          margin-left: 0;
+          justify-content: space-between;
+        }
+
+        .switch-row {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="console">
+        <div class="screen">
+          <div class="chrome-strip">
+            <div class="chrome-lights">
+              <span class="chrome-dot"></span>
+              <span class="chrome-dot"></span>
+              <span class="chrome-dot"></span>
+            </div>
+            <div>VAULT-TEC AUDIO TERMINAL // V8_FALLOUT_UI</div>
+            <div>ONLINE</div>
+          </div>
+
+          <header class="topbar">
+            <div class="tabs">
+              <span class="tab active">Discover</span>
+              <span class="tab">Library</span>
+              <span class="tab">Data</span>
+              <span class="tab">Mix</span>
+            </div>
+            <div class="top-right">
+              <span id="view-chip" class="chip">Data Source: Playlist</span>
+              <div class="switch-row">
+                <button id="open-ui-switcher" class="tactic-btn">[[ Theme Center ]]</button>
+              </div>
+            </div>
+          </header>
+
+          <div class="main">
+            <aside class="left">
+              <section class="panel">
+                <div class="panel-title">:: Accounts ::</div>
+                <div id="account-panel" class="account-panel" role="button" tabindex="0" title="点击重新登录">
+                  <div class="account-item" data-platform="netease">
+                    <span><span id="dot-ne" class="dot gray"></span> NETEASE</span>
+                    <span id="acc-ne">[Offline]</span>
+                  </div>
+                  <div class="account-item" data-platform="qq">
+                    <span><span id="dot-qq" class="dot gray"></span> QQ_MUSIC</span>
+                    <span id="acc-qq">[Offline]</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel" style="min-height: 0; display: flex; flex-direction: column;">
+                <div class="panel-title">:: Playlist Network ::</div>
+                <div id="playlist-list" class="playlist-list"></div>
+              </section>
+
+              <section class="panel subsystem">
+                <button id="play-visible" class="tactic-btn primary">[[ Play Visible ]]</button>
+                <button id="btn-refresh" class="tactic-btn">>> Reload Playlist</button>
+              </section>
+            </aside>
+
+            <main class="center">
+              <div class="search-row">
+                <input id="search-input" class="search-input" type="search" placeholder="INPUT_TARGET_SONG_NAME..." />
+                <button id="search-btn" class="tactic-btn">Search</button>
+              </div>
+
+              <div class="songs-head">
+                <div id="songs-title" class="songs-title">Playlist Data</div>
+                <div class="songs-meta">
+                  <span class="chip">Double Platform Merge</span>
+                  <span class="chip" id="song-count">0 Track</span>
+                </div>
+              </div>
+
+              <section id="song-list" class="song-list">
+                <div class="song-header">
+                  <span>#</span>
+                  <span>Designation</span>
+                  <span>Source</span>
+                  <span>Dur</span>
+                </div>
+              </section>
+            </main>
+
+            <aside class="right">
+              <section class="panel" style="min-height: 0; display: flex; flex-direction: column;">
+                <div class="panel-title">:: Lyric Decoder ::</div>
+                <div id="lyric-box" class="lyric-box"></div>
+              </section>
+
+              <section class="panel now-playing">
+                <div class="cover-box">
+                  <img id="np-cover" class="cover" src="https://p.qlogo.cn/gh/0/0/100" alt="cover" style="cursor: pointer;" title="点击打开全屏歌词" />
+                </div>
+                <div id="np-title" class="np-title">No Signal</div>
+                <div id="np-artist" class="np-artist">Awaiting Queue</div>
+              </section>
+            </aside>
+          </div>
+
+          <footer class="footer">
+            <div class="footer-left">
+              <div id="pb-title" class="pb-title">No Song Loaded</div>
+              <div id="pb-artist" class="pb-artist">--</div>
+            </div>
+
+            <div class="footer-center">
+              <div class="controls">
+                <button id="btn-prev" class="tactic-btn">[[ Prev ]]</button>
+                <button id="btn-toggle" class="tactic-btn primary">[[ Play ]]</button>
+                <button id="btn-next" class="tactic-btn">[[ Next ]]</button>
+              </div>
+              <div class="seek-row">
+                <span id="time-current">00:00</span>
+                <input id="progress" class="progress" type="range" min="0" max="1" step="1" value="0" />
+                <span id="time-total">00:00</span>
+              </div>
+            </div>
+
+            <div class="footer-right">
+              <div class="volume-box">
+                <span>VOL_LVL <span id="vol-value">75</span>%</span>
+                <input id="volume" class="volume" type="range" min="0" max="100" step="1" value="75" />
+              </div>
+              <button id="btn-quality" class="tactic-btn">HQ</button>
+            </div>
+          </footer>
+          <div id="lyric-overlay" class="lyric-overlay" aria-hidden="true">
+            <section class="lyric-overlay-panel">
+              <header class="lyric-overlay-head">
+                <div>
+                  <p id="lyric-overlay-title" class="lyric-overlay-title">LYRIC_DECODER_FULLSCREEN</p>
+                  <p id="lyric-overlay-subtitle" class="lyric-overlay-subtitle">Click cover to open, ESC to close.</p>
+                </div>
+                <button id="lyric-overlay-close" class="tactic-btn" type="button">[[ CLOSE ]]</button>
+              </header>
+              <div id="lyric-overlay-content" class="lyric-overlay-content"></div>
+            </section>
+          </div>
+
+          <div id="status-box" class="status-box">Waiting bridge handshake...</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const BRIDGE_WAIT_TIMEOUT = 8000;
+        const PLAYER_SYNC_INTERVAL = 800;
+        const DEFAULT_COVER = 'https://p.qlogo.cn/gh/0/0/100';
+        const LOCAL_API_READY_EVENT = 'allmusic:local-api-ready';
+        const BRIDGE_CACHE_UPDATED_EVENT = 'allmusic:bridge-cache-updated';
+        const OPEN_UI_SWITCHER_EVENT = 'allmusic:open-ui-switcher';
+
+        const els = {
+          dotNe: document.getElementById('dot-ne'),
+          dotQq: document.getElementById('dot-qq'),
+          accNe: document.getElementById('acc-ne'),
+          accQq: document.getElementById('acc-qq'),
+          accountPanel: document.getElementById('account-panel'),
+          playlistList: document.getElementById('playlist-list'),
+          searchInput: document.getElementById('search-input'),
+          searchBtn: document.getElementById('search-btn'),
+          songsTitle: document.getElementById('songs-title'),
+          viewChip: document.getElementById('view-chip'),
+          songCount: document.getElementById('song-count'),
+          songList: document.getElementById('song-list'),
+          npCover: document.getElementById('np-cover'),
+          npTitle: document.getElementById('np-title'),
+          npArtist: document.getElementById('np-artist'),
+          lyricBox: document.getElementById('lyric-box'),
+          lyricOverlay: document.getElementById('lyric-overlay'),
+          lyricOverlayTitle: document.getElementById('lyric-overlay-title'),
+          lyricOverlaySubtitle: document.getElementById('lyric-overlay-subtitle'),
+          lyricOverlayContent: document.getElementById('lyric-overlay-content'),
+          lyricOverlayClose: document.getElementById('lyric-overlay-close'),
+          statusBox: document.getElementById('status-box'),
+          pbTitle: document.getElementById('pb-title'),
+          pbArtist: document.getElementById('pb-artist'),
+          btnPrev: document.getElementById('btn-prev'),
+          btnToggle: document.getElementById('btn-toggle'),
+          btnNext: document.getElementById('btn-next'),
+          progress: document.getElementById('progress'),
+          timeCurrent: document.getElementById('time-current'),
+          timeTotal: document.getElementById('time-total'),
+          volume: document.getElementById('volume'),
+          volumeValue: document.getElementById('vol-value'),
+          btnQuality: document.getElementById('btn-quality'),
+          playVisible: document.getElementById('play-visible'),
+          openUiSwitcher: document.getElementById('open-ui-switcher'),
+          btnRefresh: document.getElementById('btn-refresh'),
+        };
+
+        const state = {
+          playlists: [],
+          selectedPlaylistId: '',
+          songs: [],
+          mode: 'playlist',
+          syncingPlayer: false,
+          isSeeking: false,
+          lyricCache: Object.create(null),
+          currentSongId: '',
+          lyricRenderSignature: '',
+          lastBridgeCacheRefreshAt: 0,
+          preferredQuality: '320',
+          lyricOverlayOpen: false,
+          lyricOverlaySignature: '',
+        };
+
+        function resolveBridge() {
+          if (window.parent && window.parent !== window && window.parent.__ALLMUSIC_BRIDGE__) {
+            return window.parent.__ALLMUSIC_BRIDGE__;
+          }
+          if (window.__ALLMUSIC_BRIDGE__) {
+            return window.__ALLMUSIC_BRIDGE__;
+          }
+          return null;
+        }
+
+        function normalizePreferredQuality(quality) {
+          return quality === 'flac' ? 'flac' : '320';
+        }
+
+        function qualityButtonLabel(quality) {
+          return quality === 'flac' ? 'FLAC' : 'HQ';
+        }
+
+        function updateQualityButton() {
+          if (!els.btnQuality) {
+            return;
+          }
+          els.btnQuality.textContent = qualityButtonLabel(state.preferredQuality);
+          els.btnQuality.title = state.preferredQuality === 'flac' ? '当前 FLAC，点击切回 HQ' : '当前 HQ，点击切换 FLAC';
+        }
+
+        function wait(ms) {
+          return new Promise((resolve) => window.setTimeout(resolve, ms));
+        }
+
+        async function waitForBridge(timeoutMs) {
+          const startAt = Date.now();
+          while (Date.now() - startAt < timeoutMs) {
+            if (resolveBridge()) {
+              return true;
+            }
+            await wait(120);
+          }
+          return false;
+        }
+
+        function escapeHtml(value) {
+          return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+        }
+
+        function setStatus(message, isError) {
+          if (!els.statusBox) {
+            return;
+          }
+          els.statusBox.textContent = message || '';
+          els.statusBox.style.color = isError ? '#fb7185' : 'rgba(184, 255, 201, 0.75)';
+        }
+
+        function formatMs(ms) {
+          const safe = Math.max(0, Number(ms) || 0);
+          const sec = Math.floor(safe / 1000);
+          const minute = Math.floor(sec / 60);
+          const second = sec % 60;
+          return String(minute).padStart(2, '0') + ':' + String(second).padStart(2, '0');
+        }
+
+        function parseLyric(rawLyric) {
+          const source = String(rawLyric || '').trim();
+          if (!source) {
+            return [];
+          }
+
+          const timeTag = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
+          const lines = [];
+          source.split(/\r?\n/).forEach((rawLine) => {
+            const line = rawLine.trim();
+            if (!line) {
+              return;
+            }
+            const tags = Array.from(line.matchAll(timeTag));
+            const text = line.replace(timeTag, '').trim();
+            if (!tags.length || !text) {
+              return;
+            }
+            tags.forEach((match) => {
+              const minute = Number(match[1]);
+              const second = Number(match[2]);
+              const decimal = match[3] || '0';
+              const millis = Number(decimal.padEnd(3, '0').slice(0, 3));
+              lines.push({ timeMs: minute * 60000 + second * 1000 + millis, text: text });
+            });
+          });
+
+          return lines.sort((a, b) => a.timeMs - b.timeMs);
+        }
+
+        function resolveLyricWindow(lines, currentTimeMs) {
+          if (!lines.length) {
+            return [
+              { time: '--:--', text: '暂无歌词数据', active: true },
+              { time: '--:--', text: '可切到 V8 Clay 查看柔和歌词预览', active: false },
+            ];
+          }
+
+          let activeIndex = 0;
+          for (let i = 0; i < lines.length; i += 1) {
+            const next = lines[i + 1];
+            if (!next || currentTimeMs < next.timeMs) {
+              activeIndex = i;
+              break;
+            }
+          }
+
+          const windowStart = Math.max(0, activeIndex - 2);
+          const windowEnd = Math.min(lines.length, activeIndex + 3);
+          const result = [];
+          for (let i = windowStart; i < windowEnd; i += 1) {
+            result.push({
+              time: formatMs(lines[i].timeMs),
+              text: lines[i].text,
+              active: i === activeIndex,
+            });
+          }
+          return result;
+        }
+
+        function resolveLyricOverlayWindow(lines, currentTimeMs) {
+          if (!lines.length) {
+            return [{ time: '--:--', text: '暂无歌词数据', active: true }];
+          }
+
+          let activeIndex = 0;
+          for (let i = 0; i < lines.length; i += 1) {
+            const next = lines[i + 1];
+            if (!next || currentTimeMs < next.timeMs) {
+              activeIndex = i;
+              break;
+            }
+          }
+
+          const windowStart = Math.max(0, activeIndex - 6);
+          const windowEnd = Math.min(lines.length, activeIndex + 7);
+          const result = [];
+          for (let i = windowStart; i < windowEnd; i += 1) {
+            result.push({
+              time: formatMs(lines[i].timeMs),
+              text: lines[i].text,
+              active: i === activeIndex,
+            });
+          }
+          return result;
+        }
+
+        async function renderLyricOverlay(player) {
+          if (!state.lyricOverlayOpen || !els.lyricOverlayContent) {
+            return;
+          }
+
+          const song = player && player.currentSong ? player.currentSong : null;
+          if (!song) {
+            const emptySignature = '__EMPTY_SONG__';
+            if (state.lyricOverlaySignature === emptySignature) {
+              return;
+            }
+            state.lyricOverlaySignature = emptySignature;
+            if (els.lyricOverlayTitle) {
+              els.lyricOverlayTitle.textContent = 'LYRIC_DECODER_FULLSCREEN';
+            }
+            if (els.lyricOverlaySubtitle) {
+              els.lyricOverlaySubtitle.textContent = 'No active track.';
+            }
+            els.lyricOverlayContent.innerHTML = '<p class=\"lyric-overlay-line active\"><span class=\"lyric-overlay-line-time\">--:--</span>No lyric data.</p>';
+            return;
+          }
+
+          if (els.lyricOverlayTitle) {
+            els.lyricOverlayTitle.textContent = song.name || 'UNKNOWN_TRACK';
+          }
+          if (els.lyricOverlaySubtitle) {
+            els.lyricOverlaySubtitle.textContent = `${song.artist || 'UNKNOWN_ARTIST'} · ${song.album || 'UNKNOWN_ALBUM'}`;
+          }
+
+          const lines = await loadLyrics(song);
+          const overlayLines = resolveLyricOverlayWindow(lines, Number(player.currentTime) || 0);
+          const signature = overlayLines.map((line) => `${line.active ? '1' : '0'}:${line.time}:${line.text}`).join('|');
+          if (signature === state.lyricOverlaySignature) {
+            return;
+          }
+          state.lyricOverlaySignature = signature;
+          els.lyricOverlayContent.innerHTML = overlayLines.map((line) => (
+            `<p class=\"lyric-overlay-line${line.active ? ' active' : ''}\"><span class=\"lyric-overlay-line-time\">${escapeHtml(line.time)}</span>${escapeHtml(line.text)}</p>`
+          )).join('');
+        }
+
+        function openLyricOverlay() {
+          if (!els.lyricOverlay) {
+            return;
+          }
+          state.lyricOverlayOpen = true;
+          state.lyricOverlaySignature = '';
+          els.lyricOverlay.classList.add('open');
+          els.lyricOverlay.setAttribute('aria-hidden', 'false');
+          void syncPlayerState();
+        }
+
+        function closeLyricOverlay() {
+          if (!els.lyricOverlay) {
+            return;
+          }
+          state.lyricOverlayOpen = false;
+          els.lyricOverlay.classList.remove('open');
+          els.lyricOverlay.setAttribute('aria-hidden', 'true');
+        }
+
+        function sourceLabel(platform) {
+          if (platform === 'netease') {
+            return 'NODE:NETEASE';
+          }
+          if (platform === 'qq') {
+            return 'NODE:QQ_MUSIC';
+          }
+          return 'NODE:MERGED';
+        }
+
+        async function requestOpenUiSwitcher() {
+          const bridge = resolveBridge();
+          if (bridge && typeof bridge.openUiSwitcher === 'function') {
+            await bridge.openUiSwitcher();
+            return;
+          }
+
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: OPEN_UI_SWITCHER_EVENT }, '*');
+            return;
+          }
+          window.dispatchEvent(new CustomEvent(OPEN_UI_SWITCHER_EVENT));
+        }
+
+        async function requestRelogin() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.switchUiVersion !== 'function') {
+            setStatus('Bridge does not support login jump, switch to Current UI manually.', true);
+            return;
+          }
+
+          setStatus('Jumping to Current UI login...');
+          await bridge.switchUiVersion('current');
+        }
+
+        async function refreshAuthState() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.getAuthState !== 'function') {
+            return null;
+          }
+
+          const auth = await bridge.getAuthState();
+          const ne = auth.users && auth.users.netease ? auth.users.netease : null;
+          const qq = auth.users && auth.users.qq ? auth.users.qq : null;
+
+          if (els.dotNe) {
+            els.dotNe.className = 'dot ' + (ne ? 'red' : 'gray');
+          }
+          if (els.dotQq) {
+            els.dotQq.className = 'dot ' + (qq ? 'green' : 'gray');
+          }
+          if (els.accNe) {
+            els.accNe.textContent = ne ? '[Connected]' : '[Offline]';
+          }
+          if (els.accQq) {
+            els.accQq.textContent = qq ? '[Connected]' : '[Offline]';
+          }
+
+          return auth;
+        }
+
+        function renderPlaylists() {
+          if (!els.playlistList) {
+            return;
+          }
+
+          const html = state.playlists.map((playlist) => {
+            const active = playlist.id === state.selectedPlaylistId ? ' active' : '';
+            const count = Number(playlist.songCount) || 0;
+            const platformText = sourceLabel(playlist.platform);
+            return `<button class="playlist-item${active}" data-playlist-id="${escapeHtml(playlist.id)}">
+              <div style="font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(playlist.name || '?????')}</div>
+              <div style="font-size:15px;color:rgba(184,255,201,0.6);">${platformText} · ${count} TRACK</div>
+            </button>`;
+          }).join('');
+
+          els.playlistList.innerHTML = html || '<div class="empty">暂无可用歌单</div>';
+        }
+
+        function renderSongs() {
+          if (!els.songList) {
+            return;
+          }
+
+          const rows = state.songs.map((song, index) => {
+            const isActive = song.id === state.currentSongId;
+            return `<button class="song-row${isActive ? ' active' : ''}" data-song-index="${index}">
+              <span class="song-index">${String(index + 1).padStart(3, '0')}</span>
+              <div class="song-meta">
+                <div class="song-title">${escapeHtml(song.name || '未知歌曲')}</div>
+                <div class="song-subtitle">${escapeHtml(song.artist || '未知歌手')} // ${escapeHtml(song.album || '未知专辑')}</div>
+              </div>
+              <span class="song-source">${sourceLabel(song.platform)}</span>
+              <span class="song-duration">${formatMs(song.duration || 0)}</span>
+            </button>`;
+          }).join('');
+
+          const header = '<div class="song-header"><span>#</span><span>Designation</span><span>Source</span><span>Dur</span></div>';
+          els.songList.innerHTML = header + (rows || '<div class="empty">暂无歌曲数据</div>');
+
+          if (els.songCount) {
+            els.songCount.textContent = `${state.songs.length} Track`;
+          }
+        }
+
+        async function selectPlaylistById(playlistId, options) {
+          const silent = Boolean(options && options.silent);
+          const forceRefresh = Boolean(options && options.forceRefresh);
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.loadPlaylistDetail !== 'function') {
+            return;
+          }
+
+          const playlist = state.playlists.find((item) => item.id === playlistId);
+          if (!playlist) {
+            return;
+          }
+
+          try {
+            if (!silent) {
+              setStatus('Loading playlist detail...');
+            }
+            const detail = await bridge.loadPlaylistDetail(playlist, { silent, forceRefresh });
+            state.mode = 'playlist';
+            state.selectedPlaylistId = playlistId;
+            state.songs = Array.isArray(detail.songs) ? detail.songs : [];
+            if (els.songsTitle) {
+              els.songsTitle.textContent = playlist.name || 'Playlist Detail';
+            }
+            if (els.viewChip) {
+              els.viewChip.textContent = `Data Source: Playlist (${state.songs.length})`;
+            }
+            renderPlaylists();
+            renderSongs();
+            if (!silent) {
+              setStatus('Playlist loaded.');
+            }
+          } catch (error) {
+            if (!silent) {
+              setStatus(error instanceof Error ? error.message : 'Playlist load failed.', true);
+            } else {
+              console.warn('[ALLMusic][V8Fallout] playlist detail silent refresh failed:', error);
+            }
+          }
+        }
+
+        async function loadPlaylists(options) {
+          const silent = Boolean(options && options.silent);
+          const forceRefresh = Boolean(options && options.forceRefresh);
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.loadPlaylists !== 'function') {
+            return;
+          }
+
+          try {
+            if (!silent) {
+              setStatus('Loading playlists...');
+            }
+            const result = await bridge.loadPlaylists({ silent, forceRefresh });
+            state.playlists = Array.isArray(result.playlists) ? result.playlists : [];
+            renderPlaylists();
+            if (state.playlists.length) {
+              const preferredId = state.playlists.some((item) => item.id === state.selectedPlaylistId)
+                ? state.selectedPlaylistId
+                : state.playlists[0].id;
+              await selectPlaylistById(preferredId, { silent, forceRefresh });
+            } else {
+              state.songs = [];
+              renderSongs();
+              if (!silent) {
+                setStatus('No playlist available.');
+              }
+            }
+          } catch (error) {
+            if (!silent) {
+              setStatus(error instanceof Error ? error.message : 'Playlist load failed.', true);
+            } else {
+              console.warn('[ALLMusic][V8Fallout] playlists silent refresh failed:', error);
+            }
+          }
+        }
+
+        async function searchSongs() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.searchSongs !== 'function' || !els.searchInput) {
+            return;
+          }
+
+          const keyword = els.searchInput.value.trim();
+          if (!keyword) {
+            setStatus('请输入关键词后再搜索');
+            return;
+          }
+
+          try {
+            setStatus('Searching...');
+            const result = await bridge.searchSongs(keyword, 30);
+            state.mode = 'search';
+            state.selectedPlaylistId = '';
+            state.songs = Array.isArray(result.songs) ? result.songs : [];
+            if (els.songsTitle) {
+              els.songsTitle.textContent = `Search: ${keyword}`;
+            }
+            if (els.viewChip) {
+              els.viewChip.textContent = `Data Source: Search (${state.songs.length})`;
+            }
+            renderPlaylists();
+            renderSongs();
+            setStatus(`Search completed (${state.songs.length}).`);
+          } catch (error) {
+            setStatus(error instanceof Error ? error.message : 'Search failed.', true);
+          }
+        }
+
+        async function clearSearch() {
+          if (els.searchInput) {
+            els.searchInput.value = '';
+          }
+          state.mode = 'playlist';
+          if (state.playlists.length) {
+            await selectPlaylistById(state.selectedPlaylistId || state.playlists[0].id);
+          } else {
+            state.songs = [];
+            renderSongs();
+          }
+        }
+
+        async function playSongAt(index) {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.playSongs !== 'function') {
+            return;
+          }
+          await bridge.playSongs(state.songs, index);
+          await syncPlayerState();
+        }
+
+        async function loadLyrics(song) {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.loadSongLyrics !== 'function' || !song) {
+            return [];
+          }
+
+          if (state.lyricCache[song.id]) {
+            return state.lyricCache[song.id];
+          }
+
+          try {
+            const lyricResult = await bridge.loadSongLyrics(song);
+            const lines = parseLyric(lyricResult && lyricResult.lyric);
+            state.lyricCache[song.id] = lines;
+            return lines;
+          } catch {
+            state.lyricCache[song.id] = [];
+            return [];
+          }
+        }
+
+        async function renderNowPlaying(player) {
+          const song = player && player.currentSong ? player.currentSong : null;
+          const cover = song && song.coverUrl ? song.coverUrl : DEFAULT_COVER;
+          const title = song ? song.name || '未知歌曲' : 'No Song Loaded';
+          const artist = song ? song.artist || '未知歌手' : 'Awaiting Queue';
+
+          if (els.npCover && els.npCover.src !== cover) {
+            els.npCover.src = cover;
+          }
+          if (els.pbTitle && els.pbTitle.textContent !== title) {
+            els.pbTitle.textContent = title;
+          }
+          if (els.pbArtist && els.pbArtist.textContent !== artist) {
+            els.pbArtist.textContent = artist;
+          }
+          if (els.npTitle && els.npTitle.textContent !== title) {
+            els.npTitle.textContent = title;
+          }
+          if (els.npArtist && els.npArtist.textContent !== artist) {
+            els.npArtist.textContent = artist;
+          }
+
+          if (!els.lyricBox) {
+            return;
+          }
+
+          if (!song) {
+            const emptySignature = '__EMPTY__';
+            if (state.lyricRenderSignature !== emptySignature) {
+              els.lyricBox.innerHTML = '<p class="lyric-line active">[--:--] Waiting lyric data...</p>';
+              state.lyricRenderSignature = emptySignature;
+            }
+            return;
+          }
+
+          const lines = await loadLyrics(song);
+          const preview = resolveLyricWindow(lines, Number(player.currentTime) || 0);
+          const nextSignature = preview
+            .map((line) => `${line.active ? '1' : '0'}:${line.time}:${line.text}`)
+            .join('|');
+          if (nextSignature === state.lyricRenderSignature) {
+            return;
+          }
+          els.lyricBox.innerHTML = preview.map((line) => (
+            `<p class="lyric-line${line.active ? ' active' : ''}">[${escapeHtml(line.time)}] ${escapeHtml(line.text)}</p>`
+          )).join('');
+          state.lyricRenderSignature = nextSignature;
+        }
+
+        async function syncPlayerState() {
+          if (state.syncingPlayer) {
+            return;
+          }
+
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.getPlayerState !== 'function') {
+            return;
+          }
+
+          state.syncingPlayer = true;
+          try {
+            const player = await bridge.getPlayerState();
+            const current = Number(player.currentTime) || 0;
+            const total = Number(player.duration) || 0;
+            const previousSongId = state.currentSongId;
+            const nextSongId = player.currentSong ? player.currentSong.id : '';
+            const songChanged = previousSongId !== nextSongId;
+            state.currentSongId = nextSongId;
+
+            if (els.timeCurrent) {
+              els.timeCurrent.textContent = formatMs(current);
+            }
+            if (els.timeTotal) {
+              els.timeTotal.textContent = formatMs(total);
+            }
+            if (els.progress && !state.isSeeking) {
+              const maxSec = Math.max(0, Math.floor(total / 1000));
+              const curSec = Math.max(0, Math.floor(current / 1000));
+              els.progress.max = String(maxSec);
+              els.progress.value = String(Math.min(curSec, maxSec));
+            }
+
+            if (els.btnToggle) {
+              els.btnToggle.textContent = player.isPlaying ? '[[ Pause ]]' : '[[ Play ]]';
+            }
+            if (els.volume && !state.isSeeking) {
+              const volumeValue = Math.round((Number(player.volume) || 0) * 100);
+              els.volume.value = String(volumeValue);
+              if (els.volumeValue) {
+                els.volumeValue.textContent = String(volumeValue);
+              }
+            }
+            state.preferredQuality = normalizePreferredQuality(player.preferredQuality);
+            updateQualityButton();
+
+            if (songChanged) {
+              renderSongs();
+            }
+            await renderNowPlaying(player);
+            await renderLyricOverlay(player);
+          } catch (error) {
+            setStatus(error instanceof Error ? error.message : 'Player sync failed.', true);
+          } finally {
+            state.syncingPlayer = false;
+          }
+        }
+
+        async function playVisibleSongs() {
+          const bridge = resolveBridge();
+          if (!bridge || typeof bridge.playSongs !== 'function') {
+            return;
+          }
+          if (!state.songs.length) {
+            setStatus('当前列表没有歌曲');
+            return;
+          }
+          await bridge.playSongs(state.songs, 0);
+          await syncPlayerState();
+        }
+
+        async function handleBridgeCacheUpdated(payload) {
+          if (!payload || payload.type !== BRIDGE_CACHE_UPDATED_EVENT) {
+            return;
+          }
+
+          const now = Date.now();
+          if (now - state.lastBridgeCacheRefreshAt < 400) {
+            return;
+          }
+          state.lastBridgeCacheRefreshAt = now;
+
+          if (payload.resource === 'playlists') {
+            if (state.mode !== 'playlist') {
+              return;
+            }
+            await loadPlaylists({ silent: true });
+            return;
+          }
+
+          if (payload.resource === 'playlist-detail' && state.mode === 'playlist' && state.selectedPlaylistId) {
+            await selectPlaylistById(state.selectedPlaylistId, { silent: true });
+          }
+        }
+
+        function bindEvents() {
+          if (els.playlistList) {
+            els.playlistList.addEventListener('click', (event) => {
+              const target = event.target;
+              if (!(target instanceof Element)) {
+                return;
+              }
+              const button = target.closest('[data-playlist-id]');
+              if (!(button instanceof HTMLElement)) {
+                return;
+              }
+              const nextId = button.getAttribute('data-playlist-id');
+              if (nextId) {
+                void selectPlaylistById(nextId);
+              }
+            });
+          }
+          if (els.songList) {
+            els.songList.addEventListener('click', (event) => {
+              const target = event.target;
+              if (!(target instanceof Element)) {
+                return;
+              }
+              const button = target.closest('[data-song-index]');
+              if (!(button instanceof HTMLElement)) {
+                return;
+              }
+              const index = Number(button.getAttribute('data-song-index'));
+              if (Number.isFinite(index)) {
+                void playSongAt(index);
+              }
+            });
+          }
+          if (els.searchBtn) {
+            els.searchBtn.addEventListener('click', () => {
+              void searchSongs();
+            });
+          }
+          if (els.searchInput) {
+            els.searchInput.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void searchSongs();
+              }
+            });
+            els.searchInput.addEventListener('search', () => {
+              if (!els.searchInput || els.searchInput.value.trim()) {
+                return;
+              }
+              void clearSearch();
+            });
+          }
+          if (els.accountPanel) {
+            els.accountPanel.addEventListener('click', () => {
+              void requestRelogin();
+            });
+            els.accountPanel.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                void requestRelogin();
+              }
+            });
+          }
+          if (els.npCover) {
+            els.npCover.addEventListener('click', () => {
+              openLyricOverlay();
+            });
+          }
+          if (els.lyricOverlayClose) {
+            els.lyricOverlayClose.addEventListener('click', () => {
+              closeLyricOverlay();
+            });
+          }
+          if (els.lyricOverlay) {
+            els.lyricOverlay.addEventListener('click', (event) => {
+              if (event.target === els.lyricOverlay) {
+                closeLyricOverlay();
+              }
+            });
+          }
+          window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && state.lyricOverlayOpen) {
+              closeLyricOverlay();
+            }
+          });
+
+          if (els.btnPrev) {
+            els.btnPrev.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.playPrevious === 'function') {
+                await bridge.playPrevious();
+                await syncPlayerState();
+              }
+            });
+          }
+
+          if (els.btnToggle) {
+            els.btnToggle.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.togglePlay === 'function') {
+                await bridge.togglePlay();
+                await syncPlayerState();
+              }
+            });
+          }
+
+          if (els.btnNext) {
+            els.btnNext.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.playNext === 'function') {
+                await bridge.playNext();
+                await syncPlayerState();
+              }
+            });
+          }
+
+          if (els.progress) {
+            els.progress.addEventListener('input', () => {
+              state.isSeeking = true;
+              const sec = Number(els.progress.value) || 0;
+              if (els.timeCurrent) {
+                els.timeCurrent.textContent = formatMs(sec * 1000);
+              }
+            });
+
+            els.progress.addEventListener('change', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.seekTo === 'function') {
+                const sec = Number(els.progress.value) || 0;
+                await bridge.seekTo(sec * 1000);
+              }
+              state.isSeeking = false;
+              await syncPlayerState();
+            });
+          }
+
+          if (els.volume) {
+            els.volume.addEventListener('input', () => {
+              if (els.volumeValue) {
+                els.volumeValue.textContent = String(Math.round(Number(els.volume.value) || 0));
+              }
+            });
+
+            els.volume.addEventListener('change', async () => {
+              const bridge = resolveBridge();
+              if (bridge && typeof bridge.setVolume === 'function') {
+                await bridge.setVolume(Number(els.volume.value) || 0);
+              }
+            });
+          }
+
+          if (els.playVisible) {
+            els.playVisible.addEventListener('click', () => {
+              void playVisibleSongs();
+            });
+          }
+
+          if (els.btnRefresh) {
+            els.btnRefresh.addEventListener('click', () => {
+              void loadPlaylists();
+            });
+          }
+          if (els.btnQuality) {
+            els.btnQuality.addEventListener('click', async () => {
+              const bridge = resolveBridge();
+              if (!bridge || typeof bridge.setQuality !== 'function') {
+                setStatus('Quality switching is unavailable in current bridge.', true);
+                return;
+              }
+
+              const nextQuality = state.preferredQuality === 'flac' ? '320' : 'flac';
+              try {
+                const applied = await bridge.setQuality(nextQuality);
+                state.preferredQuality = normalizePreferredQuality(applied || nextQuality);
+                updateQualityButton();
+                setStatus(state.preferredQuality === 'flac' ? 'Audio quality switched to FLAC.' : 'Audio quality switched to HQ.');
+              } catch (error) {
+                setStatus(error instanceof Error ? error.message : 'Failed to switch audio quality.', true);
+              }
+            });
+          }
+
+          if (els.openUiSwitcher) {
+            els.openUiSwitcher.addEventListener('click', () => {
+              void requestOpenUiSwitcher();
+            });
+          }
+        }
+
+        async function init() {
+          bindEvents();
+          updateQualityButton();
+          renderSongs();
+          setStatus('Waiting bridge handshake...');
+
+          const ready = await waitForBridge(BRIDGE_WAIT_TIMEOUT);
+          if (!ready) {
+            setStatus('Bridge initialization timed out, please refresh.', true);
+            return;
+          }
+
+          setStatus('Bridge connected. Syncing data...');
+          const auth = await refreshAuthState();
+          if (!auth || !auth.isAuthenticated) {
+            setStatus('未登录：请先在 Current/V4 页面完成登录', true);
+            return;
+          }
+
+          await loadPlaylists();
+          await syncPlayerState();
+          setStatus('V8 Fallout ready.');
+        }
+
+        window.addEventListener(LOCAL_API_READY_EVENT, () => {
+          void loadPlaylists({ forceRefresh: true });
+        });
+
+        window.addEventListener('message', (event) => {
+          if (window.parent && event.source !== window.parent) {
+            return;
+          }
+          const payload = event.data;
+          if (!payload || typeof payload !== 'object') {
+            return;
+          }
+          if (payload.type === LOCAL_API_READY_EVENT) {
+            void loadPlaylists({ forceRefresh: true });
+            return;
+          }
+          if (payload.type === BRIDGE_CACHE_UPDATED_EVENT) {
+            void handleBridgeCacheUpdated(payload);
+          }
+        });
+
+        window.addEventListener(BRIDGE_CACHE_UPDATED_EVENT, (event) => {
+          if (event instanceof CustomEvent) {
+            void handleBridgeCacheUpdated(event.detail);
+          }
+        });
+
+        void init();
+        window.setInterval(() => {
+          void syncPlayerState();
+        }, PLAYER_SYNC_INTERVAL);
+      })();
+    </script>
+  </body>
+</html>
