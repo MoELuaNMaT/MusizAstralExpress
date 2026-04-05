@@ -3,3 +3,8 @@
 ## 2026-04-05
 - 决策：先核对分支拓扑与工作区状态，再执行合并与推送。
 - 理由：当前存在大量未提交改动，直接合并到 `main` 风险高。
+
+## 2026-04-05（合并决策）
+- 采用方案：先提交当前工作区，再执行 `main <- feat/mobile-android-bootstrap`。
+- 冲突决策：`auth` 冲突优先保留 main 上的登录稳定性修复（cookie/header/renew 逻辑），同时切换至 `platform.config` 与 `normalizeImageUrl`。
+- 推送策略：网络不稳定时先保留本地可恢复状态，不做破坏性回滚。
