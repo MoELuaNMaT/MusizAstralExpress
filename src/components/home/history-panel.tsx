@@ -117,7 +117,6 @@ export function HistoryPanel({
             ref={containerRef}
             className="am-song-scrollbar min-h-0 flex-1 overflow-y-scroll pr-1"
             onWheel={onScrollableWheel}
-            onWheelCapture={onScrollableWheel}
           >
             <div className="relative" style={{ height: `${totalHeight}px` }}>
               {virtualItems.map((song, offsetIndex) => {

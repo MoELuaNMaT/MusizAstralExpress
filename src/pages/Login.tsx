@@ -3,41 +3,26 @@ import { useAlertStore, useAuthStore } from '@/stores';
 import { authService } from '@/services/auth.service';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { UiVersionSwitcher } from '@/components/theme/ui-version-switcher';
 import { normalizeImageUrl } from '@/lib/image-url';
 
 type LoginTab = 'netease' | 'qq';
-type NeteaseMethod = 'email' | 'phone' | 'qrcode';
-type QQMethod = 'qrcode' | 'cookie';
 
-export function LoginPage() {
+interface LoginPageProps {
+  localApiReady: boolean;
+}
+
+export function LoginPage({ localApiReady }: LoginPageProps) {
   const { setUser, users } = useAuthStore();
   const pushAlert = useAlertStore((state) => state.pushAlert);
 
   const [activeTab, setActiveTab] = useState<LoginTab>('netease');
-  const [neteaseMethod, setNeteaseMethod] = useState<NeteaseMethod>('qrcode');
-  const [qqMethod, setQqMethod] = useState<QQMethod>('qrcode');
-
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('86');
-  const [qqCookie, setQqCookie] = useState('');
-  const [qqNickname, setQqNickname] = useState('');
-
-  // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrStatus, setQrStatus] = useState('');
-
-  // NetEase QR state
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const qrLoginAbortRef = useRef<AbortController | null>(null);
-
-  // QQ QR state
   const [qqQrStatus, setQqQrStatus] = useState('');
   const [qqQrCodeUrl, setQqQrCodeUrl] = useState<string | null>(null);
   const qqQrLoginAbortRef = useRef<AbortController | null>(null);
@@ -49,36 +34,26 @@ export function LoginPage() {
     loadCredentials();
   }, []);
 
-  useEffect(() => {
-    return () => {
-      qrLoginAbortRef.current?.abort();
-      qqQrLoginAbortRef.current?.abort();
-    };
+  useEffect(() => () => {
+    qrLoginAbortRef.current?.abort();
+    qqQrLoginAbortRef.current?.abort();
   }, []);
-
-  useEffect(() => {
-    if (neteaseMethod !== 'qrcode') {
-      qrLoginAbortRef.current?.abort();
-      qrLoginAbortRef.current = null;
-      setIsLoading(false);
-      setQrCodeUrl(null);
-      setQrStatus('');
-    }
-  }, [neteaseMethod]);
-
-  useEffect(() => {
-    if (qqMethod !== 'qrcode') {
-      qqQrLoginAbortRef.current?.abort();
-      qqQrLoginAbortRef.current = null;
-      setIsLoading(false);
-      setQqQrCodeUrl(null);
-      setQqQrStatus('');
-    }
-  }, [qqMethod]);
 
   useEffect(() => {
     setError(null);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (localApiReady) {
+      return;
+    }
+
+    qrLoginAbortRef.current?.abort();
+    qqQrLoginAbortRef.current?.abort();
+  }, [localApiReady]);
+
+  const localApiPendingMessage = '本地 API 启动中，请等待启动完成后再试。';
+  const loginActionDisabled = isLoading || !localApiReady;
 
   useEffect(() => {
     if (!error) {
@@ -94,34 +69,12 @@ export function LoginPage() {
     });
   }, [activeTab, error, pushAlert]);
 
-  const handleNeteaseLogin = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      let result;
-
-      if (neteaseMethod === 'email') {
-        result = await authService.neteaseEmailLogin(email, password);
-      } else if (neteaseMethod === 'phone') {
-        result = await authService.neteaseCellphoneLogin(phone, countryCode, password);
-      } else {
-        return;
-      }
-
-      if (result.success && result.user && result.cookie) {
-        await setUser('netease', result.user, result.cookie);
-      } else {
-        setError(result.error || '登录失败');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleQRCodeLogin = async () => {
+    if (!localApiReady) {
+      setError(localApiPendingMessage);
+      return;
+    }
+
     qrLoginAbortRef.current?.abort();
     const controller = new AbortController();
     qrLoginAbortRef.current = controller;
@@ -147,7 +100,7 @@ export function LoginPage() {
             setQrStatus(status);
           }
         },
-        controller.signal
+        controller.signal,
       );
 
       if (controller.signal.aborted) {
@@ -189,27 +142,12 @@ export function LoginPage() {
     }
   };
 
-  const qrDisplayStatus = qrStatus || (qrCodeUrl ? '请使用网易云音乐 App 扫码登录' : '点击生成二维码开始登录');
-
-  const handleQQLogin = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await authService.qqMusicLogin(qqCookie.trim(), qqNickname.trim() || undefined);
-      if (result.success && result.user && result.cookie) {
-        await setUser('qq', result.user, result.cookie);
-      } else {
-        setError(result.error || '登录 QQ 音乐失败');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '登录 QQ 音乐失败');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleQQQRCodeLogin = async () => {
+    if (!localApiReady) {
+      setError(localApiPendingMessage);
+      return;
+    }
+
     qqQrLoginAbortRef.current?.abort();
     const controller = new AbortController();
     qqQrLoginAbortRef.current = controller;
@@ -235,7 +173,7 @@ export function LoginPage() {
             setQqQrStatus(status);
           }
         },
-        controller.signal
+        controller.signal,
       );
 
       if (controller.signal.aborted) {
@@ -278,7 +216,12 @@ export function LoginPage() {
     }
   };
 
-  const qqQrDisplayStatus = qqQrStatus || (qqQrCodeUrl ? '请使用 QQ 音乐 App 扫码登录' : '点击生成 QQ 二维码开始登录');
+  const qrDisplayStatus = !localApiReady
+    ? localApiPendingMessage
+    : (qrStatus || (qrCodeUrl ? '请使用网易云音乐 App 扫码登录' : '点击生成二维码开始登录'));
+  const qqQrDisplayStatus = !localApiReady
+    ? localApiPendingMessage
+    : (qqQrStatus || (qqQrCodeUrl ? '请使用 QQ 音乐 App 扫码登录' : '点击生成 QQ 二维码开始登录'));
 
   const handleLogout = async (platform: 'netease' | 'qq') => {
     try {
@@ -339,31 +282,14 @@ export function LoginPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    variant={neteaseMethod === 'qrcode' ? 'default' : 'ghost'}
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => setNeteaseMethod('qrcode')}
-                  >
-                    二维码
-                  </Button>
-                  <Button
-                    variant={neteaseMethod === 'email' ? 'default' : 'ghost'}
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => setNeteaseMethod('email')}
-                  >
-                    邮箱
-                  </Button>
-                  <Button
-                    variant={neteaseMethod === 'phone' ? 'default' : 'ghost'}
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => setNeteaseMethod('phone')}
-                  >
-                    手机号
-                  </Button>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">扫码登录</p>
+                    <p className="text-sm text-slate-400">仅支持使用网易云 App 扫码登录</p>
+                  </div>
+                  <span className="rounded-full border border-cyan-400/40 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">
+                    QR Only
+                  </span>
                 </div>
               )}
             </CardHeader>
@@ -376,110 +302,40 @@ export function LoginPage() {
                   </div>
                 )}
 
-                {neteaseMethod === 'qrcode' && (
-                  <div className="text-center">
-                    <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-300 flex items-center justify-center gap-2">
-                      {isLoading && !qrCodeUrl && <Spinner size="sm" />}
-                      <span>{qrDisplayStatus}</span>
-                    </div>
-                    {qrCodeUrl ? (
-                      <div>
-                        <img
-                          src={qrCodeUrl}
-                          alt="QR Code"
-                          className="mx-auto w-48 h-48 border-4 border-white rounded-lg"
-                        />
-                        <p className="mt-4 text-sm text-slate-400">{qrDisplayStatus}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-4"
-                          onClick={handleQRCodeLogin}
-                          disabled={isLoading}
-                        >
-                          刷新二维码
-                        </Button>
-                      </div>
-                    ) : (
-                      <div>
-                        <Button
-                          variant="primary"
-                          className="w-full"
-                          onClick={handleQRCodeLogin}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? <Spinner /> : '生成二维码'}
-                        </Button>
-                      </div>
-                    )}
+                <div className="text-center">
+                  <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-300 flex items-center justify-center gap-2">
+                    {isLoading && !qrCodeUrl && <Spinner size="sm" />}
+                    <span>{qrDisplayStatus}</span>
                   </div>
-                )}
-
-                {neteaseMethod === 'email' && (
-                  <div className="space-y-4">
-                    <Input
-                      type="email"
-                      placeholder="邮箱"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
-                    />
-                    <Input
-                      type="password"
-                      placeholder="密码"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
-                      onKeyPress={(e) => e.key === 'Enter' && handleNeteaseLogin()}
-                    />
+                  {qrCodeUrl ? (
+                    <div>
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR Code"
+                        className="mx-auto w-48 h-48 border-4 border-white rounded-lg"
+                      />
+                      <p className="mt-4 text-sm text-slate-400">{qrDisplayStatus}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-4"
+                        onClick={handleQRCodeLogin}
+                        disabled={loginActionDisabled}
+                      >
+                        刷新二维码
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
                       variant="primary"
                       className="w-full"
-                      onClick={handleNeteaseLogin}
-                      disabled={isLoading || !email || !password}
+                      onClick={handleQRCodeLogin}
+                      disabled={loginActionDisabled}
                     >
-                      {isLoading ? <Spinner size="sm" /> : '登录'}
+                      {isLoading ? <Spinner /> : '生成二维码'}
                     </Button>
-                  </div>
-                )}
-
-                {neteaseMethod === 'phone' && (
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <Input
-                        type="text"
-                        placeholder="+86"
-                        value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value)}
-                        disabled={isLoading}
-                        className="w-20"
-                      />
-                      <Input
-                        type="tel"
-                        placeholder="手机号"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        disabled={isLoading}
-                      />
-                    </div>
-                    <Input
-                      type="password"
-                      placeholder="密码"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
-                      onKeyPress={(e) => e.key === 'Enter' && handleNeteaseLogin()}
-                    />
-                    <Button
-                      variant="primary"
-                      className="w-full"
-                      onClick={handleNeteaseLogin}
-                      disabled={isLoading || !phone || !password}
-                    >
-                      {isLoading ? <Spinner size="sm" /> : '登录'}
-                    </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             )}
           </Card>
@@ -504,23 +360,14 @@ export function LoginPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    variant={qqMethod === 'qrcode' ? 'default' : 'ghost'}
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => setQqMethod('qrcode')}
-                  >
-                    二维码
-                  </Button>
-                  <Button
-                    variant={qqMethod === 'cookie' ? 'default' : 'ghost'}
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => setQqMethod('cookie')}
-                  >
-                    Cookie
-                  </Button>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">扫码登录</p>
+                    <p className="text-sm text-slate-400">仅支持使用 QQ 音乐 App 扫码登录</p>
+                  </div>
+                  <span className="rounded-full border border-cyan-400/40 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-100">
+                    QR Only
+                  </span>
                 </div>
               )}
             </CardHeader>
@@ -533,79 +380,45 @@ export function LoginPage() {
                   </div>
                 )}
 
-                {qqMethod === 'qrcode' && (
-                  <div className="text-center">
-                    <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-300 flex items-center justify-center gap-2">
-                      {isLoading && !qqQrCodeUrl && <Spinner size="sm" />}
-                      <span>{qqQrDisplayStatus}</span>
-                    </div>
-                    {qqQrCodeUrl ? (
-                      <div>
-                        <img
-                          src={qqQrCodeUrl}
-                          alt="QQ QR Code"
-                          className="mx-auto w-48 h-48 border-4 border-white rounded-lg"
-                        />
-                        <p className="mt-4 text-sm text-slate-400">{qqQrDisplayStatus}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-4"
-                          onClick={handleQQQRCodeLogin}
-                          disabled={isLoading}
-                        >
-                          刷新二维码
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        className="w-full"
-                        onClick={handleQQQRCodeLogin}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? <Spinner /> : '生成二维码'}
-                      </Button>
-                    )}
+                <div className="text-center">
+                  <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-300 flex items-center justify-center gap-2">
+                    {isLoading && !qqQrCodeUrl && <Spinner size="sm" />}
+                    <span>{qqQrDisplayStatus}</span>
                   </div>
-                )}
-
-                {qqMethod === 'cookie' && (
-                  <>
-                    <Input
-                      type="text"
-                      placeholder="QQ 昵称（可选）"
-                      value={qqNickname}
-                      onChange={(e) => setQqNickname(e.target.value)}
-                      disabled={isLoading}
-                    />
-                    <Input
-                      type="password"
-                      placeholder="粘贴 QQ 音乐 Cookie"
-                      value={qqCookie}
-                      onChange={(e) => setQqCookie(e.target.value)}
-                      disabled={isLoading}
-                    />
-                    <p className="text-xs text-slate-500 text-left">
-                      需要包含 uin / qqmusic_key / p_skey 等字段之一。
-                    </p>
+                  {qqQrCodeUrl ? (
+                    <div>
+                      <img
+                        src={qqQrCodeUrl}
+                        alt="QQ QR Code"
+                        className="mx-auto w-48 h-48 border-4 border-white rounded-lg"
+                      />
+                      <p className="mt-4 text-sm text-slate-400">{qqQrDisplayStatus}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-4"
+                        onClick={handleQQQRCodeLogin}
+                        disabled={loginActionDisabled}
+                      >
+                        刷新二维码
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
                       variant="primary"
                       className="w-full"
-                      onClick={handleQQLogin}
-                      disabled={isLoading || !qqCookie.trim()}
+                      onClick={handleQQQRCodeLogin}
+                      disabled={loginActionDisabled}
                     >
-                      {isLoading ? <Spinner size="sm" /> : '登录 QQ 音乐'}
+                      {isLoading ? <Spinner /> : '生成二维码'}
                     </Button>
-                  </>
-                )}
+                  )}
+                </div>
               </CardContent>
             )}
           </Card>
         )}
-
       </div>
     </div>
   );
 }
-

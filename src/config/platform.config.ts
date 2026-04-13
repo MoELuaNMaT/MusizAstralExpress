@@ -56,7 +56,8 @@ function resolveDefaultApiHost(runtimeTarget: RuntimeTarget): string {
     return 'http://10.0.2.2';
   }
 
-  return 'http://localhost';
+  // Prefer explicit IPv4 loopback on desktop to avoid localhost/IPv6 resolution drift.
+  return 'http://127.0.0.1';
 }
 
 function resolveEnvBaseUrl(platform: ApiPlatform, runtimeTarget: RuntimeTarget): string | null {

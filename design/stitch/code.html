@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NEO-VINTAGE HI-FI | SONIC_ARCHIVE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#006781",
+                    "surface-dim": "#1a0031",
+                    "on-tertiary-container": "#005c37",
+                    "error-container": "#a70138",
+                    "secondary-fixed-dim": "#48d2ff",
+                    "surface-variant": "#3c0066",
+                    "on-secondary-fixed": "#003949",
+                    "surface-tint": "#ff83d1",
+                    "on-secondary": "#004052",
+                    "on-surface-variant": "#cd92ff",
+                    "tertiary-fixed-dim": "#00ef97",
+                    "on-secondary-container": "#eff9ff",
+                    "surface-container-low": "#22003d",
+                    "surface-container-high": "#330058",
+                    "surface-container": "#2a004a",
+                    "secondary-dim": "#00c0ee",
+                    "surface-container-lowest": "#000000",
+                    "primary-container": "#fa6dc9",
+                    "surface": "#1a0031",
+                    "primary-dim": "#f66ac6",
+                    "outline": "#9e4be3",
+                    "on-error-container": "#ffb2b9",
+                    "tertiary-container": "#0affa1",
+                    "primary": "#ff83d1",
+                    "on-tertiary-fixed": "#004729",
+                    "on-primary-container": "#480036",
+                    "primary-fixed-dim": "#ed62be",
+                    "on-error": "#490013",
+                    "on-tertiary": "#00663d",
+                    "outline-variant": "#6c02b1",
+                    "on-tertiary-fixed-variant": "#00673e",
+                    "on-primary": "#5d0046",
+                    "on-primary-fixed": "#020001",
+                    "surface-container-highest": "#3c0066",
+                    "tertiary-fixed": "#0affa1",
+                    "background": "#1a0031",
+                    "inverse-surface": "#fff7fd",
+                    "primary-fixed": "#fd6fcc",
+                    "secondary-fixed": "#86ddff",
+                    "inverse-on-surface": "#7b21c0",
+                    "error-dim": "#d73357",
+                    "error": "#ff6e84",
+                    "tertiary-dim": "#00ef97",
+                    "tertiary": "#b1ffcd",
+                    "on-secondary-fixed-variant": "#00586f",
+                    "inverse-primary": "#a82683",
+                    "on-background": "#f3deff",
+                    "on-surface": "#f3deff",
+                    "secondary": "#0fceff",
+                    "surface-bright": "#450074",
+                    "on-primary-fixed-variant": "#5d0046"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Plus Jakarta Sans"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #1a0031; font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .scanlines { background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03)); background-size: 100% 4px, 3px 100%; pointer-events: none; }
+        .jewel-case { transform: perspective(1000px) rotateY(-15deg) rotateX(5deg); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .jewel-case:hover { transform: perspective(1000px) rotateY(0deg) rotateX(0deg) scale(1.05); }
+        .gloss { background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.1) 100%); }
+        .vapor-grid { background-image: linear-gradient(to right, rgba(177, 255, 205, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(177, 255, 205, 0.1) 1px, transparent 1px); background-size: 40px 40px; transform: perspective(500px) rotateX(60deg); transform-origin: top; }
+        .vfd-text { text-shadow: 0 0 8px #b1ffcd; }
+    </style>
+</head>
+<body class="text-on-background selection:bg-primary selection:text-on-primary">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 left-0 right-0 z-[60] h-16 bg-gradient-to-b from-zinc-200 to-zinc-400 dark:from-zinc-800 dark:to-zinc-950 flex justify-between items-center px-6 border-b-[3px] border-zinc-600 shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+<div class="flex items-center gap-4">
+<span class="text-xl font-black italic text-[#FF71CE] drop-shadow-[0_0_5px_#FF71CE] font-['Space_Grotesk'] tracking-tighter uppercase">NEO-VINTAGE HI-FI</span>
+<div class="hidden md:flex gap-6 ml-8 font-['Space_Grotesk'] font-bold tracking-tighter uppercase text-sm">
+<a class="text-cyan-400 drop-shadow-[0_0_8px_#b1ffcd] hover:brightness-125 hover:scale-105 transition-all" href="#">Library</a>
+<a class="text-zinc-500 hover:brightness-125 hover:scale-105 transition-all" href="#">Mixer</a>
+<a class="text-zinc-500 hover:brightness-125 hover:scale-105 transition-all" href="#">Archive</a>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative group">
+<input class="bg-surface-container-lowest border-2 border-outline-variant px-4 py-1 text-xs font-['Space_Grotesk'] focus:outline-none focus:border-primary transition-colors text-tertiary" placeholder="SEARCH_DATABASE..." type="text"/>
+</div>
+<button class="text-zinc-500 hover:brightness-125 hover:scale-105 transition-all active:inner-shadow-lg scale-95 duration-75">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="text-zinc-500 hover:brightness-125 hover:scale-105 transition-all active:inner-shadow-lg scale-95 duration-75">
+<span class="material-symbols-outlined">power_settings_new</span>
+</button>
+</div>
+</header>
+<!-- Side Navigation Shell -->
+<nav class="fixed left-0 top-16 h-[calc(100vh-64px)] w-20 bg-zinc-900 border-r-4 border-zinc-800 flex flex-col items-center py-8 z-40 shadow-[inset_-10px_0_20px_rgba(0,0,0,0.5)]">
+<div class="mb-8 text-center">
+<div class="text-[#FF71CE] font-['Space_Grotesk'] text-[10px] font-black leading-none">OPERATOR</div>
+<div class="text-cyan-400 font-['Space_Grotesk'] text-[8px] font-black opacity-50">SYSTEM ACTIVE</div>
+</div>
+<div class="flex flex-col gap-6 w-full px-2">
+<!-- Active: Library -->
+<button class="flex flex-col items-center justify-center w-full py-3 bg-zinc-950 shadow-[inset_4px_4px_8px_rgba(0,0,0,1)] text-cyan-300 scale-95 rounded-lg border-b border-zinc-700">
+<span class="material-symbols-outlined text-xl">inventory_2</span>
+<span class="font-['Space_Grotesk'] text-[8px] font-black mt-1 uppercase">Library</span>
+</button>
+<button class="flex flex-col items-center justify-center w-full py-3 text-zinc-600 opacity-80 hover:text-[#FF71CE] hover:drop-shadow-[0_0_5px_#FF71CE] transition-all">
+<span class="material-symbols-outlined text-xl">radio</span>
+<span class="font-['Space_Grotesk'] text-[8px] font-black mt-1 uppercase">Radio</span>
+</button>
+<button class="flex flex-col items-center justify-center w-full py-3 text-zinc-600 opacity-80 hover:text-[#FF71CE] hover:drop-shadow-[0_0_5px_#FF71CE] transition-all">
+<span class="material-symbols-outlined text-xl">album</span>
+<span class="font-['Space_Grotesk'] text-[8px] font-black mt-1 uppercase">Deck A</span>
+</button>
+<button class="flex flex-col items-center justify-center w-full py-3 text-zinc-600 opacity-80 hover:text-[#FF71CE] hover:drop-shadow-[0_0_5px_#FF71CE] transition-all">
+<span class="material-symbols-outlined text-xl">cable</span>
+<span class="font-['Space_Grotesk'] text-[8px] font-black mt-1 uppercase">Deck B</span>
+</button>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="ml-20 mt-16 pb-24 min-h-screen relative overflow-hidden">
+<!-- Background Elements -->
+<div class="absolute inset-0 z-0">
+<div class="absolute bottom-0 w-full h-[409px] vapor-grid"></div>
+<div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-t from-primary via-surface-variant to-transparent rounded-full opacity-20 blur-[100px]"></div>
+<!-- Floating Elements -->
+<div class="absolute top-20 right-20 w-32 h-32 rounded-full bg-gradient-to-br from-secondary to-primary opacity-30 blur-sm"></div>
+<div class="absolute bottom-40 left-10 w-0 h-0 border-l-[50px] border-l-transparent border-r-[50px] border-r-transparent border-b-[80px] border-b-tertiary/20 rotate-12"></div>
+</div>
+<div class="relative z-10 p-8">
+<header class="mb-12 flex items-end justify-between border-b-4 border-primary/20 pb-4">
+<div>
+<h1 class="text-5xl font-['Space_Grotesk'] font-black tracking-[0.2em] text-primary italic drop-shadow-[4px_4px_0px_#3c0066]">SONIC_ARCHIVE // VOLUMES</h1>
+<p class="text-tertiary font-mono text-xs mt-2 uppercase tracking-widest vfd-text">Status: 1024_SAMPLES_LOADED // BUFFER_CLEAN</p>
+</div>
+<div class="flex gap-4">
+<div class="h-12 w-24 bg-surface-container-highest border-2 border-outline-variant flex items-center justify-center px-2">
+<div class="flex items-end gap-0.5 h-6">
+<div class="w-1 bg-tertiary h-full"></div>
+<div class="w-1 bg-tertiary h-[80%]"></div>
+<div class="w-1 bg-tertiary h-[40%]"></div>
+<div class="w-1 bg-secondary h-[90%]"></div>
+<div class="w-1 bg-error h-[30%]"></div>
+</div>
+<span class="ml-2 text-[8px] font-black text-tertiary leading-none">VU<br/>L-CH</span>
+</div>
+</div>
+</header>
+<!-- Library Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12 pt-8">
+<!-- Playlist 1: Midnight Tokyo -->
+<div class="flex flex-col gap-6">
+<div class="jewel-case relative group cursor-pointer aspect-square bg-white/5 p-1 rounded shadow-2xl border border-white/20">
+<div class="absolute inset-0 gloss z-20 pointer-events-none rounded"></div>
+<div class="absolute right-0 top-0 bottom-0 w-4 bg-white/10 border-l border-white/20 z-10 flex items-center justify-center">
+<span class="text-[6px] text-white/40 rotate-90 font-bold uppercase tracking-widest">DIGITAL_MASTER</span>
+</div>
+<div class="w-full h-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="cyberpunk tokyo city street at night with neon signs reflecting in puddles cinematic vaporwave aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCceF5IE3TxryHplZxfljByb4BnjyZmYwlfIbm3H8di26sO_yTSOx26DPhb6_lm590Y808kw96zYavLYQDiYuYEHEyFviUsAAB1s0S7z4e0RPpk-7exQ4LMdP3bIkugJyERoofyQSmDi4Rjo6zT8L39thGs_8cKIOUB6a9RVOKsfkBIfvR57QAG9ubLmow9nlLekX9sOzdWhZEHY5tNQKsM31yNQcGWz2_Eak9psZMOCNRbq34FM9VSEuVP1eY4Ocn9TCcj_ZQUHT8Z"/>
+</div>
+<div class="absolute bottom-4 left-4 right-8 bg-black/80 p-2 backdrop-blur-sm border-l-4 border-secondary">
+<div class="text-[10px] font-['Space_Grotesk'] font-black text-secondary">VOLUME_01</div>
+<div class="text-xs font-['Space_Grotesk'] font-bold text-white uppercase tracking-tighter">MIDNIGHT_TOKYO</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 border-t-2 border-secondary/40 shadow-lg">
+<div class="flex justify-between items-center text-[10px] font-black font-['Space_Grotesk'] text-tertiary mb-1">
+<span>TRK: 12</span>
+<span>BPM: 128</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-2/3 h-full bg-secondary"></div>
+</div>
+</div>
+</div>
+<!-- Playlist 2: Static Dreams -->
+<div class="flex flex-col gap-6">
+<div class="jewel-case relative group cursor-pointer aspect-square bg-white/5 p-1 rounded shadow-2xl border border-white/20">
+<div class="absolute inset-0 gloss z-20 pointer-events-none rounded"></div>
+<div class="absolute right-0 top-0 bottom-0 w-4 bg-white/10 border-l border-white/20 z-10 flex items-center justify-center">
+<span class="text-[6px] text-white/40 rotate-90 font-bold uppercase tracking-widest">MD_DATA_CART</span>
+</div>
+<div class="w-full h-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="abstract vaporwave patterns with purple and pink gradients and geometric wireframe shapes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5_IQVfPIrny3mjYCGEj0VQyimfbO93kCVhdqQq3u0j9gxk0PCR3IKq_FNW5EL8XDkfuMFfhPzvvvqrhBvGqaU-PWdy_o9jACkvGpWGbDLFprrfXtz1MTbn9KhSpxR9otHaqRHtFbW2GH1MdKWGY9oFb5S7l4I4dLJAGRh-MkwUmpTIV16jfdb9F_5cBSo2l0RoylD4tsGqz6m9Apn06RWiXDIi9GndMgvRrDfN-V9vNVZ0szr5RM697O1pZjTH1CxNUwnx0mHgaAH"/>
+</div>
+<div class="absolute bottom-4 left-4 right-8 bg-black/80 p-2 backdrop-blur-sm border-l-4 border-primary">
+<div class="text-[10px] font-['Space_Grotesk'] font-black text-primary">VOLUME_02</div>
+<div class="text-xs font-['Space_Grotesk'] font-bold text-white uppercase tracking-tighter">STATIC_DREAMS</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 border-t-2 border-primary/40 shadow-lg">
+<div class="flex justify-between items-center text-[10px] font-black font-['Space_Grotesk'] text-primary mb-1">
+<span>TRK: 08</span>
+<span>BPM: 95</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-1/3 h-full bg-primary"></div>
+</div>
+</div>
+</div>
+<!-- Playlist 3: Neon Horizon -->
+<div class="flex flex-col gap-6">
+<div class="jewel-case relative group cursor-pointer aspect-square bg-white/5 p-1 rounded shadow-2xl border border-white/20">
+<div class="absolute inset-0 gloss z-20 pointer-events-none rounded"></div>
+<div class="absolute right-0 top-0 bottom-0 w-4 bg-white/10 border-l border-white/20 z-10 flex items-center justify-center">
+<span class="text-[6px] text-white/40 rotate-90 font-bold uppercase tracking-widest">HI-FI_AUDIO</span>
+</div>
+<div class="w-full h-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="outrun style grid sunset over a digital ocean with palm tree silhouettes and synthwave aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZS8JHzoGGmXG55QlG9xWL0PR-0xydoqgWRYmDOwoJ80gysepNV4Ine4tAwhXpJIzcSq8Y1v9eNhXNjWt4vuRGUI7_A3l2h_4ThUTRR2NLuoXRRYZon_2uTUje1tmOE82PFARmCi6IbHXE0UaGxVff7vuY3wHExaC7P4lMxHqff6PBkKbFKZkHVkT5JMEcKGofNHieE4tn2TKWLn09qkiPMl_5__5w_t9VMipTKoV7T_pf7lTl2PHv7m56N5WsP8kKH9Wn5nkKhahv"/>
+</div>
+<div class="absolute bottom-4 left-4 right-8 bg-black/80 p-2 backdrop-blur-sm border-l-4 border-tertiary">
+<div class="text-[10px] font-['Space_Grotesk'] font-black text-tertiary">VOLUME_03</div>
+<div class="text-xs font-['Space_Grotesk'] font-bold text-white uppercase tracking-tighter">NEON_HORIZON</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 border-t-2 border-tertiary/40 shadow-lg">
+<div class="flex justify-between items-center text-[10px] font-black font-['Space_Grotesk'] text-secondary mb-1">
+<span>TRK: 15</span>
+<span>BPM: 110</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-full h-full bg-tertiary"></div>
+</div>
+</div>
+</div>
+<!-- Playlist 4: Chrome Waves -->
+<div class="flex flex-col gap-6">
+<div class="jewel-case relative group cursor-pointer aspect-square bg-white/5 p-1 rounded shadow-2xl border border-white/20">
+<div class="absolute inset-0 gloss z-20 pointer-events-none rounded"></div>
+<div class="absolute right-0 top-0 bottom-0 w-4 bg-white/10 border-l border-white/20 z-10 flex items-center justify-center">
+<span class="text-[6px] text-white/40 rotate-90 font-bold uppercase tracking-widest">IMPORT_EDITION</span>
+</div>
+<div class="w-full h-full overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="liquid chrome and iridescent shapes flowing in 3d space high resolution futuristic vaporwave design" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwymZcPNPRJ5LZUzDFRLN8iDVCMnVhbtmgHSc6ujHv7lrFomZ9UPSeQHxMchuz5oAsN-qSaHQVroWbyVJJzxlOqh7n48QyaaLVb_CTAUTLa-Uk0AGDOerm118HLZkaOgz-23RoDQLtXgnnmNYIXRl4HOELeUpo28yBXt-g6UUg-OhmPtsFb6gNV973iTYVaDnlHCyG-7DC9vonG5nhYt4LWTWsq_3GQ8ZNRAjx2El5e9Xlp3RfXxvt8m1LIEaqdllFIkTaMaqkLsWu"/>
+</div>
+<div class="absolute bottom-4 left-4 right-8 bg-black/80 p-2 backdrop-blur-sm border-l-4 border-secondary-fixed-dim">
+<div class="text-[10px] font-['Space_Grotesk'] font-black text-secondary-fixed-dim">VOLUME_04</div>
+<div class="text-xs font-['Space_Grotesk'] font-bold text-white uppercase tracking-tighter">CHROME_WAVES</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 border-t-2 border-secondary-fixed-dim/40 shadow-lg">
+<div class="flex justify-between items-center text-[10px] font-black font-['Space_Grotesk'] text-primary mb-1">
+<span>TRK: 06</span>
+<span>BPM: 80</span>
+</div>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="w-1/2 h-full bg-secondary-fixed-dim"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Scanlines Overlay -->
+<div class="fixed inset-0 scanlines z-50 pointer-events-none opacity-30"></div>
+</main>
+<!-- Bottom Control Shell -->
+<footer class="fixed bottom-0 left-0 w-full z-50 h-24 flex justify-around items-center px-4 bg-gradient-to-t from-zinc-900 via-zinc-800 to-zinc-700 bg-opacity-95 backdrop-blur-md border-t-2 border-zinc-600 shadow-[0_-10px_30px_rgba(0,0,0,0.6)]">
+<button class="flex flex-col items-center justify-center text-zinc-400 p-2 grayscale hover:from-zinc-600 hover:to-zinc-800 transition-all active:translate-y-1">
+<span class="material-symbols-outlined text-3xl">fast_rewind</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-bold">Rewind</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 border-2 border-cyan-400/50 rounded-lg p-2 shadow-[0_0_15px_rgba(177,255,205,0.4)] active:translate-y-1">
+<span class="material-symbols-outlined text-3xl text-cyan-400">play_arrow</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-bold text-[#FF71CE]">Play</span>
+</button>
+<button class="flex flex-col items-center justify-center text-zinc-400 p-2 grayscale hover:from-zinc-600 hover:to-zinc-800 transition-all active:translate-y-1">
+<span class="material-symbols-outlined text-3xl">stop</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-bold">Stop</span>
+</button>
+<button class="flex flex-col items-center justify-center text-zinc-400 p-2 grayscale hover:from-zinc-600 hover:to-zinc-800 transition-all active:translate-y-1">
+<span class="material-symbols-outlined text-3xl">fast_forward</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-bold">FastFwd</span>
+</button>
+<button class="flex flex-col items-center justify-center text-zinc-400 p-2 grayscale hover:from-zinc-600 hover:to-zinc-800 transition-all active:translate-y-1">
+<span class="material-symbols-outlined text-3xl">eject</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-bold">Eject</span>
+</button>
+</footer>
+<!-- Playback Status Bar (VFD Style) -->
+<div class="fixed bottom-24 left-0 right-0 h-8 bg-surface-container-lowest border-y border-outline-variant flex items-center px-24 z-[55]">
+<div class="flex items-center gap-8 w-full justify-between overflow-hidden">
+<div class="flex items-center gap-2">
+<span class="text-primary text-[10px] font-black uppercase tracking-widest">Now_Playing:</span>
+<span class="text-tertiary text-[10px] font-black uppercase vfd-text whitespace-nowrap">VAPOR_WAVES_2077 // SEGA_REMIX_V2.WAV</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-secondary text-[10px] font-black">03:42 / 05:12</span>
+<div class="flex gap-1 h-3 items-center">
+<div class="w-1 h-full bg-tertiary"></div>
+<div class="w-1 h-2 bg-tertiary/50"></div>
+<div class="w-1 h-3 bg-tertiary"></div>
+<div class="w-1 h-1 bg-tertiary/50"></div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

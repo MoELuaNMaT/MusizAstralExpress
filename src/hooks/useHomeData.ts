@@ -103,7 +103,6 @@ export function useHomeData() {
   const [searchWarnings, setSearchWarnings] = useState<string[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [authStatusMessage, setAuthStatusMessage] = useState<string | null>(null);
   const [dailySongs, setDailySongs] = useState<UnifiedSong[]>([]);
   const [dailyWarnings, setDailyWarnings] = useState<string[]>([]);
   const [dailyError, setDailyError] = useState<string | null>(null);
@@ -457,45 +456,6 @@ export function useHomeData() {
   }, [isInitialPlaylistBootstrapPending, notifyAlert, playlistDetailError]);
 
   useEffect(() => {
-    if (isInitialPlaylistBootstrapPending || playlistDetailError || !playlistDetailInfo) {
-      return;
-    }
-
-    const message = playlistDetailInfo.trim();
-    if (!message || !/鍚庡彴鍒锋柊|鍒锋柊澶辫触/.test(message)) {
-      return;
-    }
-
-    pushToast({
-      level: /鍒锋柊澶辫触/.test(message) ? 'warning' : 'info',
-      title: 'Playlist status',
-      message,
-      source: 'home.playlist-detail.info',
-      dedupeKey: `home:playlist-detail-info:${message}`,
-      durationMs: /鍒锋柊澶辫触/.test(message) ? 3600 : 2600,
-    });
-  }, [
-    isInitialPlaylistBootstrapPending,
-    playlistDetailError,
-    playlistDetailInfo,
-    pushToast,
-  ]);
-
-  useEffect(() => {
-    if (isInitialPlaylistBootstrapPending || !isDetailRefreshing || !selectedPlaylist) {
-      return;
-    }
-    pushToast({
-      level: 'info',
-      title: 'Playlist status',
-      message: `Refreshing in background: ${selectedPlaylist.name}...`,
-      source: 'home.playlist-detail.refreshing',
-      dedupeKey: `home:playlist-detail-refreshing:${selectedPlaylist.id}`,
-      durationMs: 2200,
-    });
-  }, [isDetailRefreshing, isInitialPlaylistBootstrapPending, pushToast, selectedPlaylist]);
-
-  useEffect(() => {
     if (!likeActionError) {
       return;
     }
@@ -522,20 +482,6 @@ export function useHomeData() {
       durationMs: 2200,
     });
   }, [likeActionMessage, pushToast]);
-
-  useEffect(() => {
-    if (isInitialPlaylistBootstrapPending || !authStatusMessage) {
-      return;
-    }
-    pushToast({
-      level: 'warning',
-      title: 'Login status',
-      message: authStatusMessage,
-      source: 'home.auth-status',
-      dedupeKey: `home:auth-status:${authStatusMessage}`,
-      durationMs: 3600,
-    });
-  }, [authStatusMessage, isInitialPlaylistBootstrapPending, pushToast]);
 
   useEffect(() => {
     const nextScope = `${users.netease?.userId || ''}|${users.qq?.userId || ''}`;
@@ -580,14 +526,21 @@ export function useHomeData() {
         }
       }
 
-      return result;
+      return {
+        ...result,
+        success: true,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load playlists. Please try again.';
       if (!options?.suppressEmptyError) {
         setPlaylistError(message);
       }
       setPlaylistWarnings([]);
-      return { playlists: [], warnings: [message] };
+      return {
+        playlists: [],
+        warnings: [message],
+        success: false,
+      };
     } finally {
       setIsPlaylistLoading(false);
     }
@@ -608,7 +561,11 @@ export function useHomeData() {
           setDailyError(cached.warnings[0]);
         }
         setIsDailyLoading(false);
-        return;
+        return {
+          songs: cached.songs,
+          warnings: cached.warnings,
+          success: true,
+        };
       }
     }
 
@@ -623,7 +580,11 @@ export function useHomeData() {
       });
 
       if (dailyRequestSeqRef.current !== requestSeq) {
-        return;
+        return {
+          songs: [],
+          warnings: [],
+          success: false,
+        };
       }
 
       setDailySongs(result.songs);
@@ -635,14 +596,27 @@ export function useHomeData() {
         songs: result.songs,
         warnings: result.warnings,
       });
+      return {
+        ...result,
+        success: true,
+      };
     } catch (error) {
       if (dailyRequestSeqRef.current !== requestSeq) {
-        return;
+        return {
+          songs: [],
+          warnings: [],
+          success: false,
+        };
       }
 
       const message = error instanceof Error ? error.message : 'Failed to load daily recommendations. Please try again.';
       setDailyError(message);
       setDailyWarnings([]);
+      return {
+        songs: [],
+        warnings: [message],
+        success: false,
+      };
     } finally {
       if (dailyRequestSeqRef.current === requestSeq) {
         setIsDailyLoading(false);
@@ -1167,78 +1141,6 @@ export function useHomeData() {
     mounted,
   ]);
 
-  // --- Auth check effect ---
-
-  useEffect(() => {
-    if (!mounted || !isAuthenticated || isInitialPlaylistBootstrapPending) {
-      setAuthStatusMessage(null);
-      return;
-    }
-
-    let cancelled = false;
-    const checkAndRenewLoginStatus = async () => {
-      try {
-        const expiredPlatforms: string[] = [];
-        let renewFailed = false;
-        const checks: Array<Promise<void>> = [];
-
-        if (cookies.netease?.trim()) {
-          checks.push((async () => {
-            const isValid = await authService.verifyLogin('netease', cookies.netease!);
-            if (!isValid) {
-              expiredPlatforms.push('NetEase');
-              return;
-            }
-            const renewed = await authService.renewLogin('netease', cookies.netease!);
-            if (!renewed) {
-              renewFailed = true;
-            }
-          })());
-        }
-
-        if (cookies.qq?.trim()) {
-          checks.push((async () => {
-            const isValid = await authService.verifyLogin('qq', cookies.qq!);
-            if (!isValid) {
-              expiredPlatforms.push('QQ');
-            }
-          })());
-        }
-
-        await Promise.all(checks);
-        if (cancelled) {
-          return;
-        }
-
-        if (expiredPlatforms.length > 0) {
-          setAuthStatusMessage(`${expiredPlatforms.join(' / ')}${text.authStatusExpired}`);
-          return;
-        }
-        if (renewFailed) {
-          setAuthStatusMessage(text.authStatusRenewFailed);
-          return;
-        }
-        setAuthStatusMessage(null);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        const message = error instanceof Error ? error.message : 'Failed to verify login status. Please retry.';
-        setAuthStatusMessage(message);
-      }
-    };
-
-    void checkAndRenewLoginStatus();
-    const timer = window.setInterval(() => {
-      void checkAndRenewLoginStatus();
-    }, 20 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [cookies.netease, cookies.qq, isAuthenticated, isInitialPlaylistBootstrapPending, mounted]);
-
   // --- Profile sync effect ---
 
   useEffect(() => {
@@ -1435,7 +1337,6 @@ export function useHomeData() {
     searchWarnings,
     searchError,
     isSearching,
-    authStatusMessage,
     dailySongs,
     dailyWarnings,
     dailyError,

@@ -31,7 +31,7 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 try:
     import httpx
@@ -102,6 +102,23 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+STREAM_FORWARD_HEADERS = {
+    'range',
+    'accept',
+    'accept-encoding',
+    'if-range',
+    'user-agent',
+}
+STREAM_RESPONSE_HEADERS = {
+    'accept-ranges',
+    'content-length',
+    'content-range',
+    'content-type',
+    'cache-control',
+    'etag',
+    'last-modified',
+}
 
 
 @dataclass
@@ -284,6 +301,33 @@ def _get_httpx_client() -> httpx.AsyncClient:
         if _HTTPX_CLIENT is None:
             _HTTPX_CLIENT = httpx.AsyncClient(follow_redirects=True, timeout=12)
         return _HTTPX_CLIENT
+
+
+def _sanitize_stream_target(target: str) -> str:
+    value = _pick_text(target)
+    if not value:
+        return ''
+    if not re.match(r'^https?://', value, re.IGNORECASE):
+        return ''
+    return value
+
+
+def _build_stream_forward_headers(request: Request) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for key, value in request.headers.items():
+        lowered = key.lower()
+        if lowered in STREAM_FORWARD_HEADERS and value.strip():
+            headers[key] = value.strip()
+    return headers
+
+
+def _build_stream_response_headers(headers: Any) -> dict[str, str]:
+    response_headers: dict[str, str] = {}
+    for key, value in headers.items():
+        lowered = key.lower()
+        if lowered in STREAM_RESPONSE_HEADERS and value.strip():
+            response_headers[key] = value.strip()
+    return response_headers
 
 
 def _extract_raw_cookie(request: Request) -> str:
@@ -1407,6 +1451,53 @@ async def song_url(
             'quality': _pick_text(quality).lower() or '128',
             'url': play_url,
         }
+    )
+
+
+@app.get('/song/stream')
+async def song_stream(
+    request: Request,
+    target: str = Query(...),
+) -> Any:
+    stream_target = _sanitize_stream_target(target)
+    if not stream_target:
+        return _error(-1, 'Missing or invalid stream target.', status_code=400)
+
+    try:
+        client = _get_httpx_client()
+        upstream_request = client.build_request(
+            'GET',
+            stream_target,
+            headers=_build_stream_forward_headers(request),
+        )
+        upstream_response = await client.send(upstream_request, stream=True)
+    except Exception as exc:  # pragma: no cover - upstream errors
+        return _error(-1, f'Failed to open QQ audio stream: {exc}', status_code=502)
+
+    if upstream_response.status_code >= 400:
+        await upstream_response.aclose()
+        return _error(
+            -1,
+            f'QQ audio stream upstream returned HTTP {upstream_response.status_code}.',
+            status_code=502,
+        )
+
+    response_headers = _build_stream_response_headers(upstream_response.headers)
+    media_type = upstream_response.headers.get('content-type', 'audio/mpeg')
+
+    async def iter_stream() -> Any:
+        try:
+            async for chunk in upstream_response.aiter_bytes():
+                if chunk:
+                    yield chunk
+        finally:
+            await upstream_response.aclose()
+
+    return StreamingResponse(
+        iter_stream(),
+        status_code=upstream_response.status_code,
+        headers=response_headers,
+        media_type=media_type,
     )
 
 

@@ -52,7 +52,10 @@ class PlayerService {
 
   async resolveSongPlayUrl(song: UnifiedSong, context: ResolvePlayUrlContext): Promise<ResolvePlayUrlResult> {
     if (song.playUrl && !context.forceRefresh) {
-      return { success: true, url: song.playUrl };
+      return {
+        success: true,
+        url: song.platform === 'qq' ? this.buildQQStreamProxyUrl(song.playUrl) : song.playUrl,
+      };
     }
 
     if (song.platform === 'netease') {
@@ -201,7 +204,7 @@ class PlayerService {
 
       const url = this.toText(response.data?.data?.url ?? response.data?.url);
       if (response.ok && url) {
-        return { success: true, url };
+        return { success: true, url: this.buildQQStreamProxyUrl(url) };
       }
       latestError = response.error || latestError;
     }
@@ -259,6 +262,19 @@ class PlayerService {
       return ['320', '128'];
     }
     return ['128'];
+  }
+
+  private buildQQStreamProxyUrl(targetUrl: string): string {
+    const normalizedTarget = this.toText(targetUrl);
+    if (!normalizedTarget) {
+      return normalizedTarget;
+    }
+
+    if (normalizedTarget.startsWith(`${QQ_API_BASE_URL}/song/stream?`)) {
+      return normalizedTarget;
+    }
+
+    return `${QQ_API_BASE_URL}/song/stream?target=${encodeURIComponent(normalizedTarget)}`;
   }
 
   private buildNeteaseQualityFallbacks(

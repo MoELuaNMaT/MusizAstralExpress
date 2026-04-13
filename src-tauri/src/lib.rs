@@ -33,22 +33,8 @@ pub fn run() {
                 eprintln!("[ALLMusic] failed to initialize system tray: {}", error);
             }
 
-            // 初始化 Windows 缩略图工具栏
             #[cfg(all(desktop, target_os = "windows"))]
-            if let Err(error) = desktop::setup_thumbnail_toolbar(&app.handle()) {
-                eprintln!("[ALLMusic] failed to initialize thumbnail toolbar: {}", error);
-            }
-
-            // 注册 Windows 消息处理器
-            #[cfg(all(desktop, target_os = "windows"))]
-            {
-                use tauri::Manager;
-
-                if let Some(window) = app.get_webview_window("main") {
-                    let app_handle = app.handle().clone();
-                    desktop::setup_thumbnail_message_handler(window, app_handle);
-                }
-            }
+            desktop::setup_main_window_message_handler(&app.handle());
 
             Ok(())
         })
@@ -71,7 +57,7 @@ pub fn run() {
             ensure_local_api_services,
             shutdown_local_api_services,
             cache_cover_image,
-            sync_windows_thumbnail_state,
+            sync_main_window_aspect_ratio,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

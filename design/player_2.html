@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Retro Deck Player 2</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23121212'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23353535'/%3E%3Crect x='30' y='16' width='4' height='14' rx='2' fill='%23ff9a1f'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg: #0d1014;
+      --panel: #232323;
+      --panel-2: #151515;
+      --panel-3: #3a3a3a;
+      --screen: #050806;
+      --cyan: #00ffcc;
+      --amber: #ffbf47;
+      --orange: #ff8d1a;
+      --red: #ff4d36;
+      --green: #24ff7d;
+      --text: #efe8d6;
+      --muted: #908a82;
+      --shadow: rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Courier New", "IBM Plex Mono", Consolas, monospace;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255, 164, 53, 0.14), transparent 24%),
+        radial-gradient(circle at 82% 10%, rgba(0, 255, 204, 0.08), transparent 20%),
+        linear-gradient(180deg, #181c21, var(--bg));
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .stage {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 14px;
+    }
+
+    .deck {
+      width: min(1120px, 100%);
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid #0b0b0b;
+      background:
+        linear-gradient(180deg, rgba(49, 49, 49, 0.96), rgba(24, 24, 24, 0.98)),
+        radial-gradient(circle at 50% 0, rgba(255, 255, 255, 0.08), transparent 55%);
+      box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.52),
+        0 0 36px rgba(255, 148, 39, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .badge-row,
+    .top,
+    .transport,
+    .bottom {
+      position: relative;
+      z-index: 1;
+    }
+
+    .badge-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(10, 10, 10, 0.3);
+      color: #d5d0c6;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .badge.muted {
+      color: #99948a;
+    }
+
+    .shell {
+      position: relative;
+      overflow: hidden;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #111;
+      background: linear-gradient(135deg, #3b3b3b, #292929 42%, #171717 100%);
+      box-shadow:
+        0 22px 40px var(--shadow),
+        inset 1px 1px 1px rgba(255, 255, 255, 0.12),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.52);
+    }
+
+    .shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 28%);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-radius: 8px;
+      border: 1px solid #121212;
+      box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.65),
+        0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .cassette {
+      min-height: 176px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .small-label {
+      color: #706d67;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .cassette-window {
+      position: relative;
+      min-height: 92px;
+      margin-top: 8px;
+      border-radius: 4px;
+      border: 2px solid #0d0d0d;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 25%), #020202;
+      overflow: hidden;
+    }
+
+    .cover {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      padding: 10px 12px;
+      background:
+        linear-gradient(135deg, var(--cover-a, #5f1038), var(--cover-b, #e06b3c)),
+        radial-gradient(circle at 24% 20%, rgba(255, 255, 255, 0.24), transparent 24%);
+    }
+
+    .cover::before,
+    .cover::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+    }
+
+    .cover::before {
+      inset: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 44%);
+    }
+
+    .cover::after {
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.34)),
+        radial-gradient(circle at 50% 50%, transparent 0, transparent 20%, rgba(0, 0, 0, 0.15) 78%, rgba(0, 0, 0, 0.28) 100%);
+    }
+
+    .cover-copy {
+      position: relative;
+      z-index: 1;
+      color: rgba(255, 248, 234, 0.88);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.52);
+    }
+
+    .reel {
+      position: absolute;
+      top: 50%;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid #434343;
+      background: rgba(4, 4, 4, 0.36);
+      box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(2px);
+      transform: translateY(-50%);
+    }
+
+    .reel::before,
+    .reel::after {
+      content: "";
+      position: absolute;
+      inset: 50%;
+      background: #434343;
+    }
+
+    .reel::before {
+      width: 2px;
+      height: 100%;
+      transform: translate(-50%, -50%);
+    }
+
+    .reel::after {
+      width: 100%;
+      height: 2px;
+      transform: translate(-50%, -50%);
+    }
+
+    .reel.left {
+      left: 20px;
+    }
+
+    .reel.right {
+      right: 20px;
+    }
+
+    .reel.spinning {
+      animation: reel-spin 2.8s linear infinite;
+    }
+
+    .state {
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    .vfd {
+      min-height: 176px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) 124px;
+      gap: 16px;
+      border-radius: 8px;
+      border: 3px solid #0b0b0b;
+      background: var(--screen);
+      box-shadow:
+        inset 0 0 18px rgba(0, 0, 0, 0.96),
+        0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .vfd,
+    .dial {
+      position: relative;
+    }
+
+    .vfd::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(rgba(255, 255, 255, 0.03) 50%, transparent 50%);
+      background-size: 100% 4px;
+    }
+
+    .screen-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .track-title,
+    .track-artist,
+    .track-state,
+    .lyric-line {
+      text-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
+    }
+
+    .track-title {
+      color: var(--cyan);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-size: clamp(1.7rem, 2.6vw, 2.3rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.05em;
+    }
+
+    .track-row {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      color: var(--orange);
+    }
+
+    .track-artist {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .track-state {
+      color: #ff5f1f;
+      opacity: 0.68;
+    }
+
+    .track-state.live {
+      opacity: 1;
+    }
+
+    .lyrics {
+      min-height: 60px;
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    .lyric-stack {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      animation: lyric-shift 260ms ease-out;
+    }
+
+    .lyric-line {
+      margin: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-size: 0.92rem;
+      line-height: 1.25;
+    }
+
+    .lyric-line.primary {
+      color: var(--amber);
+    }
+
+    .lyric-line.secondary {
+      color: rgba(0, 255, 204, 0.84);
+    }
+
+    .lyric-view.bilingual .primary {
+      color: var(--amber);
+    }
+
+    .lyric-view.bilingual .secondary {
+      color: rgba(0, 255, 204, 0.96);
+    }
+
+    .spectrum {
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      align-items: end;
+      gap: 4px;
+    }
+
+    .spec-bar {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 3px;
+    }
+
+    .seg {
+      min-height: 8px;
+      border-radius: 1px;
+      background: #202625;
+      transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    }
+
+    .seg.idle {
+      opacity: 0.35;
+    }
+
+    .seg.on.cyan {
+      background: var(--cyan);
+      box-shadow: 0 0 6px rgba(0, 255, 204, 0.76);
+    }
+
+    .seg.on.orange {
+      background: var(--orange);
+      box-shadow: 0 0 6px rgba(255, 153, 0, 0.76);
+    }
+
+    .seg.on.red {
+      background: #ff3300;
+      box-shadow: 0 0 6px rgba(255, 51, 0, 0.76);
+    }
+
+    .seg.pulse {
+      animation: spectrum-pulse 0.85s ease-in-out infinite alternate;
+    }
+
+    .transport {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) 136px;
+      gap: 12px;
+    }
+
+    .transport-segment {
+      min-height: 86px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid #121212;
+      box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.65),
+        0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .transport-segment.controls {
+      padding: 10px 12px;
+    }
+
+    .transport-buttons {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .transport-btn {
+      position: relative;
+      width: 56px;
+      height: 44px;
+      border: 1px solid #0d0d0d;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #4a4a4a, #292929);
+      color: #c8c8c8;
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.38),
+        inset 0 1px 1px rgba(255, 255, 255, 0.18);
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    .transport-btn.primary {
+      width: 68px;
+    }
+
+    .transport-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .transport-btn:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.42),
+        inset 0 2px 4px rgba(0, 0, 0, 0.66);
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    .play-led {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #460000;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.48);
+      transform: translateX(-50%);
+    }
+
+    .transport-btn.primary.playing .play-led {
+      background: #ff0000;
+      box-shadow:
+        0 0 10px rgba(255, 0, 0, 0.75),
+        inset 0 1px 2px rgba(255, 255, 255, 0.46);
+    }
+
+    .loading {
+      font-size: 14px;
+      letter-spacing: 0.18em;
+    }
+
+    .mode-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .mode-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .mode-slot.red .mode-led {
+      background: #4e1717;
+    }
+
+    .mode-slot.active.green.lit .mode-led {
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(36, 255, 125, 0.9);
+    }
+
+    .mode-slot.active.red.lit .mode-led {
+      background: #ff4040;
+      box-shadow: 0 0 10px rgba(255, 64, 64, 0.88);
+    }
+
+    .mode-slot.active.green.lit .mode-label,
+    .mode-slot.active.green.lit .mode-icon {
+      color: #16c85f;
+      text-shadow: 0 0 8px rgba(36, 255, 125, 0.72), 0 0 14px rgba(36, 255, 125, 0.38);
+    }
+
+    .mode-slot.active.red.lit .mode-label,
+    .mode-slot.active.red.lit .mode-icon {
+      color: #c93131;
+      text-shadow: 0 0 8px rgba(255, 64, 64, 0.72), 0 0 14px rgba(255, 64, 64, 0.38);
+    }
+
+    .mode-slot:not(.active):hover .mode-led {
+      background: #ff9a1f;
+      box-shadow: 0 0 10px rgba(255, 154, 31, 0.88);
+    }
+
+    .mode-slot:not(.active):hover .mode-label,
+    .mode-slot:not(.active):hover .mode-icon {
+      color: #c77212;
+      text-shadow: 0 0 7px rgba(255, 154, 31, 0.58), 0 0 12px rgba(255, 154, 31, 0.24);
+    }
+
+    .mode-led {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #304230;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.48);
+    }
+
+    .mode-label {
+      color: #f2f2f2;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      line-height: 1;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.72);
+    }
+
+    .mode-btn {
+      width: 100%;
+      min-height: 48px;
+      padding: 8px 4px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      border-bottom-width: 8px;
+      background: linear-gradient(180deg, #d8d8d8, #9f9f9f);
+      color: #333;
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      cursor: pointer;
+      transition: border-bottom-width 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+    }
+
+    .mode-btn.active {
+      filter: brightness(0.93);
+      border-bottom-width: 3px;
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.34),
+        inset 0 2px 3px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    }
+
+    .mode-btn.active.phase-pressing,
+    .mode-btn.active.phase-hold {
+      border-bottom-width: 1px;
+      box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.34),
+        inset 0 2px 3px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .mode-icon {
+      width: 22px;
+      height: 22px;
+    }
+
+    .lyric-selector {
+      position: relative;
+      width: 136px;
+      height: 102px;
+    }
+
+    .lyric-knob {
+      position: absolute;
+      inset: 30px 25px 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .lyric-mark {
+      position: absolute;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      min-width: 28px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: rgba(180, 180, 180, 0.76);
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .lyric-mark.orig {
+      left: 18px;
+      top: 4px;
+    }
+
+    .lyric-mark.cn {
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+    }
+
+    .lyric-mark.ab {
+      right: 18px;
+      top: 4px;
+    }
+
+    .lyric-led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(16, 16, 16, 0.72);
+      background:
+        radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.35), transparent 35%),
+        linear-gradient(180deg, #384238, #121612);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .lyric-mark.active {
+      color: #a5ffd0;
+      text-shadow: 0 0 8px rgba(36, 255, 125, 0.38), 0 1px 0 rgba(0, 0, 0, 0.68);
+    }
+
+    .lyric-mark.active .lyric-led {
+      background:
+        radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.96), rgba(160, 255, 205, 0.72) 26%, transparent 48%),
+        radial-gradient(circle, #31ff88 0%, #11a44d 68%, #084f25 100%);
+      box-shadow: 0 0 8px rgba(49, 255, 136, 0.82), 0 0 16px rgba(49, 255, 136, 0.24);
+    }
+
+    .bottom {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+    }
+
+    .knob-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .knob-shell {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      touch-action: none;
+    }
+
+    .ring-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .ring-groove {
+      fill: #090909;
+    }
+
+    .ring-seg {
+      stroke: rgba(255, 255, 255, 0.04);
+      stroke-width: 0.8;
+    }
+
+    .ring-seg.green.off { fill: #2d4732; }
+    .ring-seg.green.on { fill: #2dff6d; filter: drop-shadow(0 0 4px rgba(45, 255, 109, 0.9)); }
+    .ring-seg.yellow.off { fill: #5a4c28; }
+    .ring-seg.yellow.on { fill: #ffcc42; filter: drop-shadow(0 0 4px rgba(255, 204, 66, 0.88)); }
+    .ring-seg.red.off { fill: #5a2a26; }
+    .ring-seg.red.on { fill: #ff5a46; filter: drop-shadow(0 0 4px rgba(255, 90, 70, 0.88)); }
+
+    .knob {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 1px solid #050505;
+      background: radial-gradient(circle at 30% 30%, #555, #111);
+      box-shadow:
+        0 8px 14px rgba(0, 0, 0, 0.52),
+        inset 0 1px 1px rgba(255, 255, 255, 0.26);
+      transition: transform 120ms ease;
+    }
+
+    .knob::before {
+      content: "";
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      width: 4px;
+      height: 13px;
+      border-radius: 999px;
+      background: var(--orange);
+      box-shadow: 0 0 6px rgba(255, 153, 0, 0.85);
+      transform: translateX(-50%);
+    }
+
+    .knob-caption {
+      min-height: 34px;
+      color: #a7a39b;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: 0.08em;
+      transform: translateY(-16px);
+    }
+
+    .dial {
+      min-height: 66px;
+      border-radius: 4px;
+      border: 2px solid #070707;
+      background: #161616;
+      box-shadow:
+        inset 0 5px 10px rgba(0, 0, 0, 0.8),
+        0 1px 0 rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .dial-lamp {
+      position: absolute;
+      inset: auto 2px 2px 2px;
+      height: 50%;
+      z-index: 3;
+      opacity: 0.92;
+      filter: blur(3px);
+      pointer-events: none;
+      background-image:
+        linear-gradient(180deg, rgba(255, 214, 112, 0) 0%, rgba(255, 206, 90, 0.08) 18%, rgba(255, 196, 66, 0.26) 42%, rgba(255, 186, 40, 0.56) 68%, rgba(255, 177, 22, 0.82) 86%, rgba(255, 170, 10, 0.98) 100%),
+        radial-gradient(72% 140% at 50% 100%, rgba(255, 210, 106, 0.56) 0%, rgba(255, 194, 61, 0.22) 42%, rgba(255, 175, 18, 0) 100%);
+      background-size: 100% 100%, 140% 100%;
+      animation: lamp-breathe 4.8s ease-in-out infinite, lamp-sweep 8.6s ease-in-out infinite;
+    }
+
+    .dial-lamp::before {
+      content: "";
+      position: absolute;
+      inset: -12px 0 auto;
+      height: 20px;
+      background: radial-gradient(72% 120% at 50% 100%, rgba(255, 206, 90, 0.42) 0%, rgba(255, 193, 58, 0.18) 42%, rgba(255, 176, 24, 0) 100%);
+      filter: blur(7px);
+    }
+
+    .dial-track {
+      position: absolute;
+      inset: 8px 14px 14px;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .dial-scale {
+      position: absolute;
+      top: 6px;
+      left: 10px;
+      right: 10px;
+      height: 12px;
+      background-image: repeating-linear-gradient(to right, #555 0, #555 2px, transparent 2px, transparent 20px);
+      opacity: 0.72;
+    }
+
+    .dial-needle {
+      position: absolute;
+      top: 20px;
+      bottom: 2px;
+      width: 2px;
+      z-index: 2;
+      border-radius: 999px 999px 0 0;
+      background: linear-gradient(180deg, #ff5d36, #ff2a00);
+      box-shadow: 0 0 3px rgba(255, 69, 22, 0.68), 0 0 8px rgba(255, 102, 36, 0.22);
+      transform: translateX(-50%);
+      transition: left 120ms linear;
+    }
+
+    .dial-time {
+      position: absolute;
+      inset: auto 10px -2px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #67fff1;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-shadow: 0 0 4px rgba(81, 255, 244, 0.78), 0 0 10px rgba(33, 233, 221, 0.38);
+      z-index: 4;
+    }
+
+    .dial-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0.01;
+      cursor: pointer;
+      z-index: 5;
+    }
+
+    .switch-dock {
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+      justify-self: end;
+      padding-bottom: 8px;
+    }
+
+    .switch-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .switch-label {
+      color: #938c83;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.72);
+    }
+
+    .power {
+      position: relative;
+      width: 76px;
+      height: 42px;
+      padding: 4px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.92);
+      background: linear-gradient(180deg, rgba(52, 52, 52, 0.98), rgba(18, 18, 18, 0.98));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.78),
+        0 6px 10px rgba(0, 0, 0, 0.38);
+      cursor: pointer;
+    }
+
+    .power::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 26%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.012) 0, rgba(255, 255, 255, 0.012) 2px, transparent 2px, transparent 4px);
+    }
+
+    .power-lens {
+      position: absolute;
+      inset: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.48);
+      transition: transform 180ms ease, box-shadow 180ms ease, background-image 180ms ease, filter 180ms ease;
+      background-image:
+        linear-gradient(180deg, rgba(64, 64, 64, 0.92), rgba(24, 24, 24, 0.98)),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0, rgba(255, 255, 255, 0.05) 1px, transparent 1px, transparent 5px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0, rgba(255, 255, 255, 0.035) 1px, transparent 1px, transparent 5px);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.12),
+        inset 0 -2px 2px rgba(0, 0, 0, 0.44),
+        0 2px 3px rgba(0, 0, 0, 0.34);
+    }
+
+    .power-lens::after {
+      content: "";
+      position: absolute;
+      inset: 2px 2px auto;
+      height: 28%;
+      border-radius: 3px 3px 8px 8px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
+      opacity: 0.6;
+    }
+
+    .power-mark {
+      position: relative;
+      z-index: 1;
+      font-size: 19px;
+      font-weight: 700;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.3);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+    }
+
+    .power.on .power-lens {
+      transform: perspective(220px) rotateY(-13deg) translateX(3px);
+    }
+
+    .power.off .power-lens {
+      transform: perspective(220px) rotateY(13deg) translateX(-3px);
+    }
+
+    .power.green.on .power-lens {
+      background-image:
+        linear-gradient(180deg, rgba(173, 255, 120, 0.96), rgba(92, 192, 20, 0.98)),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0, rgba(255, 255, 255, 0.14) 1px, transparent 1px, transparent 5px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0, rgba(255, 255, 255, 0.1) 1px, transparent 1px, transparent 5px);
+      box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.28),
+        inset 0 -3px 4px rgba(62, 122, 8, 0.58),
+        0 0 10px rgba(149, 255, 86, 0.42),
+        0 0 18px rgba(118, 255, 54, 0.26);
+    }
+
+    .power.red.on .power-lens {
+      background-image:
+        linear-gradient(180deg, rgba(255, 156, 156, 0.96), rgba(212, 30, 30, 0.98)),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0, rgba(255, 255, 255, 0.14) 1px, transparent 1px, transparent 5px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0, rgba(255, 255, 255, 0.1) 1px, transparent 1px, transparent 5px);
+      box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.26),
+        inset 0 -3px 4px rgba(132, 14, 14, 0.6),
+        0 0 10px rgba(255, 80, 80, 0.38),
+        0 0 18px rgba(255, 53, 53, 0.22);
+    }
+
+    .power.off .off-mark {
+      color: rgba(255, 255, 255, 0.74);
+    }
+
+    .power.off .on-mark,
+    .power.on .off-mark {
+      color: rgba(255, 255, 255, 0.24);
+    }
+
+    .power.on .on-mark {
+      color: rgba(255, 255, 255, 0.96);
+      text-shadow: 0 0 6px rgba(255, 255, 255, 0.5), 0 0 12px rgba(255, 255, 255, 0.22);
+    }
+
+    @media (max-width: 1024px) {
+      .top {
+        grid-template-columns: 1fr;
+      }
+
+      .bottom {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .switch-dock {
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .stage {
+        padding: 16px 8px;
+      }
+
+      .shell {
+        padding: 12px;
+      }
+
+      .badge-row {
+        flex-wrap: wrap;
+      }
+
+      .vfd {
+        grid-template-columns: 1fr;
+      }
+
+      .mode-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .transport {
+        grid-template-columns: auto minmax(0, 1fr) 128px;
+      }
+    }
+
+    @keyframes reel-spin {
+      from { transform: translateY(-50%) rotate(0deg); }
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+
+    @keyframes spectrum-pulse {
+      from { opacity: 0.55; }
+      to { opacity: 1; }
+    }
+
+    @keyframes lyric-shift {
+      from { transform: translateY(14px); opacity: 0.25; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes lamp-breathe {
+      0% { opacity: 0.8; filter: blur(2px) brightness(0.9); }
+      50% { opacity: 0.96; filter: blur(3px) brightness(1.04); }
+      100% { opacity: 0.86; filter: blur(2.6px) brightness(0.96); }
+    }
+
+    @keyframes lamp-sweep {
+      0% { background-position: 0 0, 8% 100%; }
+      50% { background-position: 0 0, 52% 100%; }
+      100% { background-position: 0 0, 8% 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="deck" aria-label="ALLMusic 复古车机播放器设计稿">
+      <div class="badge-row">
+        <span class="badge">ALLMusic Retro Deck</span>
+        <span class="badge muted">Core Transport Linked</span>
+      </div>
+      <div class="shell">
+        <section class="top">
+          <div class="panel cassette">
+            <div class="small-label">Memory Stop System</div>
+            <div class="cassette-window">
+              <div class="cover" id="cover">
+                <span class="cover-copy" id="cover-copy"></span>
+              </div>
+              <div class="reel left spinning" id="reel-left"></div>
+              <div class="reel right spinning" id="reel-right"></div>
+            </div>
+            <div class="small-label state" id="cassette-state">PLAY ▷</div>
+          </div>
+
+          <div class="vfd">
+            <div class="screen-copy">
+              <div class="track-title" id="track-title"></div>
+              <div class="track-row">
+                <span class="track-artist" id="track-artist"></span>
+                <span class="track-state live" id="track-state">LIVE</span>
+              </div>
+              <div class="lyrics lyric-view bilingual" id="lyric-view">
+                <div class="lyric-stack" id="lyric-stack">
+                  <p class="lyric-line primary" id="lyric-primary"></p>
+                  <p class="lyric-line secondary" id="lyric-secondary"></p>
+                </div>
+              </div>
+            </div>
+            <div class="spectrum" id="spectrum" aria-hidden="true"></div>
+          </div>
+        </section>
+
+        <section class="transport">
+          <div class="transport-segment controls">
+            <div class="transport-buttons">
+              <button class="transport-btn" id="prev-btn" title="上一首" aria-label="上一首">
+                <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M7 5h2v14H7zM11 12l8 6V6z" fill="currentColor"></path></svg>
+              </button>
+              <button class="transport-btn primary playing" id="play-btn" title="暂停" aria-label="暂停">
+                <span class="play-led"></span>
+                <span id="play-icon"></span>
+              </button>
+              <button class="transport-btn" id="next-btn" title="下一首" aria-label="下一首">
+                <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M15 12L7 6v12zM17 5h2v14h-2z" fill="currentColor"></path></svg>
+              </button>
+            </div>
+          </div>
+          <div class="transport-segment">
+            <div class="mode-grid">
+              <div class="mode-slot green" data-slot="loop"><span class="mode-led"></span><span class="mode-label">LIST</span><button class="mode-btn" data-action="play-mode" data-value="loop" title="列表循环"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M17.4 2.5l4.1 4.1-4.1 4.1V8.3H8.2c-1.9 0-3.3 1.4-3.3 3.3v0.1H2.5v-0.1c0-3.2 2.6-5.7 5.7-5.7h9.2V2.5zM6.6 21.5l-4.1-4.1 4.1-4.1v2.4h9.2c1.9 0 3.3-1.4 3.3-3.3v-0.1h2.4v0.1c0 3.2-2.6 5.7-5.7 5.7H6.6v3.4z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="shuffle"><span class="mode-led"></span><span class="mode-label">SHUF</span><button class="mode-btn" data-action="play-mode" data-value="shuffle" title="随机播放"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M16.9 3h4.1v4.1h-2.3V6.8l-4 4-1.7-1.7 3.9-3.9h-0.1V3zM16.9 16.9h0.1l-3.9-3.9 1.7-1.7 4 4v-0.3H21V21h-4.1v-2.3zM3 5.7h3.4l3.1 3.1-1.7 1.7-2.4-2.4H3V5.7zM3 18.3h2.4l7.8-7.8 1.7 1.7-8.5 8.5H3v-2.4z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="loop-one"><span class="mode-led"></span><span class="mode-label">ONE</span><button class="mode-btn" data-action="play-mode" data-value="loop-one" title="单曲循环"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M17.4 2.5l4.1 4.1-4.1 4.1V8.3H8.2c-1.9 0-3.3 1.4-3.3 3.3v0.1H2.5v-0.1c0-3.2 2.6-5.7 5.7-5.7h9.2V2.5zM6.6 21.5l-4.1-4.1 4.1-4.1v2.4h9.2c1.9 0 3.3-1.4 3.3-3.3v-0.1h2.4v0.1c0 3.2-2.6 5.7-5.7 5.7H6.6v3.4zM11 8.2h2.2v7.6H11zM9.1 9.9L12 7l2.9 2.9-1.6 1.6-1.3-1.3-1.3 1.3-1.6-1.6z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="sequential"><span class="mode-led"></span><span class="mode-label">SEQ</span><button class="mode-btn" data-action="play-mode" data-value="sequential" title="顺序播放"><svg viewBox="0 0 24 24" class="mode-icon"><rect x="3" y="4.5" width="3.2" height="3.2" rx="0.8" fill="currentColor"></rect><rect x="3" y="10.4" width="3.2" height="3.2" rx="0.8" fill="currentColor"></rect><rect x="3" y="16.3" width="3.2" height="3.2" rx="0.8" fill="currentColor"></rect><rect x="8" y="5" width="13" height="2.4" rx="1.2" fill="currentColor"></rect><rect x="8" y="10.9" width="13" height="2.4" rx="1.2" fill="currentColor"></rect><rect x="8" y="16.8" width="13" height="2.4" rx="1.2" fill="currentColor"></rect></svg></button></div>
+              <div class="mode-slot red" data-slot="liked"><span class="mode-led"></span><span class="mode-label">LIKE</span><button class="mode-btn" data-action="toggle-like" title="加入喜欢"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M12 20.8l-1.3-1.2C5.6 14.9 2.5 12 2.5 8.5A4.7 4.7 0 017.2 3.8c1.8 0 3.5.9 4.8 2.4 1.3-1.5 3-2.4 4.8-2.4a4.7 4.7 0 014.7 4.7c0 3.5-3.1 6.4-8.2 11.1L12 20.8z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="muted"><span class="mode-led"></span><span class="mode-label">MUTE</span><button class="mode-btn" data-action="toggle-mute" title="静音"><span id="mute-icon"></span></button></div>
+            </div>
+          </div>
+          <div class="transport-segment">
+            <div class="lyric-selector" role="radiogroup" aria-label="歌词显示模式">
+              <button class="lyric-knob" id="lyric-knob" title="歌词模式：双语" aria-label="歌词模式：双语"><div class="knob" id="lyric-rotor"></div></button>
+              <button class="lyric-mark orig" data-lyric-mode="original" aria-checked="false"><span class="lyric-led"></span><span>ORIG</span></button>
+              <button class="lyric-mark cn" data-lyric-mode="translated" aria-checked="false"><span class="lyric-led"></span><span>CN</span></button>
+              <button class="lyric-mark ab" data-lyric-mode="bilingual" aria-checked="true"><span class="lyric-led"></span><span>A+B</span></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="bottom">
+          <div class="knob-wrap">
+            <div class="knob-shell" id="volume-shell" role="slider" aria-label="音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="72">
+              <svg class="ring-svg" viewBox="0 0 88 88" id="ring-svg"></svg>
+              <div class="knob" id="volume-rotor"></div>
+            </div>
+            <div class="knob-caption" id="volume-display">72</div>
+          </div>
+
+          <div class="dial">
+            <div class="dial-lamp"></div>
+            <div class="dial-needle" id="dial-needle"></div>
+            <div class="dial-track">
+              <div class="dial-scale"></div>
+              <div class="dial-time"><span id="current-time">00:00</span><span id="duration-time">00:00</span></div>
+            </div>
+            <input class="dial-input" id="progress-input" type="range" min="0" max="100" value="0" aria-label="播放进度" />
+          </div>
+
+          <div class="switch-dock">
+            <div class="switch-slot"><div class="power green on" id="qq-switch" role="switch" aria-checked="true" tabindex="0"><div class="power-lens"><span class="power-mark off-mark">O</span><span class="power-mark on-mark">I</span></div></div><span class="switch-label">QQ</span></div>
+            <div class="switch-slot"><div class="power red on" id="ncm-switch" role="switch" aria-checked="true" tabindex="0"><div class="power-lens"><span class="power-mark off-mark">O</span><span class="power-mark on-mark">I</span></div></div><span class="switch-label">NCM</span></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const KNOB_MIN_ANGLE = -135;
+    const KNOB_MAX_ANGLE = 135;
+    const LYRIC_ORDER = ["original", "translated", "bilingual"];
+    const LYRIC_ANGLE = { original: -42, translated: 0, bilingual: 42 };
+    const timers = new Map();
+    const tracks = [
+      { title: "PLASTIC LOVE", artist: "MARIYA TAKEUCHI", duration: 319, cover: ["#e06b3c", "#5f1038"], coverCopy: "CITY POP / NCM", original: [{ time: 0, text: "突然のキスや熱いまなざしで" }, { time: 34, text: "恋のプログラムを狂わせないでね" }, { time: 68, text: "出会いと別れ上手に打ち込んで" }, { time: 101, text: "時間がくれば終わる don't hurry!" }, { time: 134, text: "愛に傷ついたあの日からずっと" }, { time: 168, text: "昼と夜が逆の暮らしを続け" }, { time: 202, text: "はやりのディスコで踊り明かすうち" }, { time: 236, text: "おぼえた魔術なのよ I'm sorry!" }], translated: [{ time: 0, text: "别用突然的吻与灼热眼神" }, { time: 34, text: "打乱我早已设好的恋爱程序" }, { time: 68, text: "邂逅与离别我都能熟练输入" }, { time: 101, text: "时间一到就该结束 别着急" }, { time: 134, text: "自从那天在爱里受过伤之后" }, { time: 168, text: "我便一直过着昼夜颠倒的生活" }, { time: 202, text: "在流行迪厅里跳到天亮的时候" }, { time: 236, text: "我学会了这种魔法 抱歉啦" }] },
+      { title: "SPARKLE", artist: "TATSURO YAMASHITA", duration: 272, cover: ["#16a6b6", "#203a8f"], coverCopy: "SEA DRIVE / QQ", original: [{ time: 0, text: "七色の虹をかけぬけて" }, { time: 32, text: "流れる風を追い越して" }, { time: 64, text: "君と二人でいたい夏のまま" }, { time: 96, text: "光る波間に夢を見てる" }, { time: 128, text: "胸の奥まで弾ける sparkle" }, { time: 160, text: "街のノイズさえ遠くなるよ" }, { time: 192, text: "夜の入り口で笑い合えば" }, { time: 224, text: "季節はまだ終わらない" }], translated: [{ time: 0, text: "穿过那道七彩的虹" }, { time: 32, text: "追过正在流动的海风" }, { time: 64, text: "想和你停在这个夏天里" }, { time: 96, text: "在闪烁浪尖上继续做梦" }, { time: 128, text: "心口深处都被火花点亮" }, { time: 160, text: "连城市噪声也变得遥远" }, { time: 192, text: "只要在夜色边缘相视而笑" }, { time: 224, text: "这一季就还没有结束" }] },
+      { title: "STAY WITH ME", artist: "MIKI MATSUBARA", duration: 301, cover: ["#9040ff", "#1b1533"], coverCopy: "MIDNIGHT / NCM", original: [{ time: 0, text: "真夜中のドアをたたき" }, { time: 33, text: "帰らないでと泣いた" }, { time: 66, text: "あの季節が今目の前 stay with me" }, { time: 99, text: "口ぐせを言いながら" }, { time: 132, text: "二人の瞬間を抱いていた" }, { time: 165, text: "まだ忘れないぬくもりを" }, { time: 198, text: "ガラス越しの都会に映して" }, { time: 231, text: "恋はきっと終わらない" }], translated: [{ time: 0, text: "敲响午夜那扇门时" }, { time: 33, text: "我哭着说别走" }, { time: 66, text: "那段季节如今又在眼前 stay with me" }, { time: 99, text: "你一边说着那句口头禅" }, { time: 132, text: "一边抱紧属于我们的瞬间" }, { time: 165, text: "那份温度我至今没能忘记" }, { time: 198, text: "隔着玻璃映在城市夜色里" }, { time: 231, text: "这场恋爱也许不会终结" }] }
+    ];
+    const state = { index: 0, playing: true, loading: false, time: 76, volume: 72, muted: false, playMode: "loop", lyricMode: "bilingual", liked: true, qq: true, ncm: true, tick: 0 };
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+    const els = { cover: $("#cover"), coverCopy: $("#cover-copy"), reels: [$("#reel-left"), $("#reel-right")], cassetteState: $("#cassette-state"), title: $("#track-title"), artist: $("#track-artist"), trackState: $("#track-state"), lyricView: $("#lyric-view"), lyricStack: $("#lyric-stack"), lyricPrimary: $("#lyric-primary"), lyricSecondary: $("#lyric-secondary"), spectrum: $("#spectrum"), playBtn: $("#play-btn"), playIcon: $("#play-icon"), lyricKnob: $("#lyric-knob"), lyricRotor: $("#lyric-rotor"), volumeShell: $("#volume-shell"), volumeRotor: $("#volume-rotor"), ringSvg: $("#ring-svg"), volumeDisplay: $("#volume-display"), dialNeedle: $("#dial-needle"), currentTime: $("#current-time"), durationTime: $("#duration-time"), progressInput: $("#progress-input"), qqSwitch: $("#qq-switch"), ncmSwitch: $("#ncm-switch"), muteIcon: $("#mute-icon"), lyricButtons: $$("[data-lyric-mode]"), modeSlots: $$("[data-slot]") };
+
+    function formatTime(total) { const safe = Math.max(0, Math.floor(total)); return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`; }
+    function track() { return tracks[state.index]; }
+    function lyricIndex(lines) { for (let i = 0; i < lines.length; i += 1) { if (!lines[i + 1] || state.time < lines[i + 1].time) return i; } return lines.length - 1; }
+    function lyricPair() { const t = track(); if (state.lyricMode === "translated") { const i = lyricIndex(t.translated); return [t.translated[i]?.text || "暂无中文歌词", t.translated[i + 1]?.text || t.translated[i]?.text || "暂无中文歌词"]; } if (state.lyricMode === "bilingual") { return [t.original[lyricIndex(t.original)]?.text || "暂无原文歌词", t.translated[lyricIndex(t.translated)]?.text || "当前歌曲没有翻译歌词"]; } const i = lyricIndex(t.original); return [t.original[i]?.text || "暂无原文歌词", t.original[i + 1]?.text || t.original[i]?.text || "暂无原文歌词"]; }
+    function polar(cx, cy, radius, deg) { const rad = ((deg - 90) * Math.PI) / 180; return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) }; }
+    function arc(cx, cy, inner, outer, start, end) { const a = polar(cx, cy, outer, start), b = polar(cx, cy, outer, end), c = polar(cx, cy, inner, end), d = polar(cx, cy, inner, start), large = end - start > 180 ? 1 : 0; return `M ${a.x} ${a.y} A ${outer} ${outer} 0 ${large} 1 ${b.x} ${b.y} L ${c.x} ${c.y} A ${inner} ${inner} 0 ${large} 0 ${d.x} ${d.y} Z`; }
+    function renderRing() { const activeCount = state.muted ? 0 : Math.ceil(state.volume / 10); const groove = `<path class="ring-groove" d="${arc(44, 44, 20, 43, 225, 495)}"></path>`; const segs = Array.from({ length: 10 }, (_, i) => { const tone = i < 3 ? "green" : i < 7 ? "yellow" : "red"; const mode = i < activeCount ? "on" : "off"; return `<path class="ring-seg ${tone} ${mode}" d="${arc(44, 44, 24, 39, 225 + i * 27, 249 + i * 27)}"></path>`; }).join(""); els.ringSvg.innerHTML = groove + segs; }
+    function renderSpectrum() { els.spectrum.innerHTML = Array.from({ length: 10 }, (_, i) => { const seed = Math.floor((state.time / 1.2) + state.tick + ((state.index + 1) * 7)); const wave = Math.abs(Math.sin((seed + i * 3) / 4)); const shimmer = Math.abs(Math.cos((seed + i * 5) / 6)); const height = state.playing || state.loading ? Math.max(1, Math.min(10, Math.round((wave * 6) + (shimmer * 3) + (state.loading ? 3 : 1)))) : 0; return `<div class="spec-bar">${Array.from({ length: 10 }, (_, j) => { const on = j < height; const tone = j >= 8 ? "red" : j >= 5 ? "orange" : "cyan"; return `<span class="seg ${on ? `on ${tone}` : ""} ${state.loading ? "pulse" : ""} ${!state.playing && !state.loading ? "idle" : ""}"></span>`; }).join("")}</div>`; }).join(""); }
+    function renderMuteIcon() { els.muteIcon.innerHTML = state.muted ? `<svg viewBox="0 0 24 24" class="mode-icon"><path d="M10.8 4.4v15.2L5.8 15H2.6V9h3.2l5-4.6zM16.2 8.7l1.7-1.7 2.2 2.2L22.3 7l1.7 1.7-2.2 2.2 2.2 2.2-1.7 1.7-2.2-2.2-2.2 2.2-1.7-1.7 2.2-2.2-2.2-2.2z" fill="currentColor"></path></svg>` : `<svg viewBox="0 0 24 24" class="mode-icon"><path d="M10.8 4.4v15.2L5.8 15H2.6V9h3.2l5-4.6zM14.7 9.1c1.8 1.1 1.8 4.7 0 5.8v-5.8zM17.4 6.5c3.4 2.2 3.4 8.8 0 11V15c1.4-1.5 1.4-4.5 0-6v-2.5z" fill="currentColor"></path></svg>`; }
+    function syncPower(el, on) { el.classList.toggle("on", on); el.classList.toggle("off", !on); el.setAttribute("aria-checked", String(on)); }
+    function animateSlot(name) { const slot = els.modeSlots.find((item) => item.dataset.slot === name); if (!slot) return; const btn = slot.querySelector(".mode-btn"); (timers.get(btn) || []).forEach(clearTimeout); btn.classList.remove("phase-pressing", "phase-hold", "phase-rebound"); btn.classList.add("active", "phase-pressing"); const ids = [setTimeout(() => { btn.classList.remove("phase-pressing"); btn.classList.add("phase-hold"); }, 140), setTimeout(() => { btn.classList.remove("phase-hold"); btn.classList.add("phase-rebound"); }, 520), setTimeout(() => { btn.classList.remove("phase-rebound"); }, 660)]; timers.set(btn, ids); }
+    function render() { const t = track(); const [primary, secondary] = lyricPair(); const progress = t.duration ? Math.min(100, Math.max(0, (state.time / t.duration) * 100)) : 0; const angle = KNOB_MIN_ANGLE + ((KNOB_MAX_ANGLE - KNOB_MIN_ANGLE) * (state.muted ? 0 : state.volume)) / 100; els.cover.style.setProperty("--cover-a", t.cover[0]); els.cover.style.setProperty("--cover-b", t.cover[1]); els.coverCopy.textContent = t.coverCopy; els.cassetteState.textContent = state.loading ? "BUFFER..." : state.playing ? "PLAY ▷" : "PAUSE ▌▌"; els.reels.forEach((reel) => reel.classList.toggle("spinning", state.playing && !state.loading)); els.title.textContent = t.title; els.artist.textContent = t.artist; els.trackState.textContent = state.loading ? "LOADING" : state.playing ? "LIVE" : "IDLE"; els.trackState.classList.toggle("live", !state.loading && state.playing); els.lyricView.classList.toggle("bilingual", state.lyricMode === "bilingual"); els.lyricPrimary.textContent = primary; els.lyricSecondary.textContent = secondary; els.lyricStack.style.animation = "none"; requestAnimationFrame(() => { els.lyricStack.style.animation = ""; }); els.playBtn.classList.toggle("playing", state.playing && !state.loading); els.playIcon.innerHTML = state.loading ? `<span class="loading">...</span>` : state.playing ? `<svg viewBox="0 0 24 24" class="icon"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"></path></svg>` : `<svg viewBox="0 0 24 24" class="icon"><path d="M8 5v14l11-7z" fill="currentColor"></path></svg>`; els.lyricRotor.style.transform = `rotate(${LYRIC_ANGLE[state.lyricMode]}deg)`; els.lyricButtons.forEach((btn) => { const active = btn.dataset.lyricMode === state.lyricMode; btn.classList.toggle("active", active); btn.setAttribute("aria-checked", String(active)); }); els.modeSlots.forEach((slot) => { const key = slot.dataset.slot; const active = key === "liked" ? state.liked : key === "muted" ? state.muted : state.playMode === key; const btn = slot.querySelector(".mode-btn"); slot.classList.toggle("active", active); slot.classList.toggle("lit", active); btn.classList.toggle("active", active); if (!active) btn.classList.remove("phase-pressing", "phase-hold", "phase-rebound"); }); renderMuteIcon(); renderRing(); renderSpectrum(); els.volumeRotor.style.transform = `rotate(${angle}deg)`; els.volumeDisplay.textContent = String(Math.min(state.muted ? 0 : state.volume, 99)).padStart(2, "0"); els.volumeShell.setAttribute("aria-valuenow", String(state.muted ? 0 : state.volume)); els.volumeShell.setAttribute("aria-valuetext", state.muted ? "静音" : `${state.volume}`); els.progressInput.max = String(t.duration); els.progressInput.value = String(Math.floor(state.time)); els.currentTime.textContent = formatTime(state.time); els.durationTime.textContent = formatTime(t.duration); els.dialNeedle.style.left = `calc(24px + (${progress} * (100% - 48px) / 100))`; syncPower(els.qqSwitch, state.qq); syncPower(els.ncmSwitch, state.ncm); }
+    function setTrack(next) { state.index = (next + tracks.length) % tracks.length; state.time = 0; state.loading = true; render(); setTimeout(() => { state.loading = false; state.playing = true; render(); }, 520); }
+    function volumeFromPoint(x, y) { const rect = els.volumeShell.getBoundingClientRect(); const cx = rect.left + rect.width / 2; const cy = rect.top + rect.height / 2; let deg = (Math.atan2(y - cy, x - cx) * 180) / Math.PI + 90; if (deg < 0) deg += 360; const signed = deg > 180 ? deg - 360 : deg; const clamped = Math.max(KNOB_MIN_ANGLE, Math.min(KNOB_MAX_ANGLE, signed)); state.volume = Math.max(0, Math.min(100, Math.round(((clamped - KNOB_MIN_ANGLE) / (KNOB_MAX_ANGLE - KNOB_MIN_ANGLE)) * 100))); state.muted = state.volume === 0; render(); }
+    $("#prev-btn").addEventListener("click", () => setTrack(state.index - 1));
+    $("#next-btn").addEventListener("click", () => setTrack(state.index + 1));
+    $("#play-btn").addEventListener("click", () => { state.loading = false; state.playing = !state.playing; render(); });
+    els.lyricKnob.addEventListener("click", () => { state.lyricMode = LYRIC_ORDER[(LYRIC_ORDER.indexOf(state.lyricMode) + 1) % LYRIC_ORDER.length]; render(); });
+    els.lyricButtons.forEach((button) => button.addEventListener("click", () => { state.lyricMode = button.dataset.lyricMode; render(); }));
+    $$("[data-action='play-mode']").forEach((button) => button.addEventListener("click", () => { state.playMode = button.dataset.value; animateSlot(state.playMode); render(); }));
+    $("[data-action='toggle-like']").addEventListener("click", () => { state.liked = !state.liked; animateSlot("liked"); render(); });
+    $("[data-action='toggle-mute']").addEventListener("click", () => { state.muted = !state.muted; animateSlot("muted"); render(); });
+    els.progressInput.addEventListener("input", (event) => { state.time = Number(event.target.value); render(); });
+    els.volumeShell.addEventListener("pointerdown", (event) => { els.volumeShell.setPointerCapture(event.pointerId); volumeFromPoint(event.clientX, event.clientY); const move = (e) => volumeFromPoint(e.clientX, e.clientY); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up); });
+    [[els.qqSwitch, "qq"], [els.ncmSwitch, "ncm"]].forEach(([el, key]) => { const toggle = () => { state[key] = !state[key]; render(); }; el.addEventListener("click", toggle); el.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); } }); });
+    setInterval(() => { if (state.playing && !state.loading) { state.time += 0.25; if (state.time >= track().duration) { setTrack(state.index + 1); return; } } render(); }, 250);
+    setInterval(() => { state.tick += 1; renderSpectrum(); }, 150);
+    render();
+  </script>
+</body>
+</html>

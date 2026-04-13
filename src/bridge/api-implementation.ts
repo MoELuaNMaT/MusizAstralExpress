@@ -10,7 +10,6 @@ import { useAuthStore, usePlayerStore } from '@/stores';
 import { authService } from '@/services/auth.service';
 import { libraryService } from '@/services/library.service';
 import { buildLibraryContext } from '@/bridge/cache';
-import { UI_VERSION_SWITCH_ENABLED, type UiVersion } from '@/stores/theme.store';
 import type { LoginResult, PreferredQuality, UnifiedPlaylist } from '@/types';
 import type {
   BridgeApi,
@@ -19,6 +18,10 @@ import type {
   BridgePlaylistDetailResult,
   BridgePlaylistResult,
 } from '@/types/bridge.types';
+
+type BridgeWindow = Window & {
+  __ALLMUSIC_BRIDGE__?: BridgeApi;
+};
 
 // ---------------------------------------------------------------------------
 // Hook params
@@ -36,12 +39,6 @@ export interface UseBridgeApiParams {
   resolveDailyRecommendationsWithBridgeCache: (
     options?: (BridgeLoadOptions & { limit?: number }) | number,
   ) => Promise<BridgeDailyResult>;
-  captureUiSwitchPlaybackSnapshot: () => void;
-  setUiVersion: (version: UiVersion) => void;
-  setUiSwitcherOpen: (open: boolean) => void;
-  setUiSwitching: (switching: boolean) => void;
-  setIsUiFrameLoading: (loading: boolean) => void;
-  uiVersion: UiVersion;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,18 +52,13 @@ export function useBridgeApi({
   resolvePlaylistsWithBridgeCache,
   resolvePlaylistDetailWithBridgeCache,
   resolveDailyRecommendationsWithBridgeCache,
-  captureUiSwitchPlaybackSnapshot,
-  setUiVersion,
-  setUiSwitcherOpen,
-  setUiSwitching,
-  setIsUiFrameLoading,
-  uiVersion,
 }: UseBridgeApiParams): void {
   useEffect(() => {
 // All bridge methods return Promise to satisfy the BridgeApi contract —
 // iframe consumers always `await` the result across the postMessage boundary.
 // Methods that are synchronous internally still use `async` for this reason.
-    window.__ALLMUSIC_BRIDGE__ = {
+    const runtimeWindow = window as BridgeWindow;
+    runtimeWindow.__ALLMUSIC_BRIDGE__ = {
       getAuthState: async () => {
         const auth = useAuthStore.getState();
         return {
@@ -82,14 +74,6 @@ export function useBridgeApi({
       },
       qqQRCodeLogin: async (onQRCodeUrl, onStatusChange, signal) => {
         const result = await authService.qqQRCodeLogin(onQRCodeUrl, onStatusChange, signal);
-        return persistLoginResult(result);
-      },
-      neteaseCellphoneLogin: async (phone, password, countryCode = '86') => {
-        const result = await authService.neteaseCellphoneLogin(phone, countryCode, password);
-        return persistLoginResult(result);
-      },
-      qqCookieLogin: async (cookie, nickname) => {
-        const result = await authService.qqMusicLogin(cookie, nickname);
         return persistLoginResult(result);
       },
       verifyLogin: async (platform, cookie) => authService.verifyLogin(platform, cookie),
@@ -155,47 +139,17 @@ export function useBridgeApi({
           preferredQuality: player.preferredQuality,
         };
       },
-      switchUiVersion: async (next) => {
-        if (!UI_VERSION_SWITCH_ENABLED) {
-          setUiVersion('current');
-          setUiSwitcherOpen(false);
-          return;
-        }
-        if (next === uiVersion) {
-          setUiSwitcherOpen(false);
-          return;
-        }
-
-        captureUiSwitchPlaybackSnapshot();
-        setUiSwitching(true);
-        setIsUiFrameLoading(next !== 'current');
-        setUiSwitcherOpen(false);
-        setUiVersion(next);
-      },
-      getUiVersion: async () => uiVersion,
-      openUiSwitcher: async () => {
-        if (!UI_VERSION_SWITCH_ENABLED) {
-          return;
-        }
-        setUiSwitcherOpen(true);
-      },
     } satisfies BridgeApi;
 
     return () => {
-      delete window.__ALLMUSIC_BRIDGE__;
+      delete runtimeWindow.__ALLMUSIC_BRIDGE__;
     };
   }, [
-    captureUiSwitchPlaybackSnapshot,
     persistLoginResult,
     resolvePlaylistDetailWithBridgeCache,
     resolvePlaylistsWithBridgeCache,
     resolveDailyRecommendationsWithBridgeCache,
     seekRef,
     retryRef,
-    setIsUiFrameLoading,
-    setUiSwitcherOpen,
-    setUiSwitching,
-    setUiVersion,
-    uiVersion,
   ]);
 }

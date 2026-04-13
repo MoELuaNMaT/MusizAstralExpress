@@ -8,7 +8,6 @@
 import type { useAuthStore, usePlayerStore } from '@/stores';
 import type { libraryService } from '@/services/library.service';
 import type { LoginResult, PreferredQuality, UnifiedPlaylist, UnifiedSong } from '@/types';
-import type { UiVersion } from '@/stores/theme.store';
 
 // ---------------------------------------------------------------------------
 // Store snapshots
@@ -55,7 +54,7 @@ export type BridgePlayerState = Pick<
 >;
 
 // ---------------------------------------------------------------------------
-// UI switch playback snapshot (persisted to localStorage)
+// Legacy UI switch playback snapshot (persisted to localStorage)
 // ---------------------------------------------------------------------------
 
 export type UiSwitchPlaybackSnapshot = {
@@ -174,8 +173,6 @@ export type BridgeApi = {
     onStatusChange?: (status: string) => void,
     signal?: AbortSignal,
   ) => Promise<LoginResult>;
-  neteaseCellphoneLogin: (phone: string, password: string, countryCode?: string) => Promise<LoginResult>;
-  qqCookieLogin: (cookie: string, nickname?: string) => Promise<LoginResult>;
   verifyLogin: (platform: 'netease' | 'qq', cookie: string) => Promise<boolean>;
   logoutPlatform: (platform: 'netease' | 'qq') => Promise<void>;
   loadPlaylists: (options?: BridgeLoadOptions) => Promise<BridgePlaylistResult>;
@@ -194,7 +191,4 @@ export type BridgeApi = {
   seekTo: (ms: number) => Promise<void>;
   retryCurrent: () => Promise<void>;
   getPlayerState: () => Promise<BridgePlayerState>;
-  switchUiVersion: (next: UiVersion) => Promise<void>;
-  getUiVersion: () => Promise<UiVersion>;
-  openUiSwitcher: () => Promise<void>;
 };

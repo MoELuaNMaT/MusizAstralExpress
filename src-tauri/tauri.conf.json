@@ -16,14 +16,15 @@
         "title": "ALLMusic",
         "width": 1280,
         "height": 800,
+        "decorations": false,
         "resizable": true,
         "fullscreen": false,
-        "minWidth": 800,
+        "minWidth": 960,
         "minHeight": 600
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://*.qlogo.cn https://*.music.126.net https://*.qq.com https://*.gtimg.cn https://*.qpic.cn data: blob:; media-src 'self' http://localhost:3000 http://localhost:3001 http://10.0.2.2:3000 http://10.0.2.2:3001 https:; connect-src 'self' http://localhost:3000 http://localhost:3001 http://10.0.2.2:3000 http://10.0.2.2:3001; font-src 'self' data:",
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://*.qlogo.cn https://*.music.126.net https://*.qq.com https://*.gtimg.cn https://*.qpic.cn data: blob:; media-src 'self' http://localhost:3000 http://localhost:3001 http://127.0.0.1:3000 http://127.0.0.1:3001 http://10.0.2.2:3000 http://10.0.2.2:3001 https:; connect-src 'self' http://localhost:3000 http://localhost:3001 http://127.0.0.1:3000 http://127.0.0.1:3001 http://10.0.2.2:3000 http://10.0.2.2:3001; font-src 'self' data:",
       "assetProtocol": {
         "enable": true,
         "scope": [

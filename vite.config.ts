@@ -2,6 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const tauriDevHost = process.env.TAURI_DEV_HOST || "127.0.0.1";
+
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
@@ -20,6 +22,8 @@ export default defineConfig(async () => ({
 
   // Tauri expects a fixed port, fail if that port is not available
   server: {
+    // Keep desktop dev stable on Windows, but still allow Tauri mobile to inject a reachable host.
+    host: tauriDevHost,
     port: 1420,
     strictPort: true,
     watch: {

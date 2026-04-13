@@ -179,7 +179,6 @@ export function PlaylistsPanel({
           <section
             className="am-song-scrollbar h-full min-h-0 space-y-3 overflow-y-scroll pr-1"
             onWheel={onScrollableWheel}
-            onWheelCapture={onScrollableWheel}
           >
             {isInitialPlaylistBootstrapPending ? (
               <div className="space-y-3 py-1">
@@ -285,7 +284,6 @@ export function PlaylistsPanel({
                 ref={containerRef}
                 className="am-song-scrollbar min-h-0 flex-1 overflow-y-scroll pr-1"
                 onWheel={onScrollableWheel}
-                onWheelCapture={onScrollableWheel}
               >
                 <div className="relative" style={{ height: `${totalHeight}px` }}>
                   {virtualItems.map((song, offsetIndex) => {

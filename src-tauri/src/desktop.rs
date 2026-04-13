@@ -133,11 +133,11 @@ use windows::{
     Win32::{
         Foundation::*,
         System::Com::*,
+        Graphics::Dwm::*,
         UI::{
             Shell::*,
             WindowsAndMessaging::*,
         },
-        Graphics::Gdi::HBITMAP,
     },
 };
 
@@ -168,6 +168,23 @@ pub(crate) fn setup_thumbnail_toolbar<R: tauri::Runtime>(
     let window = app.get_webview_window("main")
         .ok_or("Main window not found")?;
     let hwnd = HWND(window.hwnd()?.0 as *mut core::ffi::c_void);
+
+    unsafe {
+        let force_iconic: i32 = 1;
+        let has_iconic_bitmap: i32 = 1;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_FORCE_ICONIC_REPRESENTATION,
+            &force_iconic as *const _ as _,
+            std::mem::size_of_val(&force_iconic) as u32,
+        ).map_err(|e| format!("Failed to enable iconic representation: {:?}", e))?;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_HAS_ICONIC_BITMAP,
+            &has_iconic_bitmap as *const _ as _,
+            std::mem::size_of_val(&has_iconic_bitmap) as u32,
+        ).map_err(|e| format!("Failed to enable iconic bitmap: {:?}", e))?;
+    }
 
     // 创建按钮（暂时使用默认图标，后续需要加载自定义图标）
     let buttons = [
@@ -268,20 +285,10 @@ pub(crate) fn update_thumbnail_toolbar<R: tauri::Runtime>(
             .map_err(|e| format!("Failed to update thumbnail buttons: {:?}", e))?
     };
 
-    // 更新封面缩略图
-    if let Some(cover_url) = &state.cover_url {
-        if !cover_url.is_empty() {
-            match update_thumbnail_cover(app, hwnd, cover_url) {
-                Ok(_) => eprintln!("[ALLMusic] Thumbnail cover updated"),
-                Err(e) => eprintln!("[ALLMusic] Failed to update cover: {}", e),
-            }
-        } else {
-            let _ = clear_thumbnail_cover(hwnd);
-        }
-    } else {
-        let _ = clear_thumbnail_cover(hwnd);
-    }
-
+    // 仅保留缩略图工具栏按钮，不再驱动封面位图链路。
+    // 根因：当前 Tauri 主窗口接入 DWM iconic thumbnail cover 会触发额外缩略图渲染消息，
+    // 在播放态下会干扰主窗口稳定性，优先保证主窗口与播放器工作正常。
+    let _ = app;
     Ok(())
 }
 
@@ -310,31 +317,300 @@ pub(crate) fn handle_thumbnail_button_click<R: tauri::Runtime>(
 }
 
 #[cfg(target_os = "windows")]
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 #[cfg(target_os = "windows")]
-use std::sync::mpsc::{channel, Sender};
-#[cfg(target_os = "windows")]
-use std::sync::Mutex;
-
+use std::sync::{
+    mpsc::{channel, Sender},
+    Mutex,
+};
 #[cfg(target_os = "windows")]
 static THUMBNAIL_BUTTON_SENDER: OnceCell<Sender<u32>> = OnceCell::new();
 
 #[cfg(target_os = "windows")]
-static CURRENT_COVER_URL: OnceCell<Mutex<String>> = OnceCell::new();
+static ORIGINAL_MAIN_WNDPROC: OnceCell<isize> = OnceCell::new();
 
 #[cfg(target_os = "windows")]
-static ORIGINAL_MAIN_WNDPROC: OnceCell<isize> = OnceCell::new();
+#[derive(Clone, Copy)]
+struct MainWindowAspectRatio {
+    width: i32,
+    height: i32,
+    min_width: i32,
+    min_height: i32,
+}
+
+#[cfg(target_os = "windows")]
+impl MainWindowAspectRatio {
+    fn new(width: i32, height: i32) -> Self {
+        let safe_width = width.max(1);
+        let safe_height = height.max(1);
+        let min_height = 600;
+        let min_width = (((min_height as f64) * (safe_width as f64)) / (safe_height as f64)).round() as i32;
+        Self {
+            width: safe_width,
+            height: safe_height,
+            min_width: min_width.max(1),
+            min_height,
+        }
+    }
+
+    fn ratio(self) -> f64 {
+        self.width as f64 / self.height as f64
+    }
+}
+
+#[cfg(target_os = "windows")]
+static MAIN_WINDOW_ASPECT_RATIO: Lazy<Mutex<MainWindowAspectRatio>> =
+    Lazy::new(|| Mutex::new(MainWindowAspectRatio::new(1280, 800)));
+
+#[cfg(target_os = "windows")]
+fn read_main_window_aspect_ratio() -> MainWindowAspectRatio {
+    MAIN_WINDOW_ASPECT_RATIO
+        .lock()
+        .map(|guard| *guard)
+        .unwrap_or_else(|_| MainWindowAspectRatio::new(1280, 800))
+}
+
+#[cfg(target_os = "windows")]
+fn write_main_window_aspect_ratio(width: i32, height: i32) {
+    if let Ok(mut guard) = MAIN_WINDOW_ASPECT_RATIO.lock() {
+        *guard = MainWindowAspectRatio::new(width, height);
+    }
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn apply_locked_aspect_ratio(edge: u32, rect: &mut RECT, aspect_ratio: MainWindowAspectRatio) {
+    let mut width = rect.right - rect.left;
+    let mut height = rect.bottom - rect.top;
+    if width <= 0 || height <= 0 {
+        return;
+    }
+
+    let target_ratio = aspect_ratio.ratio();
+    let current_ratio = width as f64 / height as f64;
+    let adjust_width = matches!(edge, WMSZ_TOP | WMSZ_BOTTOM)
+        || (matches!(edge, WMSZ_TOPLEFT | WMSZ_TOPRIGHT | WMSZ_BOTTOMLEFT | WMSZ_BOTTOMRIGHT)
+            && current_ratio < target_ratio);
+
+    if adjust_width {
+        width = ((height as f64) * target_ratio).round() as i32;
+    } else {
+        height = ((width as f64) / target_ratio).round() as i32;
+    }
+
+    width = width.max(aspect_ratio.min_width);
+    height = height.max(aspect_ratio.min_height);
+
+    match edge {
+        WMSZ_LEFT => {
+            rect.left = rect.right - width;
+            rect.bottom = rect.top + height;
+        }
+        WMSZ_RIGHT => {
+            rect.right = rect.left + width;
+            rect.bottom = rect.top + height;
+        }
+        WMSZ_TOP => {
+            rect.top = rect.bottom - height;
+            rect.right = rect.left + width;
+        }
+        WMSZ_BOTTOM => {
+            rect.bottom = rect.top + height;
+            rect.right = rect.left + width;
+        }
+        WMSZ_TOPLEFT => {
+            rect.left = rect.right - width;
+            rect.top = rect.bottom - height;
+        }
+        WMSZ_TOPRIGHT => {
+            rect.right = rect.left + width;
+            rect.top = rect.bottom - height;
+        }
+        WMSZ_BOTTOMLEFT => {
+            rect.left = rect.right - width;
+            rect.bottom = rect.top + height;
+        }
+        WMSZ_BOTTOMRIGHT => {
+            rect.right = rect.left + width;
+            rect.bottom = rect.top + height;
+        }
+        _ => {}
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn setup_main_window_message_handler<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallWindowProcW, DefWindowProcW, GetWindowLongPtrW, SetWindowLongPtrW, GWLP_WNDPROC,
+        HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT, HTCLIENT, HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT,
+        HTTOPRIGHT, MINMAXINFO, WM_COMMAND, WM_GETMINMAXINFO, WM_NCHITTEST, WM_SIZING,
+    };
+
+    if ORIGINAL_MAIN_WNDPROC.get().is_some() {
+        return;
+    }
+
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    let hwnd = match window.hwnd() {
+        Ok(handle) => HWND(handle.0 as *mut core::ffi::c_void),
+        Err(error) => {
+            eprintln!("[ALLMusic] failed to get main window handle for resize hook: {}", error);
+            return;
+        }
+    };
+
+    unsafe extern "system" fn main_window_wndproc(
+        hwnd: HWND,
+        msg: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        if msg == WM_NCHITTEST {
+            let x = (lparam.0 & 0xFFFF) as i16 as i32;
+            let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as i32;
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect).is_ok() {
+                const RESIZE_BORDER: i32 = 8;
+                let left = x < rect.left + RESIZE_BORDER;
+                let right = x >= rect.right - RESIZE_BORDER;
+                let top = y < rect.top + RESIZE_BORDER;
+                let bottom = y >= rect.bottom - RESIZE_BORDER;
+
+                if top && left {
+                    return LRESULT(HTTOPLEFT as isize);
+                }
+                if top && right {
+                    return LRESULT(HTTOPRIGHT as isize);
+                }
+                if bottom && left {
+                    return LRESULT(HTBOTTOMLEFT as isize);
+                }
+                if bottom && right {
+                    return LRESULT(HTBOTTOMRIGHT as isize);
+                }
+                if left {
+                    return LRESULT(HTLEFT as isize);
+                }
+                if right {
+                    return LRESULT(HTRIGHT as isize);
+                }
+                if top {
+                    return LRESULT(HTTOP as isize);
+                }
+                if bottom {
+                    return LRESULT(HTBOTTOM as isize);
+                }
+            }
+
+            return LRESULT(HTCLIENT as isize);
+        }
+
+        if msg == WM_COMMAND {
+            let button_id = (wparam.0 & 0xFFFF) as u32;
+            if let Some(sender) = THUMBNAIL_BUTTON_SENDER.get() {
+                let _ = sender.send(button_id);
+            }
+        }
+
+        if msg == WM_SIZING {
+            let rect_ptr = lparam.0 as *mut RECT;
+            if !rect_ptr.is_null() {
+                let aspect_ratio = read_main_window_aspect_ratio();
+                apply_locked_aspect_ratio(wparam.0 as u32, &mut *rect_ptr, aspect_ratio);
+                return LRESULT(1);
+            }
+        }
+
+        if msg == WM_GETMINMAXINFO {
+            let minmax_ptr = lparam.0 as *mut MINMAXINFO;
+            if !minmax_ptr.is_null() {
+                let aspect_ratio = read_main_window_aspect_ratio();
+                (*minmax_ptr).ptMinTrackSize.x = aspect_ratio.min_width;
+                (*minmax_ptr).ptMinTrackSize.y = aspect_ratio.min_height;
+                return LRESULT(0);
+            }
+        }
+
+        if let Some(original) = ORIGINAL_MAIN_WNDPROC.get() {
+            let original_proc: unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT =
+                std::mem::transmute(*original);
+            return CallWindowProcW(Some(original_proc), hwnd, msg, wparam, lparam);
+        }
+
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+
+    unsafe {
+        let original_wndproc = GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
+        let _ = ORIGINAL_MAIN_WNDPROC.set(original_wndproc);
+        SetWindowLongPtrW(hwnd, GWLP_WNDPROC, main_window_wndproc as isize);
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn sync_main_window_aspect_ratio<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    width: u32,
+    height: u32,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowRect, SetWindowPos, SWP_NOMOVE, SWP_NOZORDER, SWP_NOACTIVATE,
+    };
+
+    if width == 0 || height == 0 {
+        return Ok(());
+    }
+
+    write_main_window_aspect_ratio(width as i32, height as i32);
+
+    let window = app.get_webview_window("main").ok_or("Main window not found")?;
+    let hwnd = HWND(window.hwnd()?.0 as *mut core::ffi::c_void);
+
+    let mut rect = RECT::default();
+    unsafe {
+        GetWindowRect(hwnd, &mut rect)?;
+    }
+
+    let aspect_ratio = read_main_window_aspect_ratio();
+    let current_width = (rect.right - rect.left).max(1);
+    let current_height = (rect.bottom - rect.top).max(1);
+    let current_ratio = current_width as f64 / current_height as f64;
+    let target_ratio = aspect_ratio.ratio();
+
+    let mut target_width = current_width;
+    let mut target_height = current_height;
+    if current_ratio > target_ratio {
+        target_width = ((current_height as f64) * target_ratio).round() as i32;
+    } else {
+        target_height = ((current_width as f64) / target_ratio).round() as i32;
+    }
+
+    target_width = target_width.max(aspect_ratio.min_width);
+    target_height = target_height.max(aspect_ratio.min_height);
+
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            target_width,
+            target_height,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+        )?;
+    }
+
+    Ok(())
+}
 
 #[cfg(target_os = "windows")]
 pub(crate) fn setup_thumbnail_message_handler<R: tauri::Runtime>(
     window: tauri::WebviewWindow<R>,
     app_handle: tauri::AppHandle<R>,
 ) {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        WM_COMMAND, SetWindowLongPtrW, GetWindowLongPtrW, GWLP_WNDPROC, CallWindowProcW
-    };
-    use windows::Win32::Foundation::{LPARAM, WPARAM, LRESULT};
-
     // 创建通道
     let (tx, rx) = channel::<u32>();
     THUMBNAIL_BUTTON_SENDER.set(tx).ok();
@@ -345,209 +621,7 @@ pub(crate) fn setup_thumbnail_message_handler<R: tauri::Runtime>(
             handle_thumbnail_button_click(&app_handle, button_id);
         }
     });
-
-    // 获取窗口句柄
-    let hwnd = match window.hwnd() {
-        Ok(handle) => HWND(handle.0 as *mut core::ffi::c_void),
-        Err(e) => {
-            eprintln!("[ALLMusic] Failed to get window handle: {}", e);
-            return;
-        }
-    };
-
-    unsafe {
-        // 保存原始窗口过程
-        let original_wndproc = GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
-        let _ = ORIGINAL_MAIN_WNDPROC.set(original_wndproc);
-
-        // 创建新的窗口过程
-        unsafe extern "system" fn thumbnail_wndproc(
-            hwnd: HWND,
-            msg: u32,
-            wparam: WPARAM,
-            lparam: LPARAM,
-        ) -> LRESULT {
-            if msg == WM_COMMAND {
-                let button_id = (wparam.0 & 0xFFFF) as u32;
-                if let Some(sender) = THUMBNAIL_BUTTON_SENDER.get() {
-                    let _ = sender.send(button_id);
-                }
-            }
-
-            // Forward to the original WndProc so Tauri keeps native resize/layout behavior.
-            if let Some(original) = ORIGINAL_MAIN_WNDPROC.get() {
-                let original_proc: unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT =
-                    std::mem::transmute(*original);
-                return CallWindowProcW(Some(original_proc), hwnd, msg, wparam, lparam);
-            }
-
-            use windows::Win32::UI::WindowsAndMessaging::DefWindowProcW;
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-
-        // 设置新的窗口过程
-        SetWindowLongPtrW(hwnd, GWLP_WNDPROC, thumbnail_wndproc as isize);
-
-        eprintln!("[ALLMusic] Thumbnail message handler installed");
-    }
+    let _ = window;
 }
 
-// ========== Phase 2: 封面缩略图功能 ==========
-
-#[cfg(target_os = "windows")]
-fn load_cover_image(path: &str) -> Result<image::DynamicImage, String> {
-    image::open(path).map_err(|e| format!("Failed to load image: {}", e))
-}
-
-#[cfg(target_os = "windows")]
-fn resize_cover_image(img: image::DynamicImage, width: u32, height: u32) -> image::DynamicImage {
-    img.resize_exact(width, height, image::imageops::FilterType::Lanczos3)
-}
-
-#[cfg(target_os = "windows")]
-fn image_to_hbitmap(img: &image::DynamicImage) -> Result<HBITMAP, String> {
-    use windows::Win32::Graphics::Gdi::*;
-
-    let rgba = img.to_rgba8();
-    let (width, height) = rgba.dimensions();
-
-    unsafe {
-        let hdc = GetDC(HWND::default());
-        if hdc.is_invalid() {
-            return Err("Failed to get device context".to_string());
-        }
-
-        let bmi = BITMAPINFO {
-            bmiHeader: BITMAPINFOHEADER {
-                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: width as i32,
-                biHeight: -(height as i32), // 负值表示自顶向下
-                biPlanes: 1,
-                biBitCount: 32,
-                biCompression: BI_RGB.0 as u32,
-                biSizeImage: 0,
-                biXPelsPerMeter: 0,
-                biYPelsPerMeter: 0,
-                biClrUsed: 0,
-                biClrImportant: 0,
-            },
-            bmiColors: [RGBQUAD::default(); 1],
-        };
-
-        let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
-        let hbitmap = CreateDIBSection(
-            hdc,
-            &bmi,
-            DIB_RGB_COLORS,
-            &mut bits,
-            None,
-            0,
-        ).map_err(|e| {
-            ReleaseDC(HWND::default(), hdc);
-            format!("Failed to create DIB section: {:?}", e)
-        })?;
-
-        if hbitmap.is_invalid() || bits.is_null() {
-            ReleaseDC(HWND::default(), hdc);
-            return Err("Failed to create DIB section".to_string());
-        }
-
-        // 复制像素数据（RGBA -> BGRA）
-        let pixel_data = rgba.as_raw();
-        let dest = std::slice::from_raw_parts_mut(bits as *mut u8, (width * height * 4) as usize);
-
-        for i in 0..(width * height) as usize {
-            let src_idx = i * 4;
-            let dst_idx = i * 4;
-            dest[dst_idx] = pixel_data[src_idx + 2];     // B
-            dest[dst_idx + 1] = pixel_data[src_idx + 1]; // G
-            dest[dst_idx + 2] = pixel_data[src_idx];     // R
-            dest[dst_idx + 3] = pixel_data[src_idx + 3]; // A
-        }
-
-        ReleaseDC(HWND::default(), hdc);
-        Ok(hbitmap)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn cleanup_hbitmap(hbitmap: HBITMAP) {
-    use windows::Win32::Graphics::Gdi::DeleteObject;
-
-    if !hbitmap.is_invalid() {
-        unsafe {
-            let _ = DeleteObject(hbitmap);
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn set_thumbnail_cover(hwnd: HWND, hbitmap: HBITMAP) -> Result<(), String> {
-    use windows::Win32::Graphics::Dwm::{DwmSetIconicThumbnail, DWM_SIT_DISPLAYFRAME};
-
-    unsafe {
-        DwmSetIconicThumbnail(hwnd, hbitmap, DWM_SIT_DISPLAYFRAME)
-            .map_err(|e| format!("Failed to set thumbnail cover: {:?}", e))
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn clear_thumbnail_cover(hwnd: HWND) -> Result<(), String> {
-    use windows::Win32::Graphics::Dwm::DwmSetIconicThumbnail;
-
-    unsafe {
-        DwmSetIconicThumbnail(hwnd, HBITMAP::default(), 0)
-            .map_err(|e| format!("Failed to clear thumbnail cover: {:?}", e))
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn update_thumbnail_cover<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-    hwnd: HWND,
-    cover_url: &str,
-) -> Result<(), String> {
-    // 初始化缓存
-    CURRENT_COVER_URL.get_or_init(|| Mutex::new(String::new()));
-
-    // 检查是否需要更新
-    let cache = CURRENT_COVER_URL.get().unwrap();
-    let mut cache_guard = cache.lock().unwrap();
-
-    if *cache_guard == cover_url {
-        // URL 未变化，跳过更新
-        return Ok(());
-    }
-
-    // 调用 cache_cover_image 命令获取本地路径
-    // 注意：这里需要将泛型 AppHandle<R> 转换为具体类型
-    let app_handle = unsafe {
-        std::mem::transmute::<&tauri::AppHandle<R>, &tauri::AppHandle>(app)
-    };
-
-    let local_path = tauri::async_runtime::block_on(async {
-        crate::commands::cache_cover_image(app_handle.clone(), cover_url.to_string()).await
-    }).map_err(|e| format!("Failed to cache cover image: {}", e))?;
-
-    // 加载图片
-    let img = load_cover_image(&local_path)?;
-
-    // 缩放到 200x200
-    let resized = resize_cover_image(img, 200, 200);
-
-    // 转换为 HBITMAP
-    let hbitmap = image_to_hbitmap(&resized)?;
-
-    // 设置封面
-    set_thumbnail_cover(hwnd, hbitmap)?;
-
-    // 清理 HBITMAP（注意：设置后立即清理可能导致显示问题，但避免内存泄漏）
-    // 实际上，Windows 会持有 HBITMAP 的引用，所以这里不应该立即清理
-    // cleanup_hbitmap(hbitmap);
-
-    // 更新缓存
-    *cache_guard = cover_url.to_string();
-
-    Ok(())
-}
 

@@ -35,17 +35,10 @@
   const playSelectedEl = document.getElementById('play-selected');
   const likeSelectedEl = document.getElementById('like-selected');
   const neteaseQrBoxEl = document.getElementById('ne-qr-box');
-  const neteasePhoneEl = document.getElementById('ne-phone');
-  const neteasePassEl = document.getElementById('ne-pass');
   const neteaseRefreshQrEl = document.getElementById('ne-refresh-qr');
-  const neteaseLoginSyncEl = document.getElementById('ne-login-sync');
   const neteaseLoginStatusEl = document.getElementById('ne-login-status');
   const qqQrBoxEl = document.getElementById('qq-qr-box');
-  const qqNicknameEl = document.getElementById('qq-name');
-  const qqCookieEl = document.getElementById('qq-cookie');
-  const qqVerifyCookieEl = document.getElementById('qq-verify-cookie');
   const qqStartQrEl = document.getElementById('qq-start-qr');
-  const qqLoginSyncEl = document.getElementById('qq-login-sync');
   const qqLoginStatusEl = document.getElementById('qq-login-status');
 
   const nowTitleEl = document.getElementById('now-title');
@@ -617,13 +610,13 @@
     if (hasNetease) {
       setLoginStatus(neteaseLoginStatusEl, '网易云已连接，可直接进入主页。');
     } else if (!/正在|失败/.test(neteaseStatus)) {
-      setLoginStatus(neteaseLoginStatusEl, '支持扫码登录，手机号密码也可直接登录。');
+      setLoginStatus(neteaseLoginStatusEl, '仅支持网易云 App 扫码登录。');
     }
 
     if (hasQQ) {
       setLoginStatus(qqLoginStatusEl, 'QQ 音乐已连接，可直接进入主页。');
     } else if (!/正在|失败/.test(qqStatus)) {
-      setLoginStatus(qqLoginStatusEl, '支持 Cookie 登录，也支持扫码登录。');
+      setLoginStatus(qqLoginStatusEl, '仅支持 QQ 音乐 App 扫码登录。');
     }
   }
 
@@ -762,112 +755,6 @@
       if (qqQrAbortController === controller) {
         qqQrAbortController = null;
       }
-    }
-  }
-
-  async function loginNeteaseFromForm() {
-    const bridge = resolveBridge();
-    if (!bridge) {
-      showToast('Bridge not ready');
-      return;
-    }
-
-    const phone = normalizeInputValue(neteasePhoneEl);
-    const password = normalizeInputValue(neteasePassEl);
-    const canUseCellphoneLogin = (
-      typeof bridge.neteaseCellphoneLogin === 'function'
-      && phone
-      && password
-      && !isMaskedValue(phone)
-      && !isMaskedValue(password)
-    );
-
-    if (!canUseCellphoneLogin) {
-      await startNeteaseQrLogin();
-      return;
-    }
-
-    setLoginStatus(neteaseLoginStatusEl, '正在使用手机号登录网易云...');
-    try {
-      const result = await bridge.neteaseCellphoneLogin(phone, password, '86');
-      if (result && result.success) {
-        setLoginStatus(neteaseLoginStatusEl, '网易云登录成功，正在同步...');
-        await handleAuthLoginSuccess('网易云');
-        return;
-      }
-      setLoginStatus(neteaseLoginStatusEl, (result && result.error) || '网易云登录失败，请检查账号密码。', true);
-      showToast((result && result.error) || 'NetEase login failed');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '网易云登录失败，请重试。';
-      setLoginStatus(neteaseLoginStatusEl, message, true);
-      showToast(message);
-    }
-  }
-
-  async function verifyQQCookieOnly() {
-    const bridge = resolveBridge();
-    if (!bridge || typeof bridge.verifyLogin !== 'function') {
-      showToast('Cookie verify is unavailable');
-      return;
-    }
-
-    const cookie = normalizeInputValue(qqCookieEl);
-    if (!cookie || isMaskedValue(cookie)) {
-      setLoginStatus(qqLoginStatusEl, '请先粘贴有效 QQ Cookie。', true);
-      return;
-    }
-
-    setLoginStatus(qqLoginStatusEl, '正在验证 QQ Cookie...');
-    try {
-      const ok = await bridge.verifyLogin('qq', cookie);
-      if (ok) {
-        setLoginStatus(qqLoginStatusEl, 'QQ Cookie 可用，可以直接登录。');
-        showToast('QQ cookie verified');
-      } else {
-        setLoginStatus(qqLoginStatusEl, 'QQ Cookie 验证失败，请重新获取或改用扫码。', true);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'QQ Cookie 验证失败。';
-      setLoginStatus(qqLoginStatusEl, message, true);
-      showToast(message);
-    }
-  }
-
-  async function loginQQFromForm() {
-    const bridge = resolveBridge();
-    if (!bridge) {
-      showToast('Bridge not ready');
-      return;
-    }
-
-    const cookie = normalizeInputValue(qqCookieEl);
-    const nickname = normalizeInputValue(qqNicknameEl);
-    const canUseCookieLogin = (
-      typeof bridge.qqCookieLogin === 'function'
-      && cookie
-      && !isMaskedValue(cookie)
-    );
-
-    if (!canUseCookieLogin) {
-      await startQQQrLogin();
-      return;
-    }
-
-    setLoginStatus(qqLoginStatusEl, '正在使用 Cookie 登录 QQ 音乐...');
-    try {
-      const result = await bridge.qqCookieLogin(cookie, nickname || undefined);
-      if (result && result.success) {
-        setLoginStatus(qqLoginStatusEl, 'QQ 登录成功，正在同步...');
-        await handleAuthLoginSuccess('QQ 音乐');
-        return;
-      }
-
-      setLoginStatus(qqLoginStatusEl, (result && result.error) || 'QQ 登录失败，请检查 Cookie。', true);
-      showToast((result && result.error) || 'QQ login failed');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'QQ 登录失败，请重试。';
-      setLoginStatus(qqLoginStatusEl, message, true);
-      showToast(message);
     }
   }
 
@@ -1516,27 +1403,9 @@
       });
     }
 
-    if (neteaseLoginSyncEl) {
-      neteaseLoginSyncEl.addEventListener('click', () => {
-        void loginNeteaseFromForm();
-      });
-    }
-
-    if (qqVerifyCookieEl) {
-      qqVerifyCookieEl.addEventListener('click', () => {
-        void verifyQQCookieOnly();
-      });
-    }
-
     if (qqStartQrEl) {
       qqStartQrEl.addEventListener('click', () => {
         void startQQQrLogin();
-      });
-    }
-
-    if (qqLoginSyncEl) {
-      qqLoginSyncEl.addEventListener('click', () => {
-        void loginQQFromForm();
       });
     }
 
@@ -1574,7 +1443,7 @@
         }
         setStatus('等待登录授权');
         setLoginStatus(neteaseLoginStatusEl, '建议先点击“刷新二维码”开始网易云扫码');
-        setLoginStatus(qqLoginStatusEl, '可粘贴 Cookie 登录，或直接点击“登录并同步”扫码');
+        setLoginStatus(qqLoginStatusEl, '建议先点击“生成 / 刷新二维码”开始 QQ 音乐扫码');
       });
     }
 
@@ -1761,6 +1630,17 @@
         showToast('Local APIs ready, refreshing');
         void loadPlaylists({ forceRefresh: true });
         void syncPlayerState();
+        return;
+      }
+
+      if (payload.type === 'allmusic:auth-invalidated') {
+        const platform = payload.platform === 'qq' ? 'QQ 音乐' : '网易云';
+        const message = `${platform}登录已失效，请重新扫码登录。`;
+        go('login');
+        setStatus(message);
+        setLoginStatus(payload.platform === 'qq' ? qqLoginStatusEl : neteaseLoginStatusEl, message, true);
+        showToast(message);
+        void refreshAuthState();
         return;
       }
 

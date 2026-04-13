@@ -47,55 +47,31 @@
           <article class="pane glow">
             <div class="section-title">
               <span>网易云音乐</span>
-              <span class="chip ok">推荐扫码</span>
+              <span class="chip ok">仅扫码</span>
             </div>
 
             <div class="qr-box" id="ne-qr-box" aria-label="网易云二维码占位"></div>
 
             <div class="row">
-              <div class="field">
-                <label for="ne-phone">手机号</label>
-                <input id="ne-phone" class="input95" value="138****6666" />
-              </div>
-              <div class="field">
-                <label for="ne-pass">密码</label>
-                <input id="ne-pass" class="input95" value="********" />
-              </div>
+              <button class="win-btn primary" id="ne-refresh-qr">生成 / 刷新二维码</button>
             </div>
 
-            <div class="row">
-              <button class="win-btn" id="ne-refresh-qr">刷新二维码</button>
-              <button class="win-btn primary" id="ne-login-sync">登录并同步</button>
-            </div>
-
-            <div class="hint" id="ne-login-status">如果二维码过期，先点“刷新二维码”；登录成功后会自动回写状态。</div>
+            <div class="hint" id="ne-login-status">仅支持网易云 App 扫码登录；确认后会自动回写状态。</div>
           </article>
 
           <article class="pane glow">
             <div class="section-title">
               <span>QQ 音乐</span>
-              <span class="chip info">Cookie/扫码二选一</span>
+              <span class="chip info">仅扫码</span>
             </div>
 
             <div class="qr-box" id="qq-qr-box" aria-label="QQ二维码占位"></div>
 
-            <div class="field">
-              <label for="qq-name">QQ 昵称（可选）</label>
-              <input id="qq-name" class="input95" value="Binaryify" />
-            </div>
-
-            <div class="field">
-              <label for="qq-cookie">Cookie</label>
-              <input id="qq-cookie" class="input95" value="p_skey=***; qqmusic_key=***" />
-            </div>
-
             <div class="row qq-auth-actions">
-              <button class="win-btn" id="qq-verify-cookie">验证 Cookie</button>
-              <button class="win-btn" id="qq-start-qr">扫码登录</button>
-              <button class="win-btn primary" id="qq-login-sync">登录并同步</button>
+              <button class="win-btn primary" id="qq-start-qr">生成 / 刷新二维码</button>
             </div>
 
-            <div class="hint" id="qq-login-status">Cookie 失效时改用扫码；验证成功后会在顶部显示“已连接”。</div>
+            <div class="hint" id="qq-login-status">仅支持 QQ 音乐 App 扫码登录；确认后会自动回写状态。</div>
           </article>
         </div>
       </section>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写实拟物风 - 极致3D磁带架</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=Noto+Serif+SC:wght@700;900&display=swap');
+
+  :root {
+    --wood-bg-url: url('https://images.unsplash.com/photo-1550684376-efcbd6e3f031?q=80&w=1920');
+    --metal-base: linear-gradient(180deg, #d4d4d4, #8a8a8a);
+  }
+
+  body, html {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background-color: #000; font-family: 'Noto Sans SC', sans-serif;
+    overflow: hidden; color: #e0e0e0; user-select: none;
+  }
+
+  /* 模拟 16:10 车机屏幕 */
+  #car-screen {
+    width: 100vw; height: 100vh; position: relative;
+    background: #050505; overflow: hidden; perspective: 2000px;
+  }
+
+  /* 顶部主播放器机头 (简化显示) */
+  #player-deck {
+    position: absolute; top: 40%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px; height: 350px;
+    background: var(--metal-base); border-radius: 12px;
+    box-shadow: inset 0 2px 5px rgba(255,255,255,0.8), 0 30px 60px rgba(0,0,0,0.9);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    cursor: pointer; transition: all 1s cubic-bezier(0.25, 1, 0.1, 1);
+    z-index: 10;
+  }
+  .player-instruction {
+    margin-top: 30px; font-size: 18px; color: #333; font-weight: bold;
+  }
+
+  #car-screen.playlist-mode #player-deck {
+    top: -20vh; transform: translate(-50%, 0) scale(0.7) rotateX(15deg); opacity: 0.1;
+  }
+
+  /* 木质收纳推架 */
+  #wood-cabinet {
+    position: absolute; bottom: -120%; left: 0; width: 100%; height: 100vh;
+    background: var(--wood-bg-url) center/cover;
+    box-shadow: inset 0 30px 80px rgba(0,0,0,0.9), 0 -10px 30px rgba(0,0,0,0.8);
+    transition: all 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: flex; flex-direction: column; z-index: 20;
+  }
+  #wood-cabinet::before { /* 暗化老旧滤镜 */
+    content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
+    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 30%, rgba(0,0,0,0.8) 100%);
+    z-index: -1; pointer-events: none;
+  }
+  #car-screen.playlist-mode #wood-cabinet { bottom: 0; }
+  
+  .cabinet-top-edge {
+    width: 100%; height: 16px;
+    background: linear-gradient(180deg, #6c3b17, #3a1c07);
+    box-shadow: inset 0 2px 2px rgba(255,255,255,0.1), 0 5px 15px rgba(0,0,0,0.9);
+    border-bottom: 2px solid #1a0c02;
+  }
+
+  .cabinet-nav {
+    display: flex; align-items: flex-end; padding: 20px 50px 10px; gap: 40px;
+  }
+  .nav-tab {
+    font-size: 24px; font-weight: 900; font-family: 'Noto Serif SC', serif;
+    color: #111; text-shadow: 0 1px 1px rgba(255,255,255,0.2); cursor: pointer; opacity: 0.5; transition: 0.3s;
+  }
+  .nav-tab.active { opacity: 1; color: #ffca8a; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+  .nav-tab.active::after {
+    content:''; position:absolute; bottom:-5px; left:10%; width:80%; height:4px;
+    background:#ffca8a; box-shadow:0 0 10px #ffca8a; border-radius:2px;
+  }
+
+  #return-btn {
+    position: absolute; top: 25px; right: 50px;
+    background: linear-gradient(180deg, #555, #222);
+    border: 2px solid #111; box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 4px 10px rgba(0,0,0,0.8);
+    color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer;
+  }
+  #return-btn:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); }
+  
+  .screen-content {
+    flex: 1; display: none; flex-direction: column; padding: 15px 50px; gap: 30px;
+  }
+  .screen-content.active { display: flex; }
+
+  .shelf { display: flex; flex-direction: column; flex: 1;}
+  .shelf-info-bar { display: flex; justify-content: space-between; margin-bottom: 12px; }
+  .shelf-title {
+    font-size: 20px; font-weight: 900; color: #d1b18c; letter-spacing: 2px;
+    text-shadow: -1px -1px 2px rgba(0,0,0,0.8);
+  }
+  
+  /* 极致质感的播放框内层，仿佛深邃的木柜内部 */
+  .cassette-grid {
+    background: #0a0502; /* 内部非常暗 */
+    border: 12px solid #281406; border-top-color: #120902; border-bottom-color: #3b1e0c;
+    box-shadow: inset 0 30px 50px rgba(0,0,0,1), inset 0 5px 15px rgba(0,0,0,0.9), 0 10px 20px rgba(0,0,0,0.6);
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-around; /* 均匀散布 */
+    align-items: flex-end;
+    flex: 1;
+    padding: 10px 15px;
+    gap: 8px;
+    position: relative;
+    overflow: visible; /* 允许3D元素飞出边界 */
+  }
+
+  /* ------------- 3D 磁带系统核心 ------------- */
+  .slot {
+    flex: 0 0 55px; /* 每格的宽度 */
+    height: 200px;
+    perspective: 1600px; /* 拉开透视点 */
+    position: relative;
+    transform-style: preserve-3d;
+    cursor: pointer;
+    /* 木纹隔板，通过左右border模拟 */
+    border-right: 6px solid #1a0c04;
+    border-left: 2px solid #000;
+  }
+  .slot:last-child { border-right: none; }
+  .slot:hover { z-index: 100; } /* 确保悬浮弹出的磁带在最前 */
+
+  /* 定义磁带尺寸变量: W=50, H=200, D=140. Box中心 X=25, Y=100 */
+  .tape-3d {
+    position: absolute;
+    top: 0; left: 2.5px; /* (55(slot)-50(tape))/2 = 2.5 */
+    width: 50px;
+    height: 200px;
+    transform-style: preserve-3d;
+    transform: translateZ(-70px); /* 默认退向Z轴深处，使前面板刚好在Z=0（即卡槽开口齐平） */
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s;
+    filter: drop-shadow(0px 0px 5px rgba(0,0,0,0)); /* 初始无额外投影以提效 */
+  }
+
+  /* 悬停事件：真实多角度3D弹起 */
+  .slot:hover .tape-3d {
+    /* 向前弹出(Z增加)、略微抬起(Y减小)、并倾斜暴露顶面和侧面 */
+    transform: translateZ(50px) translateY(-30px) rotateX(15deg) rotateY(-35deg);
+    filter: drop-shadow(-15px 30px 20px rgba(0,0,0,0.9));
+  }
+
+  /* 六个面基类 */
+  .t-face {
+    position: absolute;
+    backface-visibility: hidden;
+    overflow: hidden;
+    background: #111; /* 磁带默认底色 */
+    /* 添加一点微弱的高光作为塑料质感基底 */
+  }
+  
+  /* 前面(Spine脊侧): W=50x200 */
+  .t-front {
+    width: 50px; height: 200px; top: 0; left: 0;
+    transform: translateZ(70px);
+  }
+  /* 后面: W=50x200 */
+  .t-back {
+    width: 50px; height: 200px; top: 0; left: 0;
+    transform: rotateY(180deg) translateZ(70px);
+  }
+  /* 右面(较大面，磁带盒子侧边): W=140x200 */
+  .t-right {
+    width: 140px; height: 200px; top: 0;
+    /* left = (50-140)/2 = -45 */
+    left: -45px;
+    transform: rotateY(90deg) translateZ(25px);
+  }
+  /* 左面: W=140x200 */
+  .t-left {
+    width: 140px; height: 200px; top: 0; left: -45px;
+    transform: rotateY(-90deg) translateZ(25px);
+  }
+  /* 顶面: W=50x140 */
+  .t-top {
+    width: 50px; height: 140px; left: 0;
+    /* top = (200-140)/2 = 30 */
+    top: 30px;
+    transform: rotateX(90deg) translateZ(100px);
+  }
+  /* 底面: W=50x140 */
+  .t-bottom {
+    width: 50px; height: 140px; left: 0; top: 30px;
+    transform: rotateX(-90deg) translateZ(100px);
+  }
+
+  /* --------- 材质与纹理表现 --------- */
+
+  /* 专辑图片层 (置于后方) */
+  .t-bg-img {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    background-size: cover; background-position: center;
+    background-color: #222;
+  }
+  
+  /* 在侧面时，纸张会略小于塑料盒子 (J-Card折角) */
+  .t-right .t-bg-img, .t-left .t-bg-img {
+    position: absolute; top:4px; left:4px; right:4px; bottom:4px; width:auto; height:auto;
+    border-radius: 2px;
+  }
+
+  /* 磨砂透明塑料盖层 (盖在图上，不能盖住字) */
+  .t-plastic-glass {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    /* 半透明反光白 + 高斯模糊 = 真实亚克力/光面塑料 */
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    /* 边缘的立体切角高光和阴影 */
+    box-shadow: 
+      inset 2px 2px 6px rgba(255,255,255,0.5),
+      inset -2px -2px 10px rgba(0,0,0,0.6);
+    z-index: 5;
+  }
+
+  /* 右侧/左侧（盒子大面积）会有额外的接缝和细节反光 */
+  .t-right .t-plastic-glass, .t-left .t-plastic-glass {
+    border-radius: 4px;
+    box-shadow: inset 5px 5px 20px rgba(255,255,255,0.4), inset -5px -5px 20px rgba(0,0,0,0.7);
+  }
+  .side-details {
+    position:absolute; top:20px; bottom:20px; left:50%; width:100px; transform:translateX(-50%);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; z-index: 6; pointer-events:none;
+  }
+
+  /* 浮于塑料之上的立体文字（丝印效果） */
+  .t-front-text {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    z-index: 10; /* 在玻璃之上 */
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    color: #fdfdfd;
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 5px;
+    display: flex; justify-content: center; align-items: center;
+    /* 多重文字阴影，保证在任何浅色或深色图片背景上都极端锐利可读 */
+    text-shadow: 
+      1px 1px 0 rgba(0,0,0,1),
+      -1px -1px 0 rgba(0,0,0,1),
+      2px 2px 5px rgba(0,0,0,0.9),
+      0 0 15px rgba(0,0,0,1);
+    white-space: nowrap;
+    /* 添加一点轻微的反光 */
+    background: linear-gradient(0deg, transparent 40%, rgba(255,255,255,0.2) 50%, transparent 60%);
+    -webkit-background-clip: text;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="car-screen">
+  
+  <div id="player-deck">
+    <div style="font-size: 24px; font-weight:900; color: #111;">Retro Deck Engine</div>
+    <div class="player-instruction">点击此处呼出底部车机收纳架</div>
+  </div>
+
+  <div id="wood-cabinet">
+    <div class="cabinet-top-edge"></div>
+    <div class="cabinet-nav">
+      <div class="nav-tab active" data-target="s-playlists">车内典藏</div>
+      <div class="nav-tab" data-target="s-search">全局搜索</div>
+      <button id="return-btn">收起层架 ↑</button>
+    </div>
+
+    <!-- 屏1：歌单展示 -->
+    <div id="s-playlists" class="screen-content active">
+      <div class="shelf">
+        <div class="shelf-info-bar">
+          <div class="shelf-title">精选专辑录音带</div>
+          <button style="background:transparent; color:#fff; border:1px solid #777; padding:5px 15px; border-radius:4px;">下一列组</button>
+        </div>
+        <div class="cassette-grid" id="grid-main">
+           <!-- JS Rendered 3D objects -->
+        </div>
+      </div>
+      <div class="shelf">
+        <div class="shelf-info-bar"><div class="shelf-title">混合我喜欢</div></div>
+         <div class="cassette-grid" id="grid-fav"></div>
+      </div>
+    </div>
+    
+  </div>
+
+</div>
+
+<script>
+  const screen = document.getElementById('car-screen');
+  const player = document.getElementById('player-deck');
+  const returnBtn = document.getElementById('return-btn');
+
+  // Interactive toggles
+  player.addEventListener('click', () => screen.classList.add('playlist-mode'));
+  returnBtn.addEventListener('click', () => screen.classList.remove('playlist-mode'));
+
+  const albumsData = [
+    { title: "十一月的萧邦", artist: "周杰伦", bg: "https://picsum.photos/id/1025/300/300" },
+    { title: "U87", artist: "陈奕迅", bg: "https://picsum.photos/id/1018/300/300" },
+    { title: "Black & Blue", artist: "The Rolling Stones", bg: "https://picsum.photos/id/1033/300/300" },
+    { title: "天空", artist: "王菲", bg: "https://picsum.photos/id/1040/300/300" },
+    { title: "BEYOND LIVE", artist: "Beyond", bg: "https://picsum.photos/id/1069/300/300" },
+    { title: "The Dark Side", artist: "Pink Floyd", bg: "https://picsum.photos/id/1078/300/300" },
+    { title: "西界", artist: "林俊杰", bg: "https://picsum.photos/id/1080/300/300" },
+    { title: "Abbey Road", artist: "The Beatles", bg: "https://picsum.photos/id/111/300/300" },
+    { title: "Thriller", artist: "Michael Jackson", bg: "https://picsum.photos/id/119/300/300" },
+    { title: "范特西", artist: "周杰伦", bg: "https://picsum.photos/id/124/300/300" }
+  ];
+
+  function create3DTape(title, bgUrl) {
+    return `
+      <!-- Container purely for perspective constraints -->
+      <div class="slot">
+        <!-- The actual 3D preserved rotating element -->
+        <div class="tape-3d">
+          
+          <!-- 面1: Spine 脊背(朝向用户) -->
+          <div class="t-face t-front">
+             <div class="t-bg-img" style="background-image: url('${bgUrl}')"></div>
+             <!-- 磨砂玻璃层，盖在纸上 -->
+             <div class="t-plastic-glass"></div>
+             <!-- 极清晰的丝印文字，悬空在玻璃上不受模糊影响 -->
+             <div class="t-front-text">${title}</div>
+          </div>
+
+          <!-- 面2: 后背 -->
+          <div class="t-face t-back">
+             <div class="t-plastic-glass"></div>
+          </div>
+
+          <!-- 面3: 右侧 (磁带壳侧正脸) -->
+          <div class="t-face t-right">
+             <div class="t-bg-img" style="background-image: url('${bgUrl}')"></div>
+             <div class="t-plastic-glass"></div>
+             <div class="side-details"></div>
+          </div>
+
+          <!-- 面4: 左侧 -->
+          <div class="t-face t-left">
+             <div class="t-bg-img" style="background-image: url('${bgUrl}')"></div>
+             <div class="t-plastic-glass"></div>
+             <div class="side-details"></div>
+          </div>
+
+          <!-- 面5: 顶部 -->
+          <div class="t-face t-top">
+            <div class="t-plastic-glass"></div>
+          </div>
+
+          <!-- 面6: 底部 -->
+          <div class="t-face t-bottom">
+            <div class="t-plastic-glass"></div>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  function renderGrid(id) {
+    const grid = document.getElementById(id);
+    let html = '';
+    // Shuffle copy for randomness per rack
+    const shuffled = [...albumsData].sort(() => 0.5 - Math.random());
+    // Take exactly 10 for display per row
+    shuffled.slice(0, 10).forEach(item => {
+      html += create3DTape(item.title, item.bg);
+    });
+    grid.innerHTML = html;
+  }
+
+  renderGrid('grid-main');
+  renderGrid('grid-fav');
+
+</script>
+</body>
+</html>

@@ -22,15 +22,12 @@ export interface UnifiedUser {
 export interface LoginCredentials {
   platform: MusicPlatform;
   method: LoginMethod;
-  email?: string;
-  phone?: string;
-  password?: string;
 }
 
 /**
  * Login methods
  */
-export type LoginMethod = 'email' | 'phone' | 'qrcode' | 'cookie';
+export type LoginMethod = 'qrcode';
 
 /**
  * Login result
@@ -40,4 +37,16 @@ export interface LoginResult {
   user?: UnifiedUser;
   cookie?: string;
   error?: string;
+}
+
+/**
+ * Login session health check result
+ */
+export interface AuthSessionHealthResult {
+  /** Current session state after verification / recovery attempt */
+  status: 'valid' | 'recovered' | 'invalid';
+  /** Latest usable cookie when available */
+  cookie?: string;
+  /** Latest resolved user info when available */
+  user?: UnifiedUser;
 }

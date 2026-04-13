@@ -43,17 +43,18 @@ const INITIAL_PROGRESS: LocalApiProgressState = {
 
 interface UseLocalApiBootstrapParams {
   pushAlert: (input: AlertInput) => void;
-  notifyLocalApiReady: () => void;
 }
 
 export function useLocalApiBootstrap({
   pushAlert,
-  notifyLocalApiReady,
 }: UseLocalApiBootstrapParams) {
   const [localApiProgress, setLocalApiProgress] = useState<LocalApiProgressState>(INITIAL_PROGRESS);
   const [isAutoFixingLocalApi, setIsAutoFixingLocalApi] = useState(false);
   const localApiBootstrappedRef = useRef(false);
   const localApiOverlayHideTimerRef = useRef<number | null>(null);
+  const runtimeWindow = typeof window === 'undefined'
+    ? null
+    : (window as Window & { __ALLMUSIC_LOCAL_API_READY__?: boolean });
 
   const bootstrapLocalApis = useCallback(async () => {
     if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime() || localApiBootstrappedRef.current) {
@@ -61,8 +62,8 @@ export function useLocalApiBootstrap({
     }
 
     localApiBootstrappedRef.current = true;
-    if (typeof window !== 'undefined') {
-      window.__ALLMUSIC_LOCAL_API_READY__ = false;
+    if (runtimeWindow) {
+      runtimeWindow.__ALLMUSIC_LOCAL_API_READY__ = false;
     }
     setLocalApiProgress({
       visible: true,
@@ -108,8 +109,8 @@ export function useLocalApiBootstrap({
             .join('\n'),
           dedupeKey: `local-api-env:${environmentCheck.summary}`,
         });
-        if (typeof window !== 'undefined') {
-          window.__ALLMUSIC_LOCAL_API_READY__ = false;
+        if (runtimeWindow) {
+          runtimeWindow.__ALLMUSIC_LOCAL_API_READY__ = false;
         }
         localApiBootstrappedRef.current = false;
         return;
@@ -142,11 +143,6 @@ export function useLocalApiBootstrap({
         },
         logs: [...prev.logs, status].slice(-10),
       }));
-      notifyLocalApiReady();
-
-      window.setTimeout(() => {
-        setLocalApiProgress((prev) => ({ ...prev, visible: false }));
-      }, 650);
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : String(error);
       const parsedEnvironmentError = parseEnvironmentCheckFromErrorMessage(rawMessage);
@@ -181,12 +177,12 @@ export function useLocalApiBootstrap({
           : rawMessage,
         dedupeKey: `local-api-catch:${errorType}:${rawMessage}`,
       });
-      if (typeof window !== 'undefined') {
-        window.__ALLMUSIC_LOCAL_API_READY__ = false;
+      if (runtimeWindow) {
+        runtimeWindow.__ALLMUSIC_LOCAL_API_READY__ = false;
       }
       localApiBootstrappedRef.current = false;
     }
-  }, [notifyLocalApiReady, pushAlert]);
+  }, [pushAlert]);
 
   const handleRetryBootstrap = useCallback(() => {
     localApiBootstrappedRef.current = false;

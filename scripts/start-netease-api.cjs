@@ -19,7 +19,7 @@ if (!fs.existsSync(appPath)) {
 
 // Set default port
 const PORT = process.env.NETEASE_API_PORT || 3000;
-const HOST = process.env.NETEASE_API_HOST || 'localhost';
+const HOST = process.env.NETEASE_API_HOST || '127.0.0.1';
 
 // Set environment variables for the API
 process.env.PORT = PORT;

@@ -39,9 +39,10 @@ export function useAppEventListeners({
       const nextPercent = Number.isFinite(payload.percent) ? payload.percent : 0;
       const nextMessage = payload.message || '正在启动本地 API...';
       const isError = payload.level === 'error' || stage.endsWith('_error') || stage === 'error';
-      const isReadyStage = stage === 'ready' || stage.endsWith('_ready');
+      const isServiceReadyStage = stage.endsWith('_ready');
+      const isReadyStage = stage === 'ready';
       const isNoisyLogStage = stage.endsWith('_log') || stage === 'log_warning';
-      const isCriticalStage = isError || isReadyStage;
+      const isCriticalStage = isError || isReadyStage || isServiceReadyStage;
 
       if (isNoisyLogStage && !isError) {
         return;
@@ -67,7 +68,7 @@ export function useAppEventListeners({
         let nextServiceState = prev.serviceState;
         if (payload.service) {
           let nextState = nextServiceState[payload.service];
-          if (stage.endsWith('_ready')) {
+          if (isServiceReadyStage) {
             nextState = 'ready';
           } else if (isError) {
             nextState = 'error';

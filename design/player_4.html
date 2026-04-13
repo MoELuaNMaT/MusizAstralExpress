@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALLMusic Retro Deck Player 4.0 (Auth Included)</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23121212'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23353535'/%3E%3Crect x='30' y='16' width='4' height='14' rx='2' fill='%23ff9a1f'/%3E%3C/svg%3E" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Caveat:wght@700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* 原播放器变量 */
+      --bg: #0d1014;
+      --panel: #232323;
+      --screen: #050806;
+      --cyan: #00ffcc;
+      --amber: #ffbf47;
+      --orange: #ff8d1a;
+      --red: #ff4d36;
+      --green: #33ff00;
+      --text: #efe8d6;
+      --shadow: rgba(0, 0, 0, 0.45);
+
+      /* 歌单界面额外变量 */
+      --bg-surface: #1a1b22;
+      --bg-glass: rgba(255, 255, 255, 0.03);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --text-primary: #f0f0f0;
+      --text-secondary: #8b8e98;
+      --theme-color: #ffb199; 
+      --theme-gradient: linear-gradient(135deg, #ff0844 0%, #ffb199 100%);
+      --font-app: 'Inter', -apple-system, sans-serif;
+      --font-tape: 'Caveat', cursive;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      /* 示波器变量 */
+      --osc-crt-green: #39ff14;
+      --osc-crt-dark: #071a07;
+      --osc-bezel-color: #dcd8ca;
+      --osc-shell-color: #558796;
+      --osc-bevel-top: #bab5a6;
+      --osc-bevel-bottom: #f2efe6;
+      --osc-bevel-left: #c2beae;
+      --osc-bevel-right: #e3dec9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; overflow-x: hidden; }
+    body {
+      font-family: "Courier New", "IBM Plex Mono", Consolas, monospace;
+      color: var(--text);
+      background-color: var(--bg);
+      background: radial-gradient(circle at 15% 20%, rgba(255, 164, 53, 0.14), transparent 24%),
+                  radial-gradient(circle at 82% 10%, rgba(0, 255, 204, 0.08), transparent 20%),
+                  linear-gradient(180deg, #181c21, var(--bg));
+      display: flex;
+      flex-direction: column;
+    }
+
+    button, input { font: inherit; }
+
+    /* 全局环境光 (歌单视图生效) */
+    .ambient-bg {
+      position: fixed; top: 50%; left: 50%; width: 80vw; height: 80vh;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, var(--theme-color) 0%, transparent 60%);
+      opacity: 0; filter: blur(100px); z-index: 0;
+      transition: background 0.8s ease, opacity 0.8s ease; pointer-events: none;
+    }
+    .ambient-bg.active { opacity: 0.12; }
+
+    .stage {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 28px 14px; position: relative; z-index: 1;
+    }
+
+    /* ================= 1. 主播放器 (DECK VIEW) ================= */
+    .deck {
+      width: min(1120px, 100%); padding: 14px; border-radius: 16px; border: 1px solid #0b0b0b;
+      background: linear-gradient(180deg, rgba(49, 49, 49, 0.96), rgba(24, 24, 24, 0.98)),
+                  radial-gradient(circle at 50% 0, rgba(255, 255, 255, 0.08), transparent 55%);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 36px rgba(255, 148, 39, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .badge-row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(10, 10, 10, 0.3); color: #d5d0c6; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .badge.muted { color: #99948a; }
+
+    .shell { position: relative; overflow: hidden; padding: 16px; border-radius: 12px; border: 1px solid #111; background: linear-gradient(135deg, #3b3b3b, #292929 42%, #171717 100%); box-shadow: 0 22px 40px var(--shadow), inset 1px 1px 1px rgba(255, 255, 255, 0.12), inset -2px -2px 5px rgba(0, 0, 0, 0.52); }
+
+    .top { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; }
+    .panel { background: var(--panel); border-radius: 8px; border: 1px solid #121212; box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.08); }
+    .cassette { min-height: 176px; padding: 12px; display: flex; flex-direction: column; justify-content: center; }
+    .small-label { color: #706d67; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+    
+    .cassette-window { position: relative; min-height: 92px; margin-top: 8px; border-radius: 4px; border: 2px solid #0d0d0d; background: #050505; overflow: hidden; box-shadow: inset 0 4px 12px rgba(0,0,0,0.9); }
+    .tape-wrapper { position: absolute; inset: 0; transition: transform 0.5s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.4s ease; transform-origin: bottom center; }
+    .tape-wrapper.ejected { transform: translateY(110%); opacity: 0; }
+
+    .cover { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 10px 12px; background: linear-gradient(135deg, var(--cover-a, #5f1038), var(--cover-b, #e06b3c)); }
+    .cover::before { content: ""; position: absolute; inset: 10px; border: 1px solid rgba(255,255,255,0.18); }
+    .cover-copy { position: relative; z-index: 1; color: rgba(255, 248, 234, 0.88); font-size: 11px; letter-spacing: 0.12em; font-weight: bold; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
+
+    .tape-pack { position: absolute; top: 50%; transform: translateY(-50%); border-radius: 50%; background: radial-gradient(circle at center, #2e2018 40%, #17100b 95%, #0a0705 100%); display: flex; justify-content: center; align-items: center; box-shadow: 0 0 4px rgba(0,0,0,0.9); }
+    .tape-pack.left { left: 14px; width: 68px; height: 68px; }
+    .tape-pack.right { right: 14px; width: 44px; height: 44px; }
+    .reel { width: 34px; height: 34px; border-radius: 50%; background-color: #f2f2f2; position: relative; mask: radial-gradient(circle at center, transparent 3px, black 4px); -webkit-mask: radial-gradient(circle at center, transparent 3px, black 4px); }
+    .reel::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: repeating-conic-gradient(from 0deg, #333 0deg, #333 12deg, transparent 12deg, transparent 60deg); mask: radial-gradient(circle at center, transparent 7px, black 8px); -webkit-mask: radial-gradient(circle at center, transparent 7px, black 8px); }
+    .reel.spinning { animation: reel-spin 2.8s linear infinite; }
+    .state { margin-top: 10px; text-align: center; font-weight: bold; color: #a09a8f; }
+
+    .vfd { min-height: 176px; padding: 14px 18px; display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 20px; border-radius: 8px; border: 3px solid #0b0b0b; background: var(--screen); box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.96), 0 1px 0 rgba(255, 255, 255, 0.08); position: relative; }
+    .vfd::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(255, 255, 255, 0.03) 50%, transparent 50%); background-size: 100% 4px; }
+    .screen-copy { min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
+    .track-title { color: var(--cyan); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: clamp(1.7rem, 2.6vw, 2.3rem); font-weight: 700; line-height: 1; text-shadow: 0 0 6px var(--cyan), 0 0 12px rgba(0,255,204,0.4); }
+    .track-row { margin-top: 12px; display: flex; justify-content: space-between; gap: 10px; font-size: 0.95rem; color: var(--orange); text-shadow: 0 0 6px var(--orange); }
+    .track-artist { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .track-state { color: #ff5f1f; opacity: 0.68; } .track-state.live { opacity: 1; text-shadow: 0 0 8px #ff5f1f; }
+    
+    .lyrics { min-height: 60px; margin-top: 14px; display: flex; align-items: center; }
+    .lyric-stack { display: flex; flex-direction: column; gap: 6px; animation: lyric-shift 260ms ease-out; }
+    .lyric-line { margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 0.92rem; text-shadow: 0 0 6px currentColor; }
+    .lyric-view.bilingual .primary { color: var(--amber); } .lyric-view.bilingual .secondary { color: rgba(0, 255, 204, 0.96); }
+
+    .spectrum { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); align-items: end; gap: 3px; }
+    .spec-bar { display: flex; flex-direction: column-reverse; gap: 2px; }
+    .seg { min-height: 6px; border-radius: 1px; background: #0c1411; transition: background-color 100ms, box-shadow 100ms; }
+    .seg.idle { opacity: 0.35; }
+    .seg.on.cyan { background: var(--cyan); box-shadow: 0 0 6px rgba(0,255,204,0.8); }
+    .seg.on.green { background: var(--green); box-shadow: 0 0 6px rgba(51,255,0,0.8); }
+    .seg.on.yellow { background: #ffcc00; box-shadow: 0 0 6px rgba(255,204,0,0.8); }
+    .seg.on.red { background: var(--red); box-shadow: 0 0 6px rgba(255,77,54,0.8); }
+
+    .transport { margin-top: 16px; display: grid; grid-template-columns: auto minmax(0, 1fr) 136px; gap: 12px; }
+    .transport-segment { min-height: 86px; padding: 8px; display: flex; align-items: center; border-radius: 8px; background: var(--panel); border: 1px solid #121212; box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.08); }
+    
+    .transport-segment.controls { flex-direction: column; justify-content: center; gap: 10px; }
+    .transport-buttons { display: flex; gap: 6px; }
+
+    .transport-btn { position: relative; width: 56px; height: 44px; border: 1px solid #000; border-bottom: 4px solid #0b0b0b; border-radius: 6px; background: linear-gradient(180deg, #4b4b4b 0%, #202020 100%); color: #c8c8c8; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2); cursor: pointer; transition: transform 0.08s cubic-bezier(0.4, 0, 0.2, 1), border-bottom 0.08s, box-shadow 0.08s; }
+    .transport-btn:active { transform: translateY(3px); border-bottom: 1px solid #0b0b0b; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(0, 0, 0, 0.6); background: linear-gradient(180deg, #3a3a3a 0%, #1a1a1a 100%); }
+    .transport-btn.primary { width: 68px; }
+    .icon { width: 20px; height: 20px; }
+    .play-led { position: absolute; top: -12px; left: 50%; width: 7px; height: 7px; border-radius: 50%; background: #460000; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8); transform: translateX(-50%); }
+    .transport-btn.primary.playing .play-led { background: #ff0000; box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.5); }
+
+    .eject-btn { width: 100%; height: 26px; border-radius: 4px; font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: bold; color: #ff3333; text-shadow: 0 0 4px rgba(255,0,0,0.4); letter-spacing: 2px; background: linear-gradient(180deg, #2a2a2a, #111); border: 1px solid #000; border-bottom: 3px solid #050505; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .eject-btn:active { transform: translateY(2px); border-bottom: 1px solid #000; }
+
+    .mode-grid { width: 100%; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+    .mode-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .mode-led { width: 16px; height: 6px; border-radius: 1px; background: #222; border: 1px solid #111; box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.1); margin-bottom: 4px; }
+    .mode-slot.active.green.lit .mode-led { background: #00ff66; box-shadow: 0 0 8px #00ff66, inset 0 0 2px #fff; border-color: #005522; }
+    .mode-slot.active.red.lit .mode-led { background: #ff3300; box-shadow: 0 0 8px #ff3300, inset 0 0 2px #fff; border-color: #550000; }
+    .mode-label { color: #aaa; font-size: 10px; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 2px; }
+    .mode-btn { width: 100%; min-height: 48px; padding: 8px 4px; border-radius: 4px; border: 1px solid #777; border-top-color: #eee; border-bottom: 6px solid #888; background: linear-gradient(180deg, #fdfdfd 0%, #d8d8d8 100%); color: #333; cursor: pointer; box-shadow: inset 0 1px 1px #fff, 0 8px 10px rgba(0,0,0,0.5); transition: transform 0.1s, border-bottom 0.1s, box-shadow 0.1s; }
+    .mode-btn:active, .mode-btn.active.phase-pressing, .mode-btn.active.phase-hold { transform: translateY(4px); border-bottom: 2px solid #888; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2), 0 2px 3px rgba(0,0,0,0.5); }
+    .mode-btn.active.phase-rebound { transform: translateY(0); border-bottom: 6px solid #888; box-shadow: inset 0 1px 1px #fff, 0 8px 10px rgba(0,0,0,0.5); }
+    .mode-icon { width: 22px; height: 22px; }
+
+    .knob { position: relative; border-radius: 50%; background: repeating-conic-gradient(#222 0deg, #222 3deg, #444 3deg, #444 6deg); border: 1px solid #111; box-shadow: 0 8px 12px rgba(0,0,0,0.5), inset 0 0 4px rgba(0,0,0,0.9); transition: transform 120ms ease; }
+    .knob::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #555, #111); box-shadow: inset 0 2px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.8); }
+    .knob::before { content: ""; position: absolute; top: 10px; left: 50%; width: 4px; height: 12px; border-radius: 2px; background: #ff8800; box-shadow: 0 0 6px #ff8800; transform: translateX(-50%); z-index: 2; }
+    .lyric-selector { position: relative; width: 136px; height: 102px; }
+    .lyric-knob { position: absolute; inset: 30px 25px 0; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; justify-content: center;}
+    .lyric-knob .knob { width: 56px; height: 56px; }
+    .lyric-mark { position: absolute; display: inline-flex; flex-direction: column; align-items: center; gap: 3px; border: none; background: transparent; color: rgba(180, 180, 180, 0.76); cursor: pointer; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; }
+    .lyric-mark.orig { left: 18px; top: 4px; } .lyric-mark.cn { left: 50%; top: 0; transform: translateX(-50%); } .lyric-mark.ab { right: 18px; top: 4px; }
+    .lyric-led { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(16, 16, 16, 0.72); background: linear-gradient(180deg, #384238, #121612); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); }
+    .lyric-mark.active { color: #a5ffd0; text-shadow: 0 0 8px rgba(36,255,125,0.38); }
+    .lyric-mark.active .lyric-led { background: radial-gradient(circle, #31ff88 0%, #11a44d 68%, #084f25 100%); box-shadow: 0 0 8px rgba(49,255,136,0.82); }
+
+    .bottom { margin-top: 16px; padding: 12px 20px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid #1a1a1a; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; }
+    .knob-shell { position: relative; width: 120px; height: 120px; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: pointer; flex-shrink: 0; }
+    .knob-shell .knob { position: relative; width: 64px; height: 64px; }
+    .ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .ring-groove { fill: #090909; }
+    .ring-seg { stroke: rgba(255, 255, 255, 0.04); stroke-width: 0.8; }
+    .ring-seg.green.off { fill: #1a3322; } .ring-seg.green.on { fill: #33ff00; filter: drop-shadow(0 0 6px rgba(51, 255, 0, 0.8)); }
+    .ring-seg.yellow.off { fill: #332a11; } .ring-seg.yellow.on { fill: #ffcc00; filter: drop-shadow(0 0 6px rgba(255, 204, 0, 0.8)); }
+    .ring-seg.red.off { fill: #331111; } .ring-seg.red.on { fill: #ff3300; filter: drop-shadow(0 0 6px rgba(255, 51, 0, 0.8)); }
+    .knob-caption { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-family: 'Share Tech Mono', monospace; font-size: 22px; color: #00ffcc; font-weight: bold; text-shadow: 0 0 8px rgba(0,255,204,0.6); background: #0a100e; padding: 2px 8px; border-radius: 4px; border: 1px solid #003322; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); letter-spacing: 1px; pointer-events: none; z-index: 10; line-height: 1; }
+
+    .dial { flex-grow: 1; min-width: 200px; height: 84px; border-radius: 6px; border: 3px solid #111; border-bottom: 3px solid #222; background: #2a221b; position: relative; overflow: hidden; box-shadow: inset 0 8px 16px rgba(0,0,0,0.9); }
+    .dial-lamp { position: absolute; inset: 0; background: radial-gradient(circle at 50% 110%, rgba(255, 170, 50, 0.4) 0%, rgba(255, 120, 10, 0.1) 70%, transparent 100%); pointer-events: none; z-index: 0; mix-blend-mode: color-dodge; animation: lamp-breathe 4s ease-in-out infinite alternate; }
+    .dial-scale { position: absolute; top: 20px; left: 24px; right: 24px; height: 16px; background-image: repeating-linear-gradient(to right, rgba(255,200,100,0.6) 0, rgba(255,200,100,0.6) 2px, transparent 2px, transparent 20px); z-index: 1; }
+    .dial-scale::after { content: ""; position: absolute; top: 6px; left: 0; right: 0; bottom: 0; background-image: repeating-linear-gradient(to right, rgba(255,200,100,0.3) 0, rgba(255,200,100,0.3) 1px, transparent 1px, transparent 10px); }
+    .dial-needle { position: absolute; top: 10px; bottom: 10px; width: 4px; background: #ff2a00; border-radius: 2px; box-shadow: 0 0 6px rgba(255, 42, 0, 0.9), 2px 0 4px rgba(0,0,0,0.6); z-index: 2; transition: left 0.1s linear; transform: translateX(-50%); }
+    .dial::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5; background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 40%); }
+    .dial-time { position: absolute; inset: auto 12px 6px; display: flex; justify-content: space-between; color: #ffd085; font-size: 15px; font-family: 'Share Tech Mono', monospace; font-weight: bold; text-shadow: 0 0 6px rgba(255, 208, 133, 0.8); z-index: 4; }
+    .dial-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0.01; cursor: pointer; z-index: 6; }
+
+    .switch-dock { display: flex; gap: 20px; flex-shrink: 0; align-items: center; }
+    .switch-slot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .switch-label { color: #a59e92; font-size: 11px; letter-spacing: 0.15em; font-weight: bold; text-transform: uppercase; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.9); }
+    .rocker-housing { width: 40px; height: 58px; padding: 4px; border-radius: 6px; background: linear-gradient(180deg, #222, #000); box-shadow: inset 0 2px 4px rgba(0,0,0,0.9), 0 1px 1px rgba(255,255,255,0.1); }
+    .rocker-switch { width: 100%; height: 100%; perspective: 300px; cursor: pointer; }
+    .rocker-face { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s, background 0.2s; border-radius: 3px; border: 1px solid rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 11px; font-weight: 900; font-family: sans-serif; }
+    .rocker-mark { text-shadow: 0 1px 2px rgba(0,0,0,0.8); transition: color 0.2s, text-shadow 0.2s; }
+    
+    .switch-slot.green .rocker-switch[aria-checked="false"] .rocker-face { background-color: #053305; background-image: radial-gradient(circle at center, rgba(200,255,150,0) 10%, transparent 60%), linear-gradient(rgba(0,0,0,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.5) 1px, transparent 1px); background-size: 100% 100%, 3px 3px, 3px 3px; box-shadow: inset 0 4px 6px rgba(255,255,255,0.1), inset 0 -2px 5px rgba(0,0,0,0.8), 0 6px 8px rgba(0,0,0,0.6); transform: rotateX(-20deg); }
+    .switch-slot.green .rocker-switch[aria-checked="false"] .rocker-mark:first-child { color: rgba(255,255,255,0.3); } .switch-slot.green .rocker-switch[aria-checked="false"] .rocker-mark:last-child { color: rgba(255,255,255,0.7); } 
+    .switch-slot.green .rocker-switch[aria-checked="true"] .rocker-face { background-color: #11aa11; background-image: radial-gradient(circle at center, rgba(200,255,150,0.9) 10%, transparent 60%), linear-gradient(rgba(0,0,0,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.4) 1px, transparent 1px); background-size: 100% 100%, 3px 3px, 3px 3px; box-shadow: inset 0 2px 4px rgba(150,255,150,0.6), inset 0 -4px 6px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.6), 0 0 14px rgba(0, 255, 0, 0.8); transform: rotateX(20deg); }
+    .switch-slot.green .rocker-switch[aria-checked="true"] .rocker-mark:first-child { color: #fff; text-shadow: 0 0 6px #fff; } .switch-slot.green .rocker-switch[aria-checked="true"] .rocker-mark:last-child { color: rgba(255,255,255,0.3); } 
+    
+    .switch-slot.red .rocker-switch[aria-checked="false"] .rocker-face { background-color: #440000; background-image: radial-gradient(circle at center, rgba(255,255,150,0) 10%, transparent 60%), linear-gradient(rgba(0,0,0,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.5) 1px, transparent 1px); background-size: 100% 100%, 3px 3px, 3px 3px; box-shadow: inset 0 4px 6px rgba(255,255,255,0.1), inset 0 -2px 5px rgba(0,0,0,0.8), 0 6px 8px rgba(0,0,0,0.6); transform: rotateX(-20deg); }
+    .switch-slot.red .rocker-switch[aria-checked="false"] .rocker-mark:first-child { color: rgba(255,255,255,0.3); } .switch-slot.red .rocker-switch[aria-checked="false"] .rocker-mark:last-child { color: rgba(255,255,255,0.7); } 
+    .switch-slot.red .rocker-switch[aria-checked="true"] .rocker-face { background-color: #dd0000; background-image: radial-gradient(circle at center, rgba(255,255,150,0.9) 10%, transparent 60%), linear-gradient(rgba(0,0,0,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.4) 1px, transparent 1px); background-size: 100% 100%, 3px 3px, 3px 3px; box-shadow: inset 0 2px 4px rgba(255,150,150,0.6), inset 0 -4px 6px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.6), 0 0 14px rgba(255, 0, 0, 0.8); transform: rotateX(20deg); }
+    .switch-slot.red .rocker-switch[aria-checked="true"] .rocker-mark:first-child { color: #fff; text-shadow: 0 0 6px #fff; } .switch-slot.red .rocker-switch[aria-checked="true"] .rocker-mark:last-child { color: rgba(255,255,255,0.3); } 
+
+    /* ================= 2. 歌单视图 (PLAYLIST VIEW) ================= */
+    .playlist-view { display: none; width: min(1200px, 100%); height: 740px; gap: 40px; font-family: var(--font-app); color: var(--text-primary); animation: fadeIn 0.5s ease; }
+    .tape-rack { width: 340px; display: flex; flex-direction: column; justify-content: center; gap: 20px; perspective: 1200px; flex-shrink: 0; }
+    .tape { width: 300px; height: 180px; position: relative; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.4s ease; cursor: pointer; filter: brightness(0.5) grayscale(30%); margin-left: 10px; }
+    .tape.active { filter: brightness(1) grayscale(0%); transform: translateX(30px) translateZ(40px) rotateY(12deg) scale(1.05); z-index: 10; }
+    .tape:hover:not(.active) { filter: brightness(0.8) grayscale(10%); transform: translateX(10px); }
+
+    .tape-shell { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.4) 100%); border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); box-shadow: inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -2px 10px rgba(0,0,0,0.8), 0 20px 40px rgba(0,0,0,0.5); backdrop-filter: blur(5px); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .tape-label { width: 85%; height: 65%; border-radius: 6px; position: relative; box-shadow: inset 0 0 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 10px; overflow: hidden; }
+    .tape-label::before { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,0.3) 40%, transparent 60%); mix-blend-mode: overlay; pointer-events: none; }
+    
+    .tape[data-id="1"] .tape-label { background: linear-gradient(135deg, #e06b3c, #5f1038); }
+    .tape[data-id="2"] .tape-label { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .tape[data-id="3"] .tape-label { background: linear-gradient(135deg, #f6d365, #fda085); }
+    .tape[data-id="4"] .tape-label { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+    .tape-title { font-family: var(--font-tape); font-size: 28px; color: #111; z-index: 2; transform: rotate(-2deg); margin-top: 2px; }
+    .tape-window { width: 160px; height: 45px; background: rgba(10, 10, 10, 0.6); border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 5px 10px rgba(0,0,0,0.8); position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; padding: 0 10px; }
+    .tape-spool { width: 36px; height: 36px; border-radius: 50%; background: #e0e0e0; position: relative; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 15px #151515, 0 0 5px 15px rgba(0,0,0,0.8); z-index: 2; }
+    .tape-spool::after { content: ''; width: 16px; height: 16px; border-radius: 50%; background: repeating-conic-gradient(#333 0 15deg, #ccc 15deg 60deg); }
+    .screw { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #ccc, #666); border: 1px solid #333; box-shadow: inset 0 1px 2px #fff, inset 0 -1px 2px #000; }
+    .screw-tl { top: 10px; left: 10px; transform: rotate(15deg); } .screw-tr { top: 10px; right: 10px; transform: rotate(-45deg); }
+    .screw-bl { bottom: 10px; left: 10px; transform: rotate(70deg); } .screw-br { bottom: 10px; right: 10px; transform: rotate(20deg); }
+    .tape-bridge { position: absolute; bottom: 0; left: 10%; width: 80%; height: 30px; background: #181818; clip-path: polygon(5% 0, 95% 0, 100% 100%, 0% 100%); border-top: 1px solid #333; display: flex; justify-content: space-around; align-items: center; }
+    .bridge-hole { width: 10px; height: 10px; background: #000; border-radius: 50%; box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); }
+
+    .playlist-panel { flex: 1; background: var(--bg-surface); border: 1px solid var(--border-glass); border-radius: 20px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    .panel-glow { position: absolute; top: 0; left: 0; width: 100%; height: 200px; background: linear-gradient(to bottom, var(--theme-color), transparent); opacity: 0.15; transition: background 0.8s ease; pointer-events: none; }
+    .playlist-header { padding: 40px; display: flex; align-items: flex-end; gap: 30px; position: relative; z-index: 2; }
+    .album-art-placeholder { width: 140px; height: 140px; border-radius: 12px; background: var(--theme-gradient); box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: background 0.5s ease; }
+    .playlist-info h1 { font-size: 42px; font-weight: 700; margin-bottom: 10px; letter-spacing: -1px; }
+    .playlist-info p { color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; font-weight: 500;}
+    .play-all-btn { background: var(--theme-color); color: #000; font-weight: 700; border: none; padding: 12px 32px; border-radius: 30px; font-size: 14px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: inline-flex; align-items: center; gap: 8px; }
+    .play-all-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+
+    .tracklist-container { flex: 1; overflow-y: auto; padding: 0 40px 20px 40px; position: relative; z-index: 2; }
+    .tracklist-container::-webkit-scrollbar { width: 8px; } .tracklist-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    .list-header, .track-item { display: grid; grid-template-columns: 30px 40px 3fr 2fr 80px 40px; align-items: center; gap: 15px; }
+    .list-header { padding-bottom: 10px; border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; position: sticky; top: 0; background: var(--bg-surface); z-index: 5; }
+    .track-item { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.2s; cursor: pointer; border-radius: 8px; margin: 2px 0; padding-left: 10px; padding-right: 10px;}
+    .track-item:hover { background: var(--bg-glass); }
+    .track-item.playing { background: rgba(255,255,255,0.05); }
+
+    .track-num { color: var(--text-secondary); font-family: var(--font-mono); font-size: 13px; text-align: right; }
+    .track-cover { width: 40px; height: 40px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    .track-title-wrapper { display: flex; flex-direction: column; overflow: hidden; }
+    .track-title { font-weight: 500; color: var(--text-primary); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    .track-artist { font-size: 13px; color: var(--text-secondary); margin-top: 4px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    .track-album { color: var(--text-secondary); font-size: 13px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    .track-time { color: var(--text-secondary); font-family: var(--font-mono); font-size: 13px; }
+    
+    .like-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; justify-content: center; }
+    .like-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; transition: 0.3s; }
+    .like-btn:hover svg { stroke: var(--theme-color); }
+    .like-btn.liked svg { fill: var(--theme-color); stroke: var(--theme-color); filter: drop-shadow(0 0 8px var(--theme-color)); }
+
+    /* ================= 3. 示波器登录弹窗 (Oscilloscope Popup) ================= */
+    .osc-plastic-texture { background-image: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="oscNoiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23oscNoiseFilter)" opacity="0.05"/%3E%3C/svg%3E'); }
+    .osc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); opacity: 0; pointer-events: none; transition: opacity 0.5s ease; z-index: 999; display: flex; justify-content: center; align-items: center; }
+    .osc-overlay.active { opacity: 1; pointer-events: auto; }
+
+    .osc-device-shell { position: relative; padding-top: 25px; padding-left: 10px; padding-right: 15px; padding-bottom: 10px; background-color: var(--osc-shell-color); border-radius: 12px; box-shadow: 15px 25px 40px rgba(0,0,0,0.8), inset 2px 2px 5px rgba(255,255,255,0.2); transform: translateY(50px) scale(0.95); opacity: 0; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .osc-overlay.active .osc-device-shell { transform: translateY(0) scale(1); opacity: 1; }
+    .osc-front-bezel { position: relative; width: 480px; background-color: var(--osc-bezel-color); border-radius: 8px; box-shadow: inset 0 2px 3px rgba(255,255,255,0.6), inset 0 -2px 5px rgba(0,0,0,0.1), -2px -2px 5px rgba(0,0,0,0.2); display: flex; flex-direction: column; padding: 25px 25px 20px 25px; box-sizing: border-box; }
+
+    .osc-crt-recess { width: 100%; height: 320px; box-sizing: border-box; background: #111; border-top: 25px solid var(--osc-bevel-top); border-bottom: 25px solid var(--osc-bevel-bottom); border-left: 25px solid var(--osc-bevel-left); border-right: 25px solid var(--osc-bevel-right); border-radius: 12px; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 20px rgba(0,0,0,1), 2px 2px 5px rgba(0,0,0,0.1); }
+    .osc-crt-screen { width: 98%; height: 97%; background: var(--osc-crt-dark); border-radius: 6px; position: relative; overflow: hidden; box-shadow: inset 0 0 40px rgba(0,0,0,1); }
+    .osc-grid-fisheye { position: absolute; inset: 0; z-index: 1; background-image: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cstyle%3Epath%7Bstroke:rgba(57,255,20,0.2);stroke-width:0.4;fill:none%7D.thick%7Bstroke:rgba(57,255,20,0.4);stroke-width:0.8%7D%3C/style%3E%3Cpath d='M 10,0 Q -5,50 10,100'/%3E%3Cpath d='M 20,0 Q 10,50 20,100'/%3E%3Cpath d='M 30,0 Q 24,50 30,100'/%3E%3Cpath d='M 40,0 Q 37,50 40,100'/%3E%3Cpath class='thick' d='M 50,0 L 50,100'/%3E%3Cpath d='M 60,0 Q 63,50 60,100'/%3E%3Cpath d='M 70,0 Q 76,50 70,100'/%3E%3Cpath d='M 80,0 Q 90,50 80,100'/%3E%3Cpath d='M 90,0 Q 105,50 90,100'/%3E%3Cpath d='M 0,10 Q 50,-5 100,10'/%3E%3Cpath d='M 0,20 Q 50,10 100,20'/%3E%3Cpath d='M 0,30 Q 50,24 100,30'/%3E%3Cpath d='M 0,40 Q 50,37 100,40'/%3E%3Cpath class='thick' d='M 0,50 L 100,50'/%3E%3Cpath d='M 0,60 Q 50,63 100,60'/%3E%3Cpath d='M 0,70 Q 50,76 100,70'/%3E%3Cpath d='M 0,80 Q 50,90 100,80'/%3E%3Cpath d='M 0,90 Q 50,105 100,90'/%3E%3C/svg%3E"); background-size: 100% 100%; background-repeat: no-repeat; }
+    .osc-scanlines { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); background-size: 100% 4px, 3px 100%; animation: oscFlicker 0.15s infinite; }
+    .osc-crt-glare { position: absolute; inset: 0; z-index: 6; pointer-events: none; background: radial-gradient(circle at 50% 10%, rgba(255,255,255,0.12) 0%, transparent 60%); }
+    .osc-screen-content { position: absolute; inset: 0; z-index: 3; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+
+    .osc-qr-code { width: 120px; height: 120px; background-image: repeating-linear-gradient(45deg, var(--osc-crt-green) 0, var(--osc-crt-green) 8px, transparent 8px, transparent 16px), repeating-linear-gradient(-45deg, var(--osc-crt-green) 0, var(--osc-crt-green) 8px, transparent 8px, transparent 16px); border: 3px solid var(--osc-crt-green); box-shadow: 0 0 15px var(--osc-crt-green); cursor: crosshair; transition: opacity 0.3s; }
+    .osc-qr-code::before { content: "CLICK TO SCAN"; position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%); color: var(--osc-crt-green); text-shadow: 0 0 5px var(--osc-crt-green); font-size: 12px; font-family: monospace; white-space: nowrap; animation: oscTextFlicker 2s infinite; }
+    #osc-wave { display: none; width: 100%; height: 100%; }
+    .osc-crt-text { color: var(--osc-crt-green); text-shadow: 0 0 10px var(--osc-crt-green); font-size: 32px; font-weight: bold; letter-spacing: 4px; display: none; text-align: center; font-family: monospace; }
+
+    @keyframes oscFlicker { 0% { opacity: 0.95; } 50% { opacity: 0.85; } 100% { opacity: 0.95; } }
+    @keyframes oscTextFlicker { 0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { text-shadow: 0 0 10px var(--osc-crt-green), 0 0 20px var(--osc-crt-green); opacity: 1; } 20%, 22%, 24%, 55% { text-shadow: none; opacity: 0.5; } }
+
+    .osc-bottom-panel { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 25px; padding: 0 5px; }
+    .osc-brand-text { display: flex; align-items: baseline; gap: 8px; }
+    .osc-brand-logo { color: #1f6b8f; font-size: 20px; font-weight: 900; letter-spacing: -1px; }
+    .osc-brand-model { color: #333; font-size: 18px; font-weight: bold; }
+    .osc-indicator-group { display: flex; gap: 20px; align-items: center; }
+    .osc-led-container { display: flex; align-items: center; gap: 6px; }
+    .osc-led { width: 14px; height: 14px; border-radius: 50%; background: #300; border: 1px solid #222; box-shadow: inset -2px -2px 3px rgba(0,0,0,0.6), inset 2px 2px 3px rgba(255,255,255,0.3); }
+    .osc-led.active { background: #ff2a2a; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.2), inset 2px 2px 4px rgba(255,255,255,0.8), 0 0 10px #ff2a2a; }
+    .osc-led-label { font-size: 10px; font-weight: bold; color: #444; }
+
+    @keyframes reel-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes lamp-breathe { 0% { opacity: 0.8; filter: brightness(0.9); } 100% { opacity: 1; filter: brightness(1.1); } }
+    @keyframes lyric-shift { from { transform: translateY(14px); opacity: 0.25; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 1024px) {
+      .top { grid-template-columns: 1fr; }
+      .bottom { flex-wrap: wrap; justify-content: center; }
+      .dial { min-width: 100%; order: -1; }
+      .playlist-view { flex-direction: column; height: auto; align-items: center; }
+      .tape-rack { width: 100%; flex-direction: row; flex-wrap: wrap; perspective: none; }
+      .tape.active { transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 环境光背景 -->
+  <div class="ambient-bg" id="ambientBg"></div>
+
+  <!-- 示波器登录弹窗 (默认隐藏) -->
+  <div class="osc-overlay" id="osc-overlay">
+    <div class="osc-device-shell osc-plastic-texture">
+        <div class="osc-front-bezel osc-plastic-texture">
+            <div class="osc-crt-recess">
+                <div class="osc-crt-screen">
+                    <div class="osc-grid-fisheye"></div>
+                    <div class="osc-scanlines"></div>
+                    <div class="osc-crt-glare"></div>
+                    <div class="osc-screen-content">
+                        <div class="osc-qr-code" id="osc-qr" title="点击模拟扫码"></div>
+                        <canvas id="osc-wave"></canvas>
+                        <div class="osc-crt-text" id="osc-text"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="osc-bottom-panel">
+                <div class="osc-brand-text">
+                    <div class="osc-brand-logo">RetroAuth</div>
+                    <div class="osc-brand-model">222</div>
+                </div>
+                <div class="osc-indicator-group">
+                    <div class="osc-led-container">
+                        <div class="osc-led" id="osc-led1"></div><div class="osc-led-label">CH 1</div>
+                    </div>
+                    <div class="osc-led-container">
+                        <div class="osc-led" id="osc-led2"></div><div class="osc-led-label">CH 2</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <main class="stage">
+    <!-- ================= 主车机视图 ================= -->
+    <section class="deck" id="deck-view" aria-label="ALLMusic 复古车机播放器">
+      <div class="badge-row"><span class="badge">ALLMusic Retro Deck</span><span class="badge muted">Core Transport Linked</span></div>
+      <div class="shell">
+        <section class="top">
+          <div class="panel cassette">
+            <div class="small-label">Memory Stop System</div>
+            <div class="cassette-window">
+              <div class="tape-wrapper" id="tape-wrapper">
+                <div class="cover" id="cover"><span class="cover-copy" id="cover-copy"></span></div>
+                <div class="tape-pack left"><div class="reel spinning" id="reel-left"></div></div>
+                <div class="tape-pack right"><div class="reel spinning" id="reel-right"></div></div>
+              </div>
+            </div>
+            <div class="small-label state" id="cassette-state">PLAY ▷</div>
+          </div>
+
+          <div class="vfd">
+            <div class="screen-copy">
+              <div class="track-title" id="track-title"></div>
+              <div class="track-row"><span class="track-artist" id="track-artist"></span><span class="track-state live" id="track-state">LIVE</span></div>
+              <div class="lyrics lyric-view bilingual" id="lyric-view">
+                <div class="lyric-stack" id="lyric-stack">
+                  <p class="lyric-line primary" id="lyric-primary"></p>
+                  <p class="lyric-line secondary" id="lyric-secondary"></p>
+                </div>
+              </div>
+            </div>
+            <div class="spectrum" id="spectrum" aria-hidden="true"></div>
+          </div>
+        </section>
+
+        <section class="transport">
+          <div class="transport-segment controls">
+            <div class="transport-buttons">
+              <button class="transport-btn" id="prev-btn" title="上一首"><svg viewBox="0 0 24 24" class="icon"><path d="M7 5h2v14H7zM11 12l8 6V6z" fill="currentColor"></path></svg></button>
+              <button class="transport-btn primary playing" id="play-btn" title="播放/暂停"><span class="play-led"></span><span id="play-icon"></span></button>
+              <button class="transport-btn" id="next-btn" title="下一首"><svg viewBox="0 0 24 24" class="icon"><path d="M15 12L7 6v12zM17 5h2v14h-2z" fill="currentColor"></path></svg></button>
+            </div>
+            <!-- 弹出按钮 -->
+            <button class="eject-btn" id="eject-btn" title="弹出磁带并选择歌单">⏏ EJECT</button>
+          </div>
+          <div class="transport-segment">
+            <div class="mode-grid">
+              <div class="mode-slot green" data-slot="loop"><span class="mode-led"></span><span class="mode-label">LIST</span><button class="mode-btn" data-action="play-mode" data-value="loop"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M17.4 2.5l4.1 4.1-4.1 4.1V8.3H8.2c-1.9 0-3.3 1.4-3.3 3.3v0.1H2.5v-0.1c0-3.2 2.6-5.7 5.7-5.7h9.2V2.5zM6.6 21.5l-4.1-4.1 4.1-4.1v2.4h9.2c1.9 0 3.3-1.4 3.3-3.3v-0.1h2.4v0.1c0 3.2-2.6 5.7-5.7 5.7H6.6v3.4z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="shuffle"><span class="mode-led"></span><span class="mode-label">SHUF</span><button class="mode-btn" data-action="play-mode" data-value="shuffle"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M16.9 3h4.1v4.1h-2.3V6.8l-4 4-1.7-1.7 3.9-3.9h-0.1V3zM16.9 16.9h0.1l-3.9-3.9 1.7-1.7 4 4v-0.3H21V21h-4.1v-2.3zM3 5.7h3.4l3.1 3.1-1.7 1.7-2.4-2.4H3V5.7zM3 18.3h2.4l7.8-7.8 1.7 1.7-8.5 8.5H3v-2.4z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="loop-one"><span class="mode-led"></span><span class="mode-label">ONE</span><button class="mode-btn" data-action="play-mode" data-value="loop-one"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M17.4 2.5l4.1 4.1-4.1 4.1V8.3H8.2c-1.9 0-3.3 1.4-3.3 3.3v0.1H2.5v-0.1c0-3.2 2.6-5.7 5.7-5.7h9.2V2.5zM6.6 21.5l-4.1-4.1 4.1-4.1v2.4h9.2c1.9 0 3.3-1.4 3.3-3.3v-0.1h2.4v0.1c0 3.2-2.6 5.7-5.7 5.7H6.6v3.4zM11 8.2h2.2v7.6H11zM9.1 9.9L12 7l2.9 2.9-1.6 1.6-1.3-1.3-1.3 1.3-1.6-1.6z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="sequential"><span class="mode-led"></span><span class="mode-label">SEQ</span><button class="mode-btn" data-action="play-mode" data-value="sequential"><svg viewBox="0 0 24 24" class="mode-icon"><rect x="3" y="4.5" width="3.2" height="3.2" rx="0.8" fill="currentColor"></rect><rect x="3" y="10.4" width="3.2" height="3.2" rx="0.8" fill="currentColor"></rect><rect x="3" y="16.3" width="3.2" height="3.2" rx="0.8" fill="currentColor"></rect><rect x="8" y="5" width="13" height="2.4" rx="1.2" fill="currentColor"></rect><rect x="8" y="10.9" width="13" height="2.4" rx="1.2" fill="currentColor"></rect><rect x="8" y="16.8" width="13" height="2.4" rx="1.2" fill="currentColor"></rect></svg></button></div>
+              <div class="mode-slot red" data-slot="liked"><span class="mode-led"></span><span class="mode-label">LIKE</span><button class="mode-btn" data-action="toggle-like"><svg viewBox="0 0 24 24" class="mode-icon"><path d="M12 20.8l-1.3-1.2C5.6 14.9 2.5 12 2.5 8.5A4.7 4.7 0 017.2 3.8c1.8 0 3.5.9 4.8 2.4 1.3-1.5 3-2.4 4.8-2.4a4.7 4.7 0 014.7 4.7c0 3.5-3.1 6.4-8.2 11.1L12 20.8z" fill="currentColor"></path></svg></button></div>
+              <div class="mode-slot green" data-slot="muted"><span class="mode-led"></span><span class="mode-label">MUTE</span><button class="mode-btn" data-action="toggle-mute"><span id="mute-icon"></span></button></div>
+            </div>
+          </div>
+          <div class="transport-segment">
+            <div class="lyric-selector" role="radiogroup">
+              <button class="lyric-knob" id="lyric-knob"><div class="knob" id="lyric-rotor"></div></button>
+              <button class="lyric-mark orig" data-lyric-mode="original"><span class="lyric-led"></span><span>ORIG</span></button>
+              <button class="lyric-mark cn" data-lyric-mode="translated"><span class="lyric-led"></span><span>CN</span></button>
+              <button class="lyric-mark ab" data-lyric-mode="bilingual"><span class="lyric-led"></span><span>A+B</span></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="bottom">
+          <div class="knob-shell" id="volume-shell">
+            <svg class="ring-svg" viewBox="0 0 120 120" id="ring-svg"></svg>
+            <div class="knob" id="volume-rotor"></div>
+            <div class="knob-caption" id="volume-display">72</div>
+          </div>
+          <div class="dial">
+            <div class="dial-lamp"></div>
+            <div class="dial-needle" id="dial-needle"></div>
+            <div class="dial-track">
+              <div class="dial-scale"></div>
+              <div class="dial-time"><span id="current-time">00:00</span><span id="duration-time">00:00</span></div>
+            </div>
+            <input class="dial-input" id="progress-input" type="range" min="0" max="100" value="0" />
+          </div>
+          <div class="switch-dock">
+            <!-- 初始状态已设为关闭(aria-checked="false")，用户点击即可弹窗验证 -->
+            <div class="switch-slot green">
+              <div class="rocker-housing"><div class="rocker-switch" id="qq-switch" role="switch" aria-checked="false" tabindex="0"><div class="rocker-face"><span class="rocker-mark">I</span><span class="rocker-mark">O</span></div></div></div>
+              <span class="switch-label">QQ</span>
+            </div>
+            <div class="switch-slot red">
+              <div class="rocker-housing"><div class="rocker-switch" id="ncm-switch" role="switch" aria-checked="false" tabindex="0"><div class="rocker-face"><span class="rocker-mark">I</span><span class="rocker-mark">O</span></div></div></div>
+              <span class="switch-label">NCM</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ================= 2. 歌单选择器视图 ================= -->
+    <section class="playlist-view" id="playlist-view">
+      <!-- 磁带架 -->
+      <div class="tape-rack" id="tapeRack">
+        <div class="tape active" data-id="1" data-color="#e06b3c" data-gradient="linear-gradient(135deg, #e06b3c, #5f1038)">
+          <div class="tape-shell">
+            <div class="screw screw-tl"></div><div class="screw screw-tr"></div>
+            <div class="tape-label">
+              <div class="tape-title">City Pop Classics</div>
+              <div class="tape-window"><div class="tape-spool"></div><div class="tape-spool"></div></div>
+            </div>
+            <div class="tape-bridge"><div class="bridge-hole"></div><div class="bridge-hole"></div></div>
+            <div class="screw screw-bl"></div><div class="screw screw-br"></div>
+          </div>
+        </div>
+        <div class="tape" data-id="2" data-color="#00f2fe" data-gradient="linear-gradient(135deg, #4facfe, #00f2fe)">
+          <div class="tape-shell">
+            <div class="screw screw-tl"></div><div class="screw screw-tr"></div>
+            <div class="tape-label">
+              <div class="tape-title">Synthwave Vibes</div>
+              <div class="tape-window"><div class="tape-spool"></div><div class="tape-spool"></div></div>
+            </div>
+            <div class="tape-bridge"><div class="bridge-hole"></div><div class="bridge-hole"></div></div>
+            <div class="screw screw-bl"></div><div class="screw screw-br"></div>
+          </div>
+        </div>
+        <div class="tape" data-id="3" data-color="#f6d365" data-gradient="linear-gradient(135deg, #f6d365, #fda085)">
+          <div class="tape-shell">
+            <div class="screw screw-tl"></div><div class="screw screw-tr"></div>
+            <div class="tape-label">
+              <div class="tape-title">Lo-Fi Beats</div>
+              <div class="tape-window"><div class="tape-spool"></div><div class="tape-spool"></div></div>
+            </div>
+            <div class="tape-bridge"><div class="bridge-hole"></div><div class="bridge-hole"></div></div>
+            <div class="screw screw-bl"></div><div class="screw screw-br"></div>
+          </div>
+        </div>
+        <div class="tape" data-id="4" data-color="#38f9d7" data-gradient="linear-gradient(135deg, #43e97b, #38f9d7)">
+          <div class="tape-shell">
+            <div class="screw screw-tl"></div><div class="screw screw-tr"></div>
+            <div class="tape-label">
+              <div class="tape-title">Acoustic Pop</div>
+              <div class="tape-window"><div class="tape-spool"></div><div class="tape-spool"></div></div>
+            </div>
+            <div class="tape-bridge"><div class="bridge-hole"></div><div class="bridge-hole"></div></div>
+            <div class="screw screw-bl"></div><div class="screw screw-br"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧歌单面板 -->
+      <div class="playlist-panel">
+        <div class="panel-glow"></div>
+        <div class="playlist-header">
+          <div class="album-art-placeholder" id="headerArt"></div>
+          <div class="playlist-info">
+            <p>CASSETTE MIXTAPE • <span id="tapeTrackCount">12</span> SONGS</p>
+            <h1 id="playlistTitle">City Pop Classics</h1>
+            <button class="play-all-btn" id="playAllBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Play Tape
+            </button>
+          </div>
+        </div>
+        <div class="tracklist-container">
+          <div class="list-header">
+            <div style="text-align: right;">#</div>
+            <div>Cover</div>
+            <div>Title</div>
+            <div>Album</div>
+            <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+            <div></div>
+          </div>
+          <div id="tracklist"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    /* ================= 核心数据区 ================= */
+    const originalTracks =[
+      { title: "PLASTIC LOVE", artist: "MARIYA TAKEUCHI", duration: 319, album: "Variety", cover:["#e06b3c", "#5f1038"], coverCopy: "CITY POP / NCM", original:[{ time: 0, text: "突然のキスや熱いまなざしで" }, { time: 34, text: "恋のプログラムを狂わせないでね" }, { time: 68, text: "出会いと別れ上手に打ち込んで" }, { time: 101, text: "時間がくれば終わる don't hurry!" }], translated:[{ time: 0, text: "别用突然的吻与灼热眼神" }, { time: 34, text: "打乱我早已设好的恋爱程序" }, { time: 68, text: "邂逅与离别我都能熟练输入" }, { time: 101, text: "时间一到就该结束 别着急" }] },
+      { title: "SPARKLE", artist: "TATSURO YAMASHITA", duration: 272, album: "For You", cover:["#16a6b6", "#203a8f"], coverCopy: "SEA DRIVE / QQ", original:[{ time: 0, text: "七色の虹をかけぬけて" }, { time: 32, text: "流れる風を追い越して" }, { time: 64, text: "君と二人でいたい夏のまま" }], translated:[{ time: 0, text: "穿过那道七彩的虹" }, { time: 32, text: "追过正在流动的海风" }, { time: 64, text: "想和你停在这个夏天里" }] }
+    ];
+
+    function generateDummyTracks(baseName, artist, album, color1, color2, count=10) {
+      return Array.from({length: count}).map((_, i) => ({
+        title: `${baseName} Vol.${String(i+1).padStart(2,'0')}`, artist: artist, album: album, duration: Math.floor(Math.random() * 60 + 180),
+        cover:[color1, color2], coverCopy: album.toUpperCase(), original:[{time:0, text: "♪ Instrumental Audio ♪"}], translated:[{time:0, text: "♪ 纯音乐播放中 ♪"}]
+      }));
+    }
+
+    const tapeDB = {
+      "1": { title: "City Pop Classics", artist: "Various Artists", color: "#e06b3c", gradient: "linear-gradient(135deg, #e06b3c, #5f1038)", list:[...originalTracks, ...generateDummyTracks("Midnight Pretenders", "Tomoko Aran", "Fuyü-Kūkan", "#e06b3c", "#5f1038", 10)] },
+      "2": { title: "Synthwave Vibes", artist: "Kavinsky & More", color: "#00f2fe", gradient: "linear-gradient(135deg, #4facfe, #00f2fe)", list: generateDummyTracks("Nightcall", "Kavinsky", "OutRun", "#4facfe", "#00f2fe", 12) },
+      "3": { title: "Lo-Fi Beats", artist: "ChilledCow", color: "#f6d365", gradient: "linear-gradient(135deg, #f6d365, #fda085)", list: generateDummyTracks("Study Rhythm", "Lofi Girl", "Lofi Beats", "#f6d365", "#fda085", 12) },
+      "4": { title: "Acoustic Pop", artist: "Ed Sheeran", color: "#38f9d7", gradient: "linear-gradient(135deg, #43e97b, #38f9d7)", list: generateDummyTracks("Autumn Leaves", "Ed Sheeran", "Plus", "#43e97b", "#38f9d7", 12) }
+    };
+
+    /* ================= 播放器引擎与视图状态 ================= */
+    let currentTapeId = "1";
+    let tracks = tapeDB[currentTapeId].list;
+
+    const KNOB_MIN_ANGLE = -135, KNOB_MAX_ANGLE = 135;
+    const LYRIC_ORDER = ["original", "translated", "bilingual"];
+    const LYRIC_ANGLE = { original: -42, translated: 0, bilingual: 42 };
+    const timers = new Map();
+
+    // 初始状态把 qq 和 ncm 设为 false，以方便测试首次开机扫描逻辑
+    const state = { index: 0, playing: true, loading: false, time: 76, volume: 72, muted: false, playMode: "loop", lyricMode: "bilingual", liked: true, qq: false, ncm: false, tick: 0 };
+    
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => Array.from(document.querySelectorAll(s));
+    
+    const els = { deckView: $("#deck-view"), playlistView: $("#playlist-view"), tapeWrapper: $("#tape-wrapper"), cover: $("#cover"), coverCopy: $("#cover-copy"), reels: $$(".reel"), cassetteState: $("#cassette-state"), title: $("#track-title"), artist: $("#track-artist"), trackState: $("#track-state"), lyricView: $("#lyric-view"), lyricStack: $("#lyric-stack"), lyricPrimary: $("#lyric-primary"), lyricSecondary: $("#lyric-secondary"), spectrum: $("#spectrum"), playBtn: $("#play-btn"), playIcon: $("#play-icon"), lyricKnob: $("#lyric-knob"), lyricRotor: $("#lyric-rotor"), volumeShell: $("#volume-shell"), volumeRotor: $("#volume-rotor"), ringSvg: $("#ring-svg"), volumeDisplay: $("#volume-display"), dialNeedle: $("#dial-needle"), currentTime: $("#current-time"), durationTime: $("#duration-time"), progressInput: $("#progress-input"), qqSwitch: $("#qq-switch"), ncmSwitch: $("#ncm-switch"), muteIcon: $("#mute-icon"), lyricButtons: $$("[data-lyric-mode]"), modeSlots: $$("[data-slot]") };
+
+    function formatTime(total) { const safe = Math.max(0, Math.floor(total)); return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`; }
+    function track() { return tracks[state.index]; }
+    function lyricIndex(lines) { for (let i = 0; i < lines.length; i += 1) { if (!lines[i + 1] || state.time < lines[i + 1].time) return i; } return lines.length - 1; }
+    function lyricPair() { const t = track(); if (state.lyricMode === "translated") { const i = lyricIndex(t.translated); return[t.translated[i]?.text || "暂无歌词", t.translated[i + 1]?.text || ""]; } if (state.lyricMode === "bilingual") { return[t.original[lyricIndex(t.original)]?.text || "暂无歌词", t.translated[lyricIndex(t.translated)]?.text || ""]; } const i = lyricIndex(t.original); return [t.original[i]?.text || "暂无歌词", t.original[i + 1]?.text || ""]; }
+    function polar(cx, cy, radius, deg) { const rad = ((deg - 90) * Math.PI) / 180; return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) }; }
+    function arc(cx, cy, inner, outer, start, end) { const a = polar(cx, cy, outer, start), b = polar(cx, cy, outer, end), c = polar(cx, cy, inner, end), d = polar(cx, cy, inner, start), large = end - start > 180 ? 1 : 0; return `M ${a.x} ${a.y} A ${outer} ${outer} 0 ${large} 1 ${b.x} ${b.y} L ${c.x} ${c.y} A ${inner} ${inner} 0 ${large} 0 ${d.x} ${d.y} Z`; }
+    
+    function renderRing() { 
+      const activeCount = state.muted ? 0 : Math.ceil((state.volume / 100) * 15); 
+      const groove = `<path class="ring-groove" d="${arc(60, 60, 34, 52, 225, 495)}"></path>`; 
+      const segs = Array.from({ length: 15 }, (_, i) => { const tone = i < 5 ? "green" : i < 11 ? "yellow" : "red"; const mode = i < activeCount ? "on" : "off"; return `<path class="ring-seg ${tone} ${mode}" d="${arc(60, 60, 38, 48, 225 + i * 18, 240 + i * 18)}"></path>`; }).join(""); 
+      els.ringSvg.innerHTML = groove + segs; 
+    }
+
+    function renderSpectrum() { 
+      els.spectrum.innerHTML = Array.from({ length: 16 }, (_, i) => { 
+        const seed = Math.floor((state.time / 1.2) + state.tick + ((state.index + 1) * 7)); const wave = Math.abs(Math.sin((seed + i * 3) / 4)); const shimmer = Math.abs(Math.cos((seed + i * 5) / 6)); 
+        const height = state.playing || state.loading ? Math.max(1, Math.min(12, Math.round((wave * 8) + (shimmer * 4) + (state.loading ? 4 : 1)))) : 0; 
+        return `<div class="spec-bar">${Array.from({ length: 12 }, (_, j) => { const on = j < height; const tone = j >= 10 ? "red" : j >= 7 ? "yellow" : j >= 4 ? "green" : "cyan"; return `<span class="seg ${on ? `on ${tone}` : ""} ${state.loading ? "pulse" : ""} ${!state.playing && !state.loading ? "idle" : ""}"></span>`; }).join("")}</div>`; 
+      }).join(""); 
+    }
+
+    function renderMuteIcon() { els.muteIcon.innerHTML = state.muted ? `<svg viewBox="0 0 24 24" class="mode-icon"><path d="M10.8 4.4v15.2L5.8 15H2.6V9h3.2l5-4.6zM16.2 8.7l1.7-1.7 2.2 2.2L22.3 7l1.7 1.7-2.2 2.2 2.2 2.2-1.7 1.7-2.2-2.2-2.2 2.2-1.7-1.7 2.2-2.2-2.2-2.2z" fill="currentColor"></path></svg>` : `<svg viewBox="0 0 24 24" class="mode-icon"><path d="M10.8 4.4v15.2L5.8 15H2.6V9h3.2l5-4.6zM14.7 9.1c1.8 1.1 1.8 4.7 0 5.8v-5.8zM17.4 6.5c3.4 2.2 3.4 8.8 0 11V15c1.4-1.5 1.4-4.5 0-6v-2.5z" fill="currentColor"></path></svg>`; }
+    function syncPower(el, on) { el.setAttribute("aria-checked", String(on)); }
+
+    function animateSlot(name) { 
+      const slot = els.modeSlots.find((item) => item.dataset.slot === name); if (!slot) return; 
+      const btn = slot.querySelector(".mode-btn"); (timers.get(btn) ||[]).forEach(clearTimeout); 
+      btn.classList.remove("phase-pressing", "phase-hold", "phase-rebound"); btn.classList.add("active", "phase-pressing"); 
+      timers.set(btn,[setTimeout(() => { btn.classList.remove("phase-pressing"); btn.classList.add("phase-hold"); }, 140), setTimeout(() => { btn.classList.remove("phase-hold"); btn.classList.add("phase-rebound"); }, 420), setTimeout(() => { btn.classList.remove("phase-rebound"); }, 560)]); 
+    }
+
+    function render() { 
+      const t = track(); const [primary, secondary] = lyricPair(); 
+      const progress = t.duration ? Math.min(100, Math.max(0, (state.time / t.duration) * 100)) : 0; 
+      const angle = KNOB_MIN_ANGLE + ((KNOB_MAX_ANGLE - KNOB_MIN_ANGLE) * (state.muted ? 0 : state.volume)) / 100; 
+      
+      els.cover.style.setProperty("--cover-a", t.cover[0]); els.cover.style.setProperty("--cover-b", t.cover[1]); 
+      els.coverCopy.textContent = t.coverCopy; 
+      els.cassetteState.textContent = state.loading ? "BUFFER..." : state.playing ? "PLAY ▷" : "PAUSE ▌▌"; 
+      els.reels.forEach((reel) => reel.classList.toggle("spinning", state.playing && !state.loading)); 
+      els.title.textContent = t.title; els.artist.textContent = t.artist; 
+      els.trackState.textContent = state.loading ? "LOADING" : state.playing ? "LIVE" : "IDLE"; els.trackState.classList.toggle("live", !state.loading && state.playing); 
+      els.lyricView.classList.toggle("bilingual", state.lyricMode === "bilingual"); els.lyricPrimary.textContent = primary; els.lyricSecondary.textContent = secondary; 
+      els.lyricStack.style.animation = "none"; requestAnimationFrame(() => { els.lyricStack.style.animation = ""; }); 
+      
+      els.playBtn.classList.toggle("playing", state.playing); 
+      els.playIcon.innerHTML = state.playing ? `<svg viewBox="0 0 24 24" class="icon"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"></path></svg>` : `<svg viewBox="0 0 24 24" class="icon"><path d="M8 5v14l11-7z" fill="currentColor"></path></svg>`; 
+      els.lyricRotor.style.transform = `rotate(${LYRIC_ANGLE[state.lyricMode]}deg)`; 
+      els.lyricButtons.forEach((btn) => { const active = btn.dataset.lyricMode === state.lyricMode; btn.classList.toggle("active", active); }); 
+      
+      els.modeSlots.forEach((slot) => { 
+        const key = slot.dataset.slot; const active = key === "liked" ? state.liked : key === "muted" ? state.muted : state.playMode === key; 
+        const btn = slot.querySelector(".mode-btn"); slot.classList.toggle("active", active); slot.classList.toggle("lit", active); 
+        btn.classList.toggle("active", active); if (!active) btn.classList.remove("phase-pressing", "phase-hold", "phase-rebound"); 
+      }); 
+      
+      renderMuteIcon(); renderRing(); renderSpectrum(); 
+      els.volumeRotor.style.transform = `rotate(${angle}deg)`; els.volumeDisplay.textContent = String(Math.min(state.muted ? 0 : state.volume, 99)).padStart(2, "0"); 
+      els.progressInput.max = String(t.duration); els.progressInput.value = String(Math.floor(state.time)); 
+      els.currentTime.textContent = formatTime(state.time); els.durationTime.textContent = formatTime(t.duration); 
+      els.dialNeedle.style.left = `calc(24px + (${progress} * (100% - 48px) / 100))`; 
+      
+      // 更新右下角两个开关的状态
+      syncPower(els.qqSwitch, state.qq); syncPower(els.ncmSwitch, state.ncm); 
+    }
+
+    function setTrack(next) { 
+      if (state.loading) return;
+      const wasPlaying = state.playing; state.playing = false; state.loading = true; els.tapeWrapper.classList.add("ejected"); render(); 
+      setTimeout(() => { 
+        state.index = (next + tracks.length) % tracks.length; state.time = 0; render(); 
+        els.tapeWrapper.classList.remove("ejected"); 
+        setTimeout(() => { state.loading = false; if (wasPlaying) state.playing = true; render(); }, 500); 
+      }, 500); 
+    }
+
+    function volumeFromPoint(x, y) { 
+      const rect = els.volumeShell.getBoundingClientRect(); const cx = rect.left + rect.width / 2; const cy = rect.top + rect.height / 2; 
+      let deg = (Math.atan2(y - cy, x - cx) * 180) / Math.PI + 90; if (deg < 0) deg += 360; 
+      const signed = deg > 180 ? deg - 360 : deg; const clamped = Math.max(KNOB_MIN_ANGLE, Math.min(KNOB_MAX_ANGLE, signed)); 
+      state.volume = Math.max(0, Math.min(100, Math.round(((clamped - KNOB_MIN_ANGLE) / (KNOB_MAX_ANGLE - KNOB_MIN_ANGLE)) * 100))); 
+      state.muted = state.volume === 0; render(); 
+    }
+
+
+    /* ================= 3. 示波器动画与登录流程封装 ================= */
+    let oscResolve = null;
+    let oscReject = null;
+    let oscAnimId = null;
+    let oscWavePhaseTarget = 0, oscWavePhaseCurrent = Math.PI;
+    let oscWaveAmplitudeTarget = 45, oscWaveAmplitudeCurrent = 15;
+    let oscSyncProgress = 0, oscIsSyncing = false;
+    
+    const oscCanvas = $("#osc-wave");
+    const oscCtx = oscCanvas.getContext('2d');
+    let oscCanvasWidth, oscCanvasHeight;
+
+    function resizeOscCanvas() {
+        oscCanvasWidth = oscCanvas.clientWidth;
+        oscCanvasHeight = oscCanvas.clientHeight;
+        oscCanvas.width = oscCanvasWidth;
+        oscCanvas.height = oscCanvasHeight;
+    }
+
+    function drawOscWaveform() {
+        oscCtx.clearRect(0, 0, oscCanvasWidth, oscCanvasHeight);
+        oscCtx.shadowBlur = 10; oscCtx.shadowColor = '#39ff14';
+        oscCtx.strokeStyle = '#39ff14'; oscCtx.lineWidth = 2.5; oscCtx.lineJoin = 'round';
+
+        // 目标基准波形
+        oscCtx.beginPath();
+        for (let x = 0; x < oscCanvasWidth; x++) {
+            let y = oscCanvasHeight / 2 + Math.sin(x * 0.05 + oscWavePhaseTarget) * oscWaveAmplitudeTarget;
+            oscCtx.lineTo(x, y);
+        }
+        oscCtx.stroke();
+
+        // 当前收敛波形
+        let currentPhase = oscWavePhaseCurrent + (oscWavePhaseTarget - oscWavePhaseCurrent) * oscSyncProgress;
+        let currentAmp = oscWaveAmplitudeCurrent + (oscWaveAmplitudeTarget - oscWaveAmplitudeCurrent) * oscSyncProgress;
+
+        oscCtx.beginPath();
+        for (let x = 0; x < oscCanvasWidth; x++) {
+            let y = oscCanvasHeight / 2 + Math.sin(x * 0.05 + currentPhase) * currentAmp;
+            let noise = (Math.random() - 0.5) * 5 * (1 - oscSyncProgress);
+            oscCtx.lineTo(x, y + noise);
+        }
+        oscCtx.stroke();
+
+        oscWavePhaseTarget -= 0.1; oscWavePhaseCurrent -= 0.1;
+        if (oscIsSyncing && oscSyncProgress < 1) oscSyncProgress += 0.006;
+        oscAnimId = requestAnimationFrame(drawOscWaveform);
+    }
+
+    function resetOscUI() {
+        $("#osc-qr").style.display = 'block';
+        $("#osc-qr").style.pointerEvents = 'auto';
+        $("#osc-wave").style.display = 'none';
+        $("#osc-text").style.display = 'none';
+        $("#osc-led1").classList.remove('active');
+        $("#osc-led2").classList.remove('active');
+        cancelAnimationFrame(oscAnimId);
+    }
+
+    function closeOscPopup() {
+        $("#osc-overlay").classList.remove('active');
+        setTimeout(resetOscUI, 500);
+    }
+
+    function showLoginPopup() {
+        return new Promise((resolve, reject) => {
+            oscResolve = resolve;
+            oscReject = reject;
+            resetOscUI();
+            $("#osc-overlay").classList.add('active');
+        });
+    }
+
+    // 点击外部区域取消登录
+    $("#osc-overlay").addEventListener('click', (e) => {
+        if (e.target === $("#osc-overlay")) {
+            closeOscPopup();
+            if (oscReject) oscReject(new Error("用户取消了扫描"));
+        }
+    });
+
+    // 二维码被点击时触发波形同步流程
+    $("#osc-qr").addEventListener('click', async () => {
+        $("#osc-qr").style.pointerEvents = 'none';
+        $("#osc-qr").style.display = 'none';
+        $("#osc-wave").style.display = 'block';
+        resizeOscCanvas();
+
+        oscSyncProgress = 0; oscIsSyncing = true;
+        oscWavePhaseTarget = 0; oscWavePhaseCurrent = Math.PI;
+        drawOscWaveform();
+
+        while(oscSyncProgress < 1) await sleep(50);
+        await sleep(400);
+
+        cancelAnimationFrame(oscAnimId);
+        $("#osc-wave").style.display = 'none';
+        $("#osc-text").innerText = 'MATCH';
+        $("#osc-text").style.display = 'block';
+        await sleep(800);
+
+        for (let i = 0; i < 6; i++) {
+            $("#osc-led1").classList.toggle('active'); await sleep(150);
+            $("#osc-led1").classList.toggle('active'); $("#osc-led2").classList.toggle('active'); await sleep(150);
+            $("#osc-led2").classList.toggle('active');
+        }
+        $("#osc-led1").classList.add('active'); $("#osc-led2").classList.add('active');
+        await sleep(600);
+
+        $("#osc-text").innerText = 'SUCCESS';
+        await sleep(1000);
+
+        closeOscPopup();
+        if (oscResolve) oscResolve(); // 验证成功，继续拨码操作
+    });
+
+    window.addEventListener('resize', () => {
+        if ($("#osc-wave").style.display === 'block') resizeOscCanvas();
+    });
+
+
+    /* ================= 4. 歌单与 UI 交互控制 ================= */
+
+    // 弹出磁带，进入歌单选择器
+    $("#eject-btn").addEventListener("click", () => {
+      if (state.loading) return;
+      state.playing = false;
+      els.tapeWrapper.classList.add("ejected");
+      render();
+      setTimeout(() => {
+        els.deckView.style.display = "none";
+        els.playlistView.style.display = "flex";
+        $("#ambientBg").classList.add("active");
+        renderPlaylistUI(currentTapeId);
+      }, 600);
+    });
+
+    // 渲染歌单 UI 列表
+    function renderPlaylistUI(tapeId) {
+      const data = tapeDB[tapeId];
+      $("#playlistTitle").textContent = data.title;
+      $("#tapeTrackCount").textContent = data.list.length;
+      $("#headerArt").style.background = data.gradient;
+      document.documentElement.style.setProperty('--theme-color', data.color);
+      document.documentElement.style.setProperty('--theme-gradient', data.gradient);
+
+      const tracklistEl = $("#tracklist");
+      tracklistEl.innerHTML = '';
+      
+      data.list.forEach((trk, idx) => {
+        const tr = document.createElement('div');
+        tr.className = 'track-item';
+        tr.innerHTML = `
+          <div class="track-num">${idx + 1}</div>
+          <div class="track-cover" style="background: linear-gradient(135deg, ${trk.cover[0]}, ${trk.cover[1]})"></div>
+          <div class="track-title-wrapper">
+            <div class="track-title">${trk.title}</div>
+            <div class="track-artist">${trk.artist}</div>
+          </div>
+          <div class="track-album">${trk.album}</div>
+          <div class="track-time">${formatTime(trk.duration)}</div>
+          <button class="like-btn"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></button>
+        `;
+        // 单曲点击播放
+        tr.addEventListener('click', (e) => {
+          if(!e.target.closest('.like-btn')) insertAndPlay(tapeId, idx);
+        });
+        tracklistEl.appendChild(tr);
+      });
+    }
+
+    $("#tapeRack").addEventListener('click', (e) => {
+      const clickedTape = e.target.closest('.tape');
+      if (!clickedTape || clickedTape.classList.contains('active')) return;
+      document.querySelectorAll('.tape').forEach(t => t.classList.remove('active'));
+      clickedTape.classList.add('active');
+      renderPlaylistUI(clickedTape.dataset.id);
+    });
+
+    $("#tracklist").addEventListener('click', (e) => {
+      const btn = e.target.closest('.like-btn');
+      if (btn) { btn.classList.toggle('liked'); e.stopPropagation(); }
+    });
+
+    $("#playAllBtn").addEventListener('click', () => {
+      const activeTapeId = document.querySelector('.tape.active').dataset.id;
+      insertAndPlay(activeTapeId, 0);
+    });
+
+    // 载入磁带并回到播放界面的动画序列
+    function insertAndPlay(tapeId, trackIndex) {
+      currentTapeId = tapeId; tracks = tapeDB[tapeId].list; state.index = trackIndex; state.time = 0; state.loading = true;
+      els.playlistView.style.display = "none"; $("#ambientBg").classList.remove("active"); els.deckView.style.display = "block";
+      els.tapeWrapper.classList.add("ejected");
+      render();
+      setTimeout(() => {
+        els.tapeWrapper.classList.remove("ejected");
+        setTimeout(() => { state.loading = false; state.playing = true; render(); }, 500); 
+      }, 50);
+    }
+
+    /* 播放器交互绑定 */
+    $("#prev-btn").addEventListener("click", () => setTrack(state.index - 1));
+    $("#next-btn").addEventListener("click", () => setTrack(state.index + 1));
+    $("#play-btn").addEventListener("click", () => { if (state.loading) return; state.playing = !state.playing; render(); });
+    els.lyricKnob.addEventListener("click", () => { state.lyricMode = LYRIC_ORDER[(LYRIC_ORDER.indexOf(state.lyricMode) + 1) % LYRIC_ORDER.length]; render(); });
+    els.lyricButtons.forEach((button) => button.addEventListener("click", () => { state.lyricMode = button.dataset.lyricMode; render(); }));
+    $$("[data-action='play-mode']").forEach((button) => button.addEventListener("click", () => { state.playMode = button.dataset.value; animateSlot(state.playMode); render(); }));
+    $("[data-action='toggle-like']").addEventListener("click", () => { state.liked = !state.liked; animateSlot("liked"); render(); });
+    $("[data-action='toggle-mute']").addEventListener("click", () => { state.muted = !state.muted; animateSlot("muted"); render(); });
+    
+    els.progressInput.addEventListener("input", (event) => { state.time = Number(event.target.value); render(); });
+    els.volumeShell.addEventListener("pointerdown", (event) => { els.volumeShell.setPointerCapture(event.pointerId); volumeFromPoint(event.clientX, event.clientY); const move = (e) => volumeFromPoint(e.clientX, e.clientY); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up); });
+    
+    // ================== 右下角拨码开关逻辑（增加弹窗判断） ==================
+    [[els.qqSwitch, "qq"],[els.ncmSwitch, "ncm"]].forEach(([el, key]) => { 
+      const toggle = async () => { 
+        if (!state[key]) {
+          // 当前是 OFF，想要打开，需要通过示波器验证
+          try {
+            await showLoginPopup(); // 等待扫码验证完成
+            state[key] = true;
+            render();
+          } catch (error) {
+            // 用户点击了外部取消，放弃开启
+            console.log(error.message);
+          }
+        } else {
+          // 当前是 ON，直接关闭无需验证
+          state[key] = false; 
+          render(); 
+        }
+      }; 
+      el.addEventListener("click", toggle); 
+      el.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); } }); 
+    });
+
+    setInterval(() => { if (state.playing && !state.loading) { state.time += 0.25; if (state.time >= track().duration) { setTrack(state.index + 1); return; } } render(); }, 250);
+    setInterval(() => { state.tick += 1; renderSpectrum(); }, 150);
+    render();
+  </script>
+</body>
+</html>

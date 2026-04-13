@@ -5,6 +5,7 @@
 
 import type {
   ApiResponse,
+  AuthSessionHealthResult,
   LoginResult,
   MusicPlatform,
   UnifiedUser,
@@ -62,6 +63,122 @@ class AuthService {
     }
     const separator = endpoint.includes('?') ? '&' : '?';
     return `${endpoint}${separator}cookie=${encodeURIComponent(cookie.trim())}`;
+  }
+
+  private extractNeteaseUser(data: unknown): UnifiedUser | null {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    const payload = data as {
+      profile?: { userId?: number; nickname?: string; avatarUrl?: string };
+      account?: { id?: number };
+      data?: {
+        profile?: { userId?: number; nickname?: string; avatarUrl?: string };
+        account?: { id?: number };
+      };
+    };
+    const profile = payload.profile || payload.data?.profile;
+    const account = payload.account || payload.data?.account;
+    const userId = profile?.userId || account?.id;
+
+    if (!userId) {
+      return null;
+    }
+
+    return {
+      platform: 'netease',
+      userId: String(userId),
+      nickname: profile?.nickname || 'NetEase User',
+      avatarUrl: normalizeImageUrl(profile?.avatarUrl) || '',
+      isLoggedIn: true,
+    };
+  }
+
+  private async probeNeteaseSession(cookie: string): Promise<{
+    reachable: boolean;
+    authenticated: boolean;
+    cookie: string;
+    user: UnifiedUser | null;
+  }> {
+    const normalizedCookie = cookie.trim();
+    this.sessionCookie = normalizedCookie;
+
+    try {
+      const endpoint = this.appendNeteaseCookie(`/login/status?timestamp=${Date.now()}`, normalizedCookie);
+      const response = await fetch(`${this.apiBase}${endpoint}`, {
+        headers: this.isTauriRuntime() ? { Cookie: normalizedCookie } : undefined,
+        cache: 'no-store',
+      });
+      const data = await response.json().catch(() => ({}));
+
+      const setCookieHeader = response.headers.get('Set-Cookie');
+      if (setCookieHeader) {
+        this.sessionCookie = setCookieHeader;
+      }
+      const cookieFromBody = (data as { cookie?: unknown }).cookie;
+      if (typeof cookieFromBody === 'string' && cookieFromBody.trim()) {
+        this.sessionCookie = cookieFromBody.trim();
+      }
+
+      const latestCookie = this.sessionCookie?.trim() || normalizedCookie;
+      const authenticated = (data as { data?: { code?: number }; code?: number }).data?.code === 200
+        || (data as { code?: number }).code === 200;
+      if (!authenticated) {
+        return {
+          reachable: true,
+          authenticated: false,
+          cookie: latestCookie,
+          user: null,
+        };
+      }
+
+      const user = this.extractNeteaseUser(data) || await this.fetchNeteaseLoggedInUser(latestCookie);
+      return {
+        reachable: true,
+        authenticated: true,
+        cookie: latestCookie,
+        user,
+      };
+    } catch {
+      return {
+        reachable: false,
+        authenticated: false,
+        cookie: normalizedCookie,
+        user: null,
+      };
+    }
+  }
+
+  private async fetchNeteaseLoggedInUser(
+    cookie: string,
+    signal?: AbortSignal
+  ): Promise<UnifiedUser | null> {
+    this.sessionCookie = cookie.trim();
+
+    const endpoints = [
+      `/login/status?timestamp=${Date.now()}`,
+      `/user/account?timestamp=${Date.now()}`,
+    ];
+
+    for (const endpoint of endpoints) {
+      const response = await this.request<unknown>(
+        endpoint,
+        { signal, cache: 'no-store' },
+        true
+      );
+
+      if (!response.success || !response.data) {
+        continue;
+      }
+
+      const user = this.extractNeteaseUser(response.data);
+      if (user) {
+        return user;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -571,8 +688,10 @@ class AuthService {
             };
           }
 
-          // Some API responses are eventually consistent after 803; retry briefly.
-          for (let profileAttempt = 0; profileAttempt < 5; profileAttempt++) {
+          this.sessionCookie = cookie;
+
+          // 二维码确认成功后，登录状态和用户资料可能存在短暂延迟。
+          for (let profileAttempt = 0; profileAttempt < 8; profileAttempt++) {
             if (signal?.aborted) {
               return {
                 success: false,
@@ -581,31 +700,13 @@ class AuthService {
             }
 
             try {
-              const accountResponse = await this.request<{ profile: { userId: number; nickname: string; avatarUrl: string } }>(
-                '/user/account',
-                { signal },
-                true
-              );
-
-              if (accountResponse.success && accountResponse.data) {
-                const accountData = accountResponse.data as any;
-                const userProfile = accountData.profile || accountData.data?.profile;
-                const fallbackAccount = accountData.account || accountData.data?.account;
-                const userId = userProfile?.userId || fallbackAccount?.id;
-
-                if (userId) {
-                  return {
-                    success: true,
-                    user: {
-                      platform: 'netease',
-                      userId: String(userId),
-                      nickname: userProfile?.nickname || 'NetEase User',
-                      avatarUrl: userProfile?.avatarUrl || '',
-                      isLoggedIn: true,
-                    },
-                    cookie,
-                  };
-                }
+              const user = await this.fetchNeteaseLoggedInUser(cookie, signal);
+              if (user) {
+                return {
+                  success: true,
+                  user,
+                  cookie,
+                };
               }
             } catch (e) {
               console.error('Failed to fetch user profile:', e);
@@ -916,12 +1017,20 @@ class AuthService {
     };
   }
 
-  private async fetchQQProfile(cookie: string): Promise<{ userId: string; nickname: string; avatarUrl: string } | null> {
+  private async probeQQProfile(cookie: string): Promise<{
+    reachable: boolean;
+    unauthorized: boolean;
+    cookie: string;
+    profile: { userId: string; nickname: string; avatarUrl: string } | null;
+  }> {
     const endpoints = ['/connect/status', '/user/detail'];
     const authHeaders = {
       token: `Bearer ${cookie}`,
       Authorization: `Bearer ${cookie}`,
     };
+    let reachable = false;
+    let unauthorized = false;
+    let latestCookie = cookie.trim();
 
     for (const endpoint of endpoints) {
       try {
@@ -929,11 +1038,28 @@ class AuthService {
           headers: authHeaders,
         });
 
+        reachable = true;
+        const setCookieHeader = response.headers.get('Set-Cookie');
+        if (setCookieHeader) {
+          latestCookie = this.isTauriRuntime()
+            ? setCookieHeader
+            : this.normalizeSetCookieHeader(setCookieHeader);
+          this.qqSessionCookie = latestCookie;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          unauthorized = true;
+          continue;
+        }
+
         if (!response.ok) {
           continue;
         }
 
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
+        if (!data) {
+          continue;
+        }
 
         if (endpoint === '/connect/status') {
           const payload = data?.data || data;
@@ -941,9 +1067,14 @@ class AuthService {
           const nickname = payload?.name || payload?.nickname;
           if (userId || nickname) {
             return {
-              userId: String(userId || this.extractQQUserId(cookie)),
-              nickname: nickname || 'QQ \u97f3\u4e50\u7528\u6237',
-              avatarUrl: payload?.avatar || payload?.avatarUrl || '',
+              reachable,
+              unauthorized,
+              cookie: latestCookie,
+              profile: {
+                userId: String(userId || this.extractQQUserId(cookie)),
+                nickname: nickname || 'QQ \u97f3\u4e50\u7528\u6237',
+                avatarUrl: payload?.avatar || payload?.avatarUrl || '',
+              },
             };
           }
           continue;
@@ -955,9 +1086,14 @@ class AuthService {
         const nickname = profile?.nickname || profile?.nick;
         if (userId || nickname) {
           return {
-            userId: String(userId || this.extractQQUserId(cookie)),
-            nickname: nickname || 'QQ \u97f3\u4e50\u7528\u6237',
-            avatarUrl: normalizeImageUrl(profile?.avatarUrl || profile?.avatar || profile?.headpic) || '',
+            reachable,
+            unauthorized,
+            cookie: latestCookie,
+            profile: {
+              userId: String(userId || this.extractQQUserId(cookie)),
+              nickname: nickname || 'QQ \u97f3\u4e50\u7528\u6237',
+              avatarUrl: normalizeImageUrl(profile?.avatarUrl || profile?.avatar || profile?.headpic) || '',
+            },
           };
         }
       } catch {
@@ -965,21 +1101,46 @@ class AuthService {
       }
     }
 
-    return null;
+    return {
+      reachable,
+      unauthorized,
+      cookie: latestCookie,
+      profile: null,
+    };
+  }
+
+  private async fetchQQProfile(cookie: string): Promise<{ userId: string; nickname: string; avatarUrl: string } | null> {
+    const result = await this.probeQQProfile(cookie);
+    return result.profile;
   }
 
   /**
    * Renew login session
    */
-  async renewLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
+  async renewLogin(platform: MusicPlatform, cookie: string): Promise<AuthSessionHealthResult> {
     if (platform === 'netease') {
       const normalizedCookie = cookie?.trim();
       if (!normalizedCookie) {
-        return false;
+        return { status: 'invalid' };
       }
 
       if (this.sessionCookie !== normalizedCookie) {
         this.sessionCookie = normalizedCookie;
+      }
+
+      const initialProbe = await this.probeNeteaseSession(normalizedCookie);
+      if (!initialProbe.reachable) {
+        return {
+          status: 'valid',
+          cookie: normalizedCookie,
+        };
+      }
+      if (initialProbe.authenticated) {
+        return {
+          status: 'valid',
+          cookie: initialProbe.cookie,
+          user: initialProbe.user || undefined,
+        };
       }
 
       const endpoint = this.appendNeteaseCookie(`/login/refresh?timestamp=${Date.now()}`, normalizedCookie);
@@ -999,23 +1160,57 @@ class AuthService {
         if (typeof cookieFromBody === 'string') {
           this.sessionCookie = cookieFromBody;
         }
-
-        if (response.ok && ((data as { code?: number; data?: { code?: number } }).code === 200
-          || (data as { data?: { code?: number } }).data?.code === 200)) {
-          return true;
-        }
       } catch {
-        // Fall through to verification fallback.
+        return { status: 'invalid' };
       }
 
-      return this.verifyLogin('netease', normalizedCookie);
+      const refreshedCookie = this.sessionCookie?.trim() || normalizedCookie;
+      const refreshedProbe = await this.probeNeteaseSession(refreshedCookie);
+      if (refreshedProbe.authenticated) {
+        return {
+          status: 'recovered',
+          cookie: refreshedProbe.cookie,
+          user: refreshedProbe.user || undefined,
+        };
+      }
+
+      return { status: 'invalid' };
     }
 
     if (platform === 'qq') {
-      return this.verifyLogin('qq', cookie);
+      const normalizedCookie = cookie?.trim();
+      if (!normalizedCookie) {
+        return { status: 'invalid' };
+      }
+
+      this.qqSessionCookie = normalizedCookie;
+      const result = await this.probeQQProfile(normalizedCookie);
+      if (result.profile) {
+        const nextCookie = result.cookie || normalizedCookie;
+        return {
+          status: nextCookie !== normalizedCookie ? 'recovered' : 'valid',
+          cookie: nextCookie,
+          user: {
+            platform: 'qq',
+            userId: result.profile.userId,
+            nickname: result.profile.nickname,
+            avatarUrl: normalizeImageUrl(result.profile.avatarUrl) || '',
+            isLoggedIn: true,
+          },
+        };
+      }
+
+      if (!result.reachable) {
+        return {
+          status: 'valid',
+          cookie: normalizedCookie,
+        };
+      }
+
+      return { status: 'invalid' };
     }
 
-    return false;
+    return { status: 'invalid' };
   }
 
   /**
@@ -1023,13 +1218,8 @@ class AuthService {
    */
   async verifyLogin(platform: MusicPlatform, cookie: string): Promise<boolean> {
     if (platform === 'netease') {
-      const endpoint = this.appendNeteaseCookie('/login/status', cookie);
-      const response = await fetch(`${this.apiBase}${endpoint}`, {
-        headers: this.isTauriRuntime() ? { Cookie: cookie } : undefined,
-        cache: 'no-store',
-      });
-      const data = await response.json();
-      return data.data?.code === 200 || data.code === 200;
+      const result = await this.probeNeteaseSession(cookie);
+      return !result.reachable || result.authenticated;
     }
 
     if (platform === 'qq') {
@@ -1037,13 +1227,8 @@ class AuthService {
         return false;
       }
 
-      const profile = await this.fetchQQProfile(cookie);
-      if (profile) {
-        return true;
-      }
-
-      // Fallback: if cookie contains key auth tokens, treat as logged in for local mode.
-      return this.hasQQAuthTokens(cookie);
+      const result = await this.probeQQProfile(cookie);
+      return !result.reachable || Boolean(result.profile);
     }
 
     return false;
@@ -1060,16 +1245,7 @@ class AuthService {
         cache: 'no-store',
       });
       const data = await response.json();
-
-      if (data.code === 200 && data.profile) {
-        return {
-          platform: 'netease',
-          userId: String(data.profile.userId),
-          nickname: data.profile.nickname,
-          avatarUrl: data.profile.avatarUrl || '',
-          isLoggedIn: true,
-        };
-      }
+      return this.extractNeteaseUser(data);
     }
 
     if (platform === 'qq') {
@@ -1080,16 +1256,6 @@ class AuthService {
           userId: profile.userId,
           nickname: profile.nickname,
           avatarUrl: normalizeImageUrl(profile.avatarUrl) || '',
-          isLoggedIn: true,
-        };
-      }
-
-      if (this.hasQQAuthTokens(cookie)) {
-        return {
-          platform: 'qq',
-          userId: this.extractQQUserId(cookie),
-          nickname: 'QQ \u97f3\u4e50\u7528\u6237',
-          avatarUrl: '',
           isLoggedIn: true,
         };
       }

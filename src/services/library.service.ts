@@ -694,15 +694,26 @@ class LibraryService {
     likedOrder: 'latest' | 'earliest' | 'api' = 'latest',
     forceRefreshWebOrder = false,
   ): Promise<PlaylistDetailResult> {
+    let resolvedPlaylistId = this.normalizeNumericId(playlist.originalId);
+
     // NetEase likelist endpoint is unordered. For liked playlists, try webpage order first,
     // cache it once, then keep incremental updates by prepending newly liked songs.
     if (playlist.type === 'liked' && cookie) {
       const accountUserId = await this.resolveNeteaseUserId(cookie);
       if (accountUserId) {
+        const officialLikedPlaylistId = await this.resolveNeteaseLikedPlaylistId(
+          accountUserId,
+          cookie,
+          resolvedPlaylistId,
+        );
+        if (officialLikedPlaylistId) {
+          resolvedPlaylistId = officialLikedPlaylistId;
+        }
+
         const neteaseOrder = await this.resolveNeteaseLikedOrderedIds({
           userId: accountUserId,
           cookie,
-          fallbackPlaylistId: playlist.originalId,
+          fallbackPlaylistId: resolvedPlaylistId,
           likedOrder,
           forceRefreshWebOrder,
           includePlaylistHint: true,
@@ -720,8 +731,15 @@ class LibraryService {
       }
     }
 
+    if (!resolvedPlaylistId) {
+      return {
+        songs: [],
+        warning: '网易云我喜欢歌单 ID 解析失败，请重新连接网易云后重试。',
+      };
+    }
+
     const endpoint = this.buildNeteaseUrl('/playlist/track/all', {
-      id: playlist.originalId,
+      id: resolvedPlaylistId,
       limit: '500',
       timestamp: String(Date.now()),
     }, cookie);
@@ -741,7 +759,7 @@ class LibraryService {
     }
 
     const fallbackEndpoint = this.buildNeteaseUrl('/playlist/detail', {
-      id: playlist.originalId,
+      id: resolvedPlaylistId,
       timestamp: String(Date.now()),
     }, cookie);
 
@@ -1938,11 +1956,6 @@ class LibraryService {
   }
 
   private async resolveNeteaseUserId(cookie: string, currentUserId?: string): Promise<string> {
-    const fromState = this.normalizeNumericId(currentUserId);
-    if (fromState) {
-      return fromState;
-    }
-
     const accountEndpoint = this.buildNeteaseUrl('/user/account', {
       timestamp: String(Date.now()),
     }, cookie);
@@ -1951,11 +1964,20 @@ class LibraryService {
       cache: 'no-store',
     });
 
-    return this.normalizeNumericId(this.toText(
+    const fromAccount = this.normalizeNumericId(this.toText(
       accountResponse.data?.profile?.userId
       ?? accountResponse.data?.account?.id
-      ?? accountResponse.data?.account?.userId,
+      ?? accountResponse.data?.account?.userId
+      ?? accountResponse.data?.data?.profile?.userId
+      ?? accountResponse.data?.data?.account?.id
+      ?? accountResponse.data?.data?.account?.userId,
     ));
+    if (fromAccount) {
+      return fromAccount;
+    }
+
+    // Stored auth state can be stale or contain a non-account identifier.
+    return this.normalizeNumericId(currentUserId);
   }
 
   private async fetchQQLikedSongs(cookie: string, userId?: string): Promise<PlaylistDetailResult> {
@@ -2243,6 +2265,7 @@ class LibraryService {
   private async fetchJson<T>(url: string, init: RequestInit = {}): Promise<{ ok: boolean; data?: T; error?: string }> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), LIBRARY_REQUEST_TIMEOUT_MS);
+    const requestLabel = this.describeRequestTarget(url);
 
     try {
       const response = await fetch(url, {
@@ -2259,7 +2282,7 @@ class LibraryService {
         const maybeMessage = this.extractErrorMessage(data);
         return {
           ok: false,
-          error: maybeMessage || `Request failed (HTTP ${response.status})`,
+          error: maybeMessage || `${requestLabel} 请求失败（HTTP ${response.status}）`,
         };
       }
 
@@ -2271,11 +2294,20 @@ class LibraryService {
       return {
         ok: false,
         error: isAbort
-          ? `请求超时（${Math.floor(LIBRARY_REQUEST_TIMEOUT_MS / 1000)}s），请检查本地 API 状态。`
-          : (isConnectionIssue ? this.getConnectionIssueMessage() : message),
+          ? `${requestLabel} 请求超时（${Math.floor(LIBRARY_REQUEST_TIMEOUT_MS / 1000)}s），请检查本地 API 状态。`
+          : (isConnectionIssue ? `${this.getConnectionIssueMessage()}（${requestLabel}）` : `${requestLabel} 请求异常：${message}`),
       };
     } finally {
       clearTimeout(timeoutId);
+    }
+  }
+
+  private describeRequestTarget(url: string): string {
+    try {
+      const parsed = new URL(url);
+      return parsed.pathname || parsed.origin;
+    } catch {
+      return url;
     }
   }
 

@@ -1,9 +1,23 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuthStore, usePlayerStore } from '@/stores';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useSongLikeAction } from '@/hooks/useSongLikeAction';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
-import { libraryService } from '@/services/library.service';
 import { formatDuration } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { libraryService } from '@/services/library.service';
+import { useAuthStore, useLocalApiStatusStore, usePlayerStore, useSongLikeStore } from '@/stores';
+import type { PlayMode, UnifiedSong } from '@/types';
+import { getSongLikeKey } from '@/utils/home.utils';
+
+const SPECTRUM_BAR_COUNT = 10;
+const KNOB_MIN_ANGLE = -135;
+const KNOB_MAX_ANGLE = 135;
+const LYRIC_MODE_ORDER = ['original', 'translated', 'bilingual'] as const;
+const LYRIC_MODE_ANGLE: Record<LyricDisplayMode, number> = {
+  original: -42,
+  translated: 0,
+  bilingual: 42,
+};
+
+type LyricDisplayMode = (typeof LYRIC_MODE_ORDER)[number];
 
 interface TimedLyricLine {
   timeMs: number;
@@ -15,172 +29,149 @@ interface ParsedLyric {
   hasTimeline: boolean;
 }
 
-type LyricDisplayMode = 'original' | 'translated' | 'bilingual';
-
-const LYRIC_DISPLAY_MODE_STORAGE_KEY = 'allmusic_lyric_display_mode_v1';
-
-const lyricDisplayModeLabelMap: Record<LyricDisplayMode, string> = {
-  original: '原',
-  translated: '译',
-  bilingual: '同',
-};
-
-const playModeLabelMap = {
-  sequential: '顺序播放',
-  loop: '列表循环',
-  shuffle: '随机播放',
-  'loop-one': '单曲循环',
-} as const;
-
-const playModeOrder = ['sequential', 'loop', 'shuffle', 'loop-one'] as const;
+interface VolumeSegmentSpec {
+  active: boolean;
+  path: string;
+  tone: 'green' | 'yellow' | 'red';
+}
 
 interface IconProps {
   className?: string;
 }
 
-function PrevIcon({ className = 'h-4 w-4' }: IconProps) {
+interface PlatformPowerSwitchProps {
+  label: string;
+  accent: 'green' | 'red';
+  active: boolean;
+  disabled?: boolean;
+  onToggle?: () => void;
+}
+
+function PrevIcon({ className = 'am-retro-player__icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M11 19L4 12l7-7v14Z" />
-      <path d="M20 5v14" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M7 5h2v14H7zM11 12l8 6V6z" fill="currentColor" />
     </svg>
   );
 }
 
-function NextIcon({ className = 'h-4 w-4' }: IconProps) {
+function NextIcon({ className = 'am-retro-player__icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M13 19l7-7-7-7v14Z" />
-      <path d="M4 5v14" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M15 12L7 6v12zM17 5h2v14h-2z" fill="currentColor" />
     </svg>
   );
 }
 
-function PlayIcon({ className = 'h-4 w-4' }: IconProps) {
+function PlayIcon({ className = 'am-retro-player__icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M8 5.5a1 1 0 0 1 1.52-.86l9 6a1 1 0 0 1 0 1.72l-9 6A1 1 0 0 1 8 17.5v-12Z" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M8 5v14l11-7z" fill="currentColor" />
     </svg>
   );
 }
 
-function PauseIcon({ className = 'h-4 w-4' }: IconProps) {
+function PauseIcon({ className = 'am-retro-player__icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <rect x="7" y="5" width="4" height="14" rx="1" />
-      <rect x="13" y="5" width="4" height="14" rx="1" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" />
     </svg>
   );
 }
 
-function RepeatIcon({ className = 'h-4 w-4' }: IconProps) {
+function SequentialIcon({ className = 'am-retro-player__mode-icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 1l4 4-4 4" />
-      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-      <path d="M7 23l-4-4 4-4" />
-      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <rect x="3" y="4.5" width="3.2" height="3.2" rx="0.8" fill="currentColor" />
+      <rect x="3" y="10.4" width="3.2" height="3.2" rx="0.8" fill="currentColor" />
+      <rect x="3" y="16.3" width="3.2" height="3.2" rx="0.8" fill="currentColor" />
+      <rect x="8" y="5" width="13" height="2.4" rx="1.2" fill="currentColor" />
+      <rect x="8" y="10.9" width="13" height="2.4" rx="1.2" fill="currentColor" />
+      <rect x="8" y="16.8" width="13" height="2.4" rx="1.2" fill="currentColor" />
     </svg>
   );
 }
 
-function ShuffleIcon({ className = 'h-4 w-4' }: IconProps) {
+function RepeatIcon({ className = 'am-retro-player__mode-icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M16 3h5v5" />
-      <path d="M4 20l6.5-6.5" />
-      <path d="M21 3l-8.5 8.5" />
-      <path d="M16 21h5v-5" />
-      <path d="M21 21l-8.5-8.5" />
-      <path d="M4 4l3 3" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M17.4 2.5l4.1 4.1-4.1 4.1V8.3H8.2c-1.9 0-3.3 1.4-3.3 3.3v0.1H2.5v-0.1c0-3.2 2.6-5.7 5.7-5.7h9.2V2.5z" fill="currentColor" />
+      <path d="M6.6 21.5l-4.1-4.1 4.1-4.1v2.4h9.2c1.9 0 3.3-1.4 3.3-3.3v-0.1h2.4v0.1c0 3.2-2.6 5.7-5.7 5.7H6.6v3.4z" fill="currentColor" />
     </svg>
   );
 }
 
-function ListIcon({ className = 'h-4 w-4' }: IconProps) {
+function ShuffleIcon({ className = 'am-retro-player__mode-icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M8 6h13" />
-      <path d="M8 12h13" />
-      <path d="M8 18h13" />
-      <circle cx="4" cy="6" r="1" fill="currentColor" />
-      <circle cx="4" cy="12" r="1" fill="currentColor" />
-      <circle cx="4" cy="18" r="1" fill="currentColor" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M16.9 3h4.1v4.1h-2.3V6.8l-4 4-1.7-1.7 3.9-3.9h-0.1V3z" fill="currentColor" />
+      <path d="M16.9 16.9h0.1l-3.9-3.9 1.7-1.7 4 4v-0.3H21V21h-4.1v-2.3z" fill="currentColor" />
+      <path d="M3 5.7h3.4l3.1 3.1-1.7 1.7-2.4-2.4H3V5.7z" fill="currentColor" />
+      <path d="M3 18.3h2.4l7.8-7.8 1.7 1.7-8.5 8.5H3v-2.4z" fill="currentColor" />
     </svg>
   );
 }
 
-function RepeatOneIcon({ className = 'h-4 w-4' }: IconProps) {
+function RepeatOneIcon({ className = 'am-retro-player__mode-icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 1l4 4-4 4" />
-      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-      <path d="M7 23l-4-4 4-4" />
-      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-      <path d="M12 8v8" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M17.4 2.5l4.1 4.1-4.1 4.1V8.3H8.2c-1.9 0-3.3 1.4-3.3 3.3v0.1H2.5v-0.1c0-3.2 2.6-5.7 5.7-5.7h9.2V2.5z" fill="currentColor" />
+      <path d="M6.6 21.5l-4.1-4.1 4.1-4.1v2.4h9.2c1.9 0 3.3-1.4 3.3-3.3v-0.1h2.4v0.1c0 3.2-2.6 5.7-5.7 5.7H6.6v3.4z" fill="currentColor" />
+      <path d="M11 8.2h2.2v7.6H11zM9.1 9.9L12 7l2.9 2.9-1.6 1.6-1.3-1.3-1.3 1.3-1.6-1.6z" fill="currentColor" />
     </svg>
   );
 }
 
-function VolumeIcon({ className = 'h-4 w-4', level = 1, muted = false }: IconProps & { level?: number; muted?: boolean }) {
-  if (muted || level === 0) {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M11 5L6 9H3v6h3l5 4V5Z" />
-        <line x1="23" y1="9" x2="17" y2="15" />
-        <line x1="17" y1="9" x2="23" y2="15" />
-      </svg>
-    );
-  }
+function HeartIcon({ className = 'am-retro-player__mode-icon' }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M11 5L6 9H3v6h3l5 4V5Z" />
-      {level >= 0.1 && <path d="M15.5 8.5a5 5 0 0 1 0 7" />}
-      {level >= 0.6 && <path d="M18.5 6a8.5 8.5 0 0 1 0 12" />}
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        d="M12 20.8l-1.3-1.2C5.6 14.9 2.5 12 2.5 8.5A4.7 4.7 0 017.2 3.8c1.8 0 3.5.9 4.8 2.4 1.3-1.5 3-2.4 4.8-2.4a4.7 4.7 0 014.7 4.7c0 3.5-3.1 6.4-8.2 11.1L12 20.8z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
 
-function QueueIcon({ className = 'h-4 w-4' }: IconProps) {
+function MuteIcon({ className = 'am-retro-player__mode-icon', muted = false }: IconProps & { muted?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 6h16" />
-      <path d="M4 12h16" />
-      <path d="M4 18h10" />
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M10.8 4.4v15.2L5.8 15H2.6V9h3.2l5-4.6z" fill="currentColor" />
+      {muted ? (
+        <>
+          <path d="M16.2 8.7l1.7-1.7 2.2 2.2L22.3 7l1.7 1.7-2.2 2.2 2.2 2.2-1.7 1.7-2.2-2.2-2.2 2.2-1.7-1.7 2.2-2.2-2.2-2.2z" fill="currentColor" />
+        </>
+      ) : (
+        <>
+          <path d="M14.7 9.1c1.8 1.1 1.8 4.7 0 5.8v-5.8z" fill="currentColor" />
+          <path d="M17.4 6.5c3.4 2.2 3.4 8.8 0 11V15c1.4-1.5 1.4-4.5 0-6v-2.5z" fill="currentColor" />
+        </>
+      )}
     </svg>
   );
 }
 
-function TrashIcon({ className = 'h-4 w-4' }: IconProps) {
+function PlatformPowerSwitch({ label, accent, active, disabled = false, onToggle }: PlatformPowerSwitchProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M6 6l1 14h10l1-14" />
-      <path d="M10 10v7" />
-      <path d="M14 10v7" />
-    </svg>
-  );
-}
-
-function InfoIcon({ className = 'h-4 w-4' }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v6" />
-      <circle cx="12" cy="8" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function RetryIcon({ className = 'h-4 w-4' }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 0 1 15.4-6.3L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-15.4 6.3L3 16" />
-      <path d="M3 21v-5h5" />
-    </svg>
+    <button
+      type="button"
+      className="am-retro-player__power-switch-slot am-retro-player__power-switch-button"
+      title={`${label}${active ? '已连接，点击断开' : '未连接，点击扫码登录'}`}
+      aria-label={`${label}${active ? '已连接，点击断开' : '未连接，点击扫码登录'}`}
+      onClick={onToggle}
+      disabled={disabled}
+    >
+      <div
+        className={`am-retro-player__power-switch am-retro-player__power-switch--${accent} ${active ? 'is-on' : 'is-off'}`}
+        aria-label={`${label}${active ? '已连接' : '未连接'}`}
+      >
+        <span className="am-retro-player__power-switch-lens">
+          <span className="am-retro-player__power-switch-mark am-retro-player__power-switch-mark--off">O</span>
+          <span className="am-retro-player__power-switch-mark am-retro-player__power-switch-mark--on">I</span>
+        </span>
+      </div>
+      <span className="am-retro-player__power-switch-label">{label}</span>
+    </button>
   );
 }
 
@@ -191,13 +182,39 @@ function toMillis(minute: string, second: string, decimal: string | undefined): 
     return 0;
   }
 
-  let ms = 0;
-  if (decimal) {
-    const normalized = decimal.padEnd(3, '0').slice(0, 3);
-    ms = Number(normalized);
-  }
+  const ms = decimal ? Number(decimal.padEnd(3, '0').slice(0, 3)) || 0 : 0;
+  return (min * 60 * 1000) + (sec * 1000) + ms;
+}
 
-  return min * 60 * 1000 + sec * 1000 + ms;
+function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
+  const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+  return {
+    x: cx + (radius * Math.cos(angleRad)),
+    y: cy + (radius * Math.sin(angleRad)),
+  };
+}
+
+function describeRingArcPath(
+  cx: number,
+  cy: number,
+  innerRadius: number,
+  outerRadius: number,
+  startAngle: number,
+  endAngle: number,
+) {
+  const outerStart = polarToCartesian(cx, cy, outerRadius, startAngle);
+  const outerEnd = polarToCartesian(cx, cy, outerRadius, endAngle);
+  const innerEnd = polarToCartesian(cx, cy, innerRadius, endAngle);
+  const innerStart = polarToCartesian(cx, cy, innerRadius, startAngle);
+  const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
+    'Z',
+  ].join(' ');
 }
 
 function parseLyric(rawLyric: string): ParsedLyric {
@@ -218,24 +235,18 @@ function parseLyric(rawLyric: string): ParsedLyric {
 
     const matches = Array.from(line.matchAll(timeTagRegex));
     const text = line.replace(timeTagRegex, '').trim();
-
-    if (matches.length === 0) {
-      if (text) {
-        plainLines.push(text);
-      }
+    if (!text) {
       continue;
     }
 
-    if (!text) {
+    if (matches.length === 0) {
+      plainLines.push(text);
       continue;
     }
 
     for (const match of matches) {
       const [, minute, second, decimal] = match;
-      timedLines.push({
-        timeMs: toMillis(minute, second, decimal),
-        text,
-      });
+      timedLines.push({ timeMs: toMillis(minute, second, decimal), text });
     }
   }
 
@@ -245,373 +256,729 @@ function parseLyric(rawLyric: string): ParsedLyric {
   }
 
   return {
-    lines: plainLines.map((text, index) => ({ timeMs: index * 1000, text })),
+    lines: plainLines.map((text, index) => ({ timeMs: index * 3000, text })),
     hasTimeline: false,
   };
 }
 
 function getActiveLyricIndex(parsedLyric: ParsedLyric, currentTimeMs: number): number {
-  if (!parsedLyric.hasTimeline || parsedLyric.lines.length === 0) {
+  if (parsedLyric.lines.length === 0) {
     return -1;
   }
 
-  for (let i = 0; i < parsedLyric.lines.length; i += 1) {
-    const next = parsedLyric.lines[i + 1];
-    if (!next || currentTimeMs < next.timeMs) {
-      return i;
+  if (!parsedLyric.hasTimeline) {
+    return Math.floor(Math.max(0, currentTimeMs) / 3000) % parsedLyric.lines.length;
+  }
+
+  for (let index = 0; index < parsedLyric.lines.length; index += 1) {
+    const nextLine = parsedLyric.lines[index + 1];
+    if (!nextLine || currentTimeMs < nextLine.timeMs) {
+      return index;
     }
   }
 
   return parsedLyric.lines.length - 1;
 }
 
-function findClosestLyricText(parsedLyric: ParsedLyric, timeMs: number, indexHint: number): string {
+function resolveLyricPair(parsedLyric: ParsedLyric, currentTimeMs: number): [string, string] {
   if (parsedLyric.lines.length === 0) {
-    return '';
+    return ['暂无歌词', '等待歌曲开始播放'];
   }
 
-  const byIndex = parsedLyric.lines[indexHint];
-  if (byIndex) {
-    return byIndex.text;
-  }
-
-  let closest = parsedLyric.lines[0];
-  let minDiff = Math.abs(closest.timeMs - timeMs);
-  for (let i = 1; i < parsedLyric.lines.length; i += 1) {
-    const current = parsedLyric.lines[i];
-    const diff = Math.abs(current.timeMs - timeMs);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = current;
-    }
-  }
-  return closest.text;
+  const activeIndex = getActiveLyricIndex(parsedLyric, currentTimeMs);
+  const currentLine = parsedLyric.lines[activeIndex]?.text || parsedLyric.lines[0].text;
+  const nextLine = parsedLyric.lines[(activeIndex + 1) % parsedLyric.lines.length]?.text || currentLine;
+  return [currentLine, nextLine];
 }
 
-function resolveLyricPair(
-  parsedLyric: ParsedLyric,
-  activeIndex: number,
+function resolveBilingualLyricPair(
+  originalLyric: ParsedLyric,
+  translatedLyric: ParsedLyric,
   currentTimeMs: number,
-  fallbackText: string,
 ): [string, string] {
-  if (parsedLyric.lines.length === 0) {
-    return [fallbackText, ''];
+  if (originalLyric.lines.length === 0 && translatedLyric.lines.length === 0) {
+    return ['暂无歌词', '等待歌曲开始播放'];
   }
 
-  if (parsedLyric.hasTimeline && activeIndex >= 0) {
-    const currentLine = parsedLyric.lines[activeIndex]?.text || fallbackText;
-    const nextLine = parsedLyric.lines[activeIndex + 1]?.text || currentLine;
-    return [currentLine, nextLine];
+  if (translatedLyric.lines.length === 0) {
+    return ['暂无中文歌词', '当前歌曲没有翻译歌词'];
   }
 
-  const currentLineIndex = Math.floor(currentTimeMs / 3000) % parsedLyric.lines.length;
-  const nextLineIndex = (currentLineIndex + 1) % parsedLyric.lines.length;
-  return [
-    parsedLyric.lines[currentLineIndex]?.text || fallbackText,
-    parsedLyric.lines[nextLineIndex]?.text || parsedLyric.lines[currentLineIndex]?.text || fallbackText,
-  ];
+  const originalIndex = getActiveLyricIndex(originalLyric, currentTimeMs);
+  const translatedIndex = getActiveLyricIndex(translatedLyric, currentTimeMs);
+  const originalLine = originalLyric.lines[originalIndex]?.text || originalLyric.lines[0]?.text || '暂无原文歌词';
+  const translatedLine =
+    translatedLyric.lines[translatedIndex]?.text || translatedLyric.lines[0]?.text || '暂无中文歌词';
+  return [originalLine, translatedLine];
 }
 
-function PlayModeIcon({ mode, className = 'h-4 w-4' }: { mode: keyof typeof playModeLabelMap; className?: string }) {
-  if (mode === 'shuffle') {
-    return <ShuffleIcon className={className} />;
-  }
-  if (mode === 'loop-one') {
-    return <RepeatOneIcon className={className} />;
-  }
-  if (mode === 'sequential') {
-    return <ListIcon className={className} />;
-  }
-  return <RepeatIcon className={className} />;
+function VfdLyricWindow({
+  lines,
+  mode,
+}: {
+  lines: [string, string];
+  mode: LyricDisplayMode;
+}) {
+  const currentLine = lines[0].trim() || '暂无歌词';
+  const nextLine = lines[1].trim() || currentLine;
+  const activeKey = `${currentLine}|${nextLine}`;
+
+  return (
+    <div className={`am-retro-player__lyric-viewport ${mode === 'bilingual' ? 'is-bilingual' : ''}`}>
+      <div key={activeKey} className="am-retro-player__lyric-stack">
+        <p className="am-retro-player__lyric-row am-retro-player__lyric-row--primary">{currentLine}</p>
+        <p className="am-retro-player__lyric-row am-retro-player__lyric-row--secondary">{nextLine}</p>
+      </div>
+    </div>
+  );
 }
 
-export function PlayerBar() {
-  const [showQueue, setShowQueue] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isCoverExpanded, setIsCoverExpanded] = useState(false);
-  const [isVolumePanelOpen, setIsVolumePanelOpen] = useState(false);
-  const [detailLyric, setDetailLyric] = useState('');
-  const [detailTranslatedLyric, setDetailTranslatedLyric] = useState('');
-  const [detailLyricError, setDetailLyricError] = useState<string | null>(null);
-  const [isDetailLyricLoading, setIsDetailLyricLoading] = useState(false);
-  const [barOriginalLyric, setBarOriginalLyric] = useState('');
-  const [barTranslatedLyric, setBarTranslatedLyric] = useState('');
-  const [lyricDisplayMode, setLyricDisplayMode] = useState<LyricDisplayMode>(() => {
-    if (typeof window === 'undefined') {
-      return 'bilingual';
+interface DeckShellProps {
+  children: React.ReactNode;
+}
+
+function DeckShell({ children }: DeckShellProps) {
+  return (
+    <div className="am-player-shell am-retro-player">
+      <div className="am-retro-player__frame">
+        <div className="am-retro-player__badge-row">
+          <span className="am-retro-player__badge">ALLMusic Retro Deck</span>
+          <span className="am-retro-player__badge am-retro-player__badge--muted">Core Transport Linked</span>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+interface DeckDisplayProps {
+  coverUrl: string;
+  titleLabel: string;
+  artistLabel: string;
+  isPlaying: boolean;
+  isLoading: boolean;
+  spectrumLevels: number[];
+  lyricLines: [string, string];
+  lyricDisplayMode: LyricDisplayMode;
+}
+
+function DeckDisplay({
+  coverUrl,
+  titleLabel,
+  artistLabel,
+  isPlaying,
+  isLoading,
+  spectrumLevels,
+  lyricLines,
+  lyricDisplayMode,
+}: DeckDisplayProps) {
+  return (
+    <div className="am-retro-player__top">
+      <div className="am-retro-player__cassette">
+        <div className="am-retro-player__cassette-label">Memory Stop System</div>
+        <div className="am-retro-player__cassette-window">
+          <div className="am-retro-player__cassette-art">
+            {coverUrl ? (
+              <img src={coverUrl} alt={titleLabel} className="am-retro-player__cassette-image" />
+            ) : (
+              <span className="am-retro-player__cassette-placeholder">TAPE</span>
+            )}
+          </div>
+          <div className={`am-retro-player__reel am-retro-player__reel--left ${isPlaying ? 'is-spinning' : ''}`} />
+          <div className={`am-retro-player__reel am-retro-player__reel--right ${isPlaying ? 'is-spinning' : ''}`} />
+        </div>
+        <div className="am-retro-player__cassette-state">
+          {isLoading ? 'BUFFER...' : isPlaying ? 'PLAY ▷' : 'PAUSE ▌▌'}
+        </div>
+      </div>
+
+      <div className="am-retro-player__display">
+        <div className="am-retro-player__vfd">
+          <div className="am-retro-player__vfd-copy">
+            <div className="am-retro-player__vfd-title-main" title={titleLabel}>{titleLabel}</div>
+            <div className="am-retro-player__vfd-track-row">
+              <span className="am-retro-player__vfd-track-tag" title={artistLabel}>{artistLabel}</span>
+              <span className={`am-retro-player__vfd-state ${isPlaying ? 'is-live' : ''}`}>
+                {isLoading ? 'LOADING' : isPlaying ? 'LIVE' : 'IDLE'}
+              </span>
+            </div>
+            <div className="am-retro-player__vfd-lyrics">
+              <VfdLyricWindow lines={lyricLines} mode={lyricDisplayMode} />
+            </div>
+          </div>
+          <DeckSpectrum levels={spectrumLevels} isPlaying={isPlaying} isLoading={isLoading} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DeckSpectrumProps {
+  levels: number[];
+  isPlaying: boolean;
+  isLoading: boolean;
+}
+
+function DeckSpectrum({ levels, isPlaying, isLoading }: DeckSpectrumProps) {
+  return (
+    <div className="am-retro-player__spectrum" aria-hidden="true">
+      {levels.map((level, index) => (
+        <div key={`spectrum-${index}`} className="am-retro-player__spectrum-bar">
+          {Array.from({ length: 10 }, (_, segmentIndex) => {
+            const active = segmentIndex < level;
+            const className = active
+              ? segmentIndex >= 8
+                ? 'is-red'
+                : segmentIndex >= 5
+                  ? 'is-orange'
+                  : 'is-cyan'
+              : '';
+            return (
+              <span
+                key={`segment-${index}-${segmentIndex}`}
+                className={`am-retro-player__spectrum-segment ${active ? 'is-active' : ''} ${className} ${
+                  isLoading ? 'is-pulsing' : ''
+                } ${!isPlaying && !isLoading ? 'is-idle' : ''}`}
+              />
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface DeckTransportControlsProps {
+  disabled: boolean;
+  isPlaying: boolean;
+  isLoading: boolean;
+  lyricDisplayMode: LyricDisplayMode;
+  modeControls: React.ReactNode;
+  onOpenLibrary?: () => void;
+  onPrevious: () => void;
+  onTogglePlay: () => void;
+  onNext: () => void;
+  onLyricDisplayModeChange: (mode: LyricDisplayMode) => void;
+}
+
+interface DeckLyricModeKnobProps {
+  disabled: boolean;
+  mode: LyricDisplayMode;
+  onChange: (mode: LyricDisplayMode) => void;
+}
+
+function DeckLyricModeKnob({ disabled, mode, onChange }: DeckLyricModeKnobProps) {
+  const activeIndex = LYRIC_MODE_ORDER.indexOf(mode);
+  const activeOption = LYRIC_MODE_ORDER[activeIndex] || 'bilingual';
+
+  const cycleMode = () => {
+    if (disabled) {
+      return;
     }
-    const storedMode = window.localStorage.getItem(LYRIC_DISPLAY_MODE_STORAGE_KEY);
-    return storedMode === 'original' || storedMode === 'translated' || storedMode === 'bilingual'
-      ? storedMode
-      : 'bilingual';
-  });
+    const nextMode = LYRIC_MODE_ORDER[(activeIndex + 1) % LYRIC_MODE_ORDER.length] || 'bilingual';
+    onChange(nextMode);
+  };
 
+  return (
+    <div className={`am-retro-player__lyric-selector ${disabled ? 'is-disabled' : ''}`} role="radiogroup" aria-label="歌词显示模式">
+      <button
+        type="button"
+        className="am-retro-player__lyric-knob"
+        onClick={cycleMode}
+        disabled={disabled}
+        title={`歌词模式：${activeOption === 'original' ? '原文' : activeOption === 'translated' ? '中文' : '双语'}`}
+        aria-label={`歌词模式：${activeOption === 'original' ? '原文' : activeOption === 'translated' ? '中文' : '双语'}`}
+      >
+        <div className={`am-retro-player__lyric-knob-shell am-retro-player__knob-shell ${disabled ? 'is-disabled' : ''}`}>
+          <div className="am-retro-player__knob-glow am-retro-player__lyric-knob-glow" />
+          <div className="am-retro-player__knob" style={{ transform: `rotate(${LYRIC_MODE_ANGLE[mode]}deg)` }}>
+            <span className="am-retro-player__knob-indicator" />
+          </div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === 'original'}
+        className={`am-retro-player__lyric-marker am-retro-player__lyric-marker--original ${mode === 'original' ? 'is-active' : ''}`}
+        onClick={() => onChange('original')}
+        disabled={disabled}
+        title="原文歌词"
+        aria-label="原文歌词"
+      >
+        <span className="am-retro-player__lyric-marker-led" />
+        <span className="am-retro-player__lyric-marker-label">ORIG</span>
+      </button>
+
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === 'translated'}
+        className={`am-retro-player__lyric-marker am-retro-player__lyric-marker--translated ${mode === 'translated' ? 'is-active' : ''}`}
+        onClick={() => onChange('translated')}
+        disabled={disabled}
+        title="中文歌词"
+        aria-label="中文歌词"
+      >
+        <span className="am-retro-player__lyric-marker-led" />
+        <span className="am-retro-player__lyric-marker-label">CN</span>
+      </button>
+
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === 'bilingual'}
+        className={`am-retro-player__lyric-marker am-retro-player__lyric-marker--bilingual ${mode === 'bilingual' ? 'is-active' : ''}`}
+        onClick={() => onChange('bilingual')}
+        disabled={disabled}
+        title="双语歌词"
+        aria-label="双语歌词"
+      >
+        <span className="am-retro-player__lyric-marker-led" />
+        <span className="am-retro-player__lyric-marker-label">A+B</span>
+      </button>
+    </div>
+  );
+}
+
+function DeckTransportControls({
+  disabled,
+  isPlaying,
+  isLoading,
+  lyricDisplayMode,
+  modeControls,
+  onOpenLibrary,
+  onPrevious,
+  onTogglePlay,
+  onNext,
+  onLyricDisplayModeChange,
+}: DeckTransportControlsProps) {
+  return (
+    <div className="am-retro-player__transport-panel">
+      <div className="am-retro-player__transport-segment am-retro-player__transport-segment--controls">
+        <div className="am-retro-player__transport-buttons">
+          <button
+            type="button"
+            className="am-retro-player__transport-btn"
+            onClick={onPrevious}
+            disabled={disabled}
+            title="上一首"
+            aria-label="上一首"
+          >
+            <PrevIcon />
+          </button>
+          <button
+            type="button"
+            className={`am-retro-player__transport-btn am-retro-player__transport-btn--primary ${isPlaying ? 'is-playing' : ''}`}
+            onClick={onTogglePlay}
+            disabled={disabled}
+            title={isPlaying ? '暂停' : '播放'}
+            aria-label={isPlaying ? '暂停' : '播放'}
+          >
+            <span className="am-retro-player__led" />
+            {isLoading ? <span className="am-retro-player__loading-dot">...</span> : isPlaying ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          <button
+            type="button"
+            className="am-retro-player__transport-btn"
+            onClick={onNext}
+            disabled={disabled}
+            title="下一首"
+            aria-label="下一首"
+          >
+            <NextIcon />
+          </button>
+        </div>
+        <button
+          type="button"
+          className="am-retro-player__eject-btn"
+          onClick={onOpenLibrary}
+          title="弹出磁带并打开资料库"
+          aria-label="弹出磁带并打开资料库"
+        >
+          ⏏ EJECT
+        </button>
+      </div>
+
+      <div className="am-retro-player__transport-segment am-retro-player__transport-segment--modes">
+        {modeControls}
+      </div>
+
+      <div className="am-retro-player__transport-segment am-retro-player__transport-segment--selector">
+        <DeckLyricModeKnob
+          disabled={disabled}
+          mode={lyricDisplayMode}
+          onChange={onLyricDisplayModeChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface DeckModeButtonProps {
+  label: string;
+  title: string;
+  active: boolean;
+  accent?: 'green' | 'red';
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+function DeckModeButton({
+  label,
+  title,
+  active,
+  accent = 'green',
+  disabled = false,
+  onClick,
+  children,
+}: DeckModeButtonProps) {
+  const previousActiveRef = useRef(active);
+  const timeoutIdsRef = useRef<number[]>([]);
+  const [pressPhase, setPressPhase] = useState<'idle' | 'pressing' | 'hold' | 'rebound' | 'settled'>(
+    active ? 'settled' : 'idle',
+  );
+  const [isLit, setIsLit] = useState(active);
+
+  useEffect(() => {
+    const clearTimers = () => {
+      timeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      timeoutIdsRef.current = [];
+    };
+
+    if (previousActiveRef.current === active) {
+      return clearTimers;
+    }
+
+    clearTimers();
+
+    if (active) {
+      setIsLit(false);
+      setPressPhase('pressing');
+
+      timeoutIdsRef.current.push(
+        window.setTimeout(() => {
+          setPressPhase('hold');
+        }, 140),
+      );
+
+      timeoutIdsRef.current.push(
+        window.setTimeout(() => {
+          setIsLit(true);
+          setPressPhase('rebound');
+        }, 520),
+      );
+
+      timeoutIdsRef.current.push(
+        window.setTimeout(() => {
+          setPressPhase('settled');
+        }, 660),
+      );
+    } else {
+      setIsLit(false);
+      setPressPhase('idle');
+    }
+
+    previousActiveRef.current = active;
+    return clearTimers;
+  }, [active]);
+
+  return (
+    <div
+      className={`am-retro-player__mode-slot ${active ? 'is-active' : ''} ${isLit ? 'is-lit' : ''} ${disabled ? 'is-disabled' : ''} ${accent === 'red' ? 'is-red' : 'is-green'}`}
+    >
+      <span className="am-retro-player__mode-led" />
+      <span className="am-retro-player__mode-label">{label}</span>
+      <button
+        type="button"
+        className={`am-retro-player__mode-btn ${active ? 'is-active' : ''} is-phase-${pressPhase}`}
+        title={title}
+        aria-label={title}
+        aria-pressed={active}
+        disabled={disabled}
+        onClick={onClick}
+      >
+        <span className="am-retro-player__mode-icon-wrap">{children}</span>
+      </button>
+    </div>
+  );
+}
+
+interface DeckModeControlsProps {
+  hasSong: boolean;
+  playMode: PlayMode;
+  isMuted: boolean;
+  isLiked: boolean;
+  likePending: boolean;
+  embedded?: boolean;
+  onSetPlayMode: (mode: PlayMode) => void;
+  onToggleMute: () => void;
+  onToggleLike: () => void;
+}
+
+function DeckModeControls({
+  hasSong,
+  playMode,
+  isMuted,
+  isLiked,
+  likePending,
+  embedded = false,
+  onSetPlayMode,
+  onToggleMute,
+  onToggleLike,
+}: DeckModeControlsProps) {
+  return (
+    <div className={`am-retro-player__mode-panel ${embedded ? 'is-embedded' : ''}`}>
+      <DeckModeButton
+        label="LIST"
+        title="列表循环"
+        active={playMode === 'loop'}
+        onClick={() => onSetPlayMode('loop')}
+      >
+        <RepeatIcon />
+      </DeckModeButton>
+      <DeckModeButton
+        label="SHUF"
+        title="随机播放"
+        active={playMode === 'shuffle'}
+        onClick={() => onSetPlayMode('shuffle')}
+      >
+        <ShuffleIcon />
+      </DeckModeButton>
+      <DeckModeButton
+        label="ONE"
+        title="单曲循环"
+        active={playMode === 'loop-one'}
+        onClick={() => onSetPlayMode('loop-one')}
+      >
+        <RepeatOneIcon />
+      </DeckModeButton>
+      <DeckModeButton
+        label="SEQ"
+        title="顺序播放"
+        active={playMode === 'sequential'}
+        onClick={() => onSetPlayMode('sequential')}
+      >
+        <SequentialIcon />
+      </DeckModeButton>
+      <DeckModeButton
+        label={likePending ? 'SYNC' : 'LIKE'}
+        title={isLiked ? '取消喜欢' : '加入喜欢'}
+        active={isLiked}
+        accent="red"
+        disabled={!hasSong || likePending}
+        onClick={onToggleLike}
+      >
+        <HeartIcon />
+      </DeckModeButton>
+      <DeckModeButton
+        label="MUTE"
+        title={isMuted ? '取消静音' : '静音'}
+        active={isMuted}
+        disabled={!hasSong}
+        onClick={onToggleMute}
+      >
+        <MuteIcon muted={isMuted} />
+      </DeckModeButton>
+    </div>
+  );
+}
+
+interface DeckVolumeKnobProps {
+  volumePercent: number;
+  knobAngle: number;
+  isMuted: boolean;
+  disabled: boolean;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+}
+
+function DeckVolumeKnob({
+  volumePercent,
+  knobAngle,
+  isMuted,
+  disabled,
+  onPointerDown,
+}: DeckVolumeKnobProps) {
+  const activeSegmentCount = isMuted ? 0 : Math.ceil(volumePercent / 10);
+  const volumeDisplay = String(Math.min(volumePercent, 99)).padStart(2, '0');
+  const groovePath = useMemo(
+    () => describeRingArcPath(44, 44, 20, 43, 225, 495),
+    [],
+  );
+  const volumeSegments = useMemo<VolumeSegmentSpec[]>(
+    () => Array.from({ length: 10 }, (_, index) => {
+      const startAngle = 225 + (index * 27);
+      const endAngle = startAngle + 24;
+      return {
+        active: index < activeSegmentCount,
+        path: describeRingArcPath(44, 44, 24, 39, startAngle, endAngle),
+        tone: index < 3 ? 'green' : index < 7 ? 'yellow' : 'red',
+      };
+    }),
+    [activeSegmentCount],
+  );
+
+  return (
+    <div className="am-retro-player__knob-wrap">
+      <div
+        className={`am-retro-player__knob-shell am-retro-player__knob-shell--volume ${disabled ? 'is-disabled' : ''}`}
+        onPointerDown={disabled ? undefined : onPointerDown}
+        role="slider"
+        aria-label="音量"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={volumePercent}
+        aria-valuetext={isMuted ? '静音' : `${volumePercent}%`}
+        tabIndex={disabled ? -1 : 0}
+      >
+        <div className="am-retro-player__knob-scale" aria-hidden="true">
+          <svg viewBox="0 0 88 88" className="am-retro-player__knob-scale-svg">
+            <path className="am-retro-player__knob-groove" d={groovePath} />
+            {volumeSegments.map((segment, index) => (
+              <path
+                key={`volume-segment-${index}`}
+                className={`am-retro-player__knob-segment am-retro-player__knob-segment--${segment.tone} ${
+                  segment.active ? 'is-active' : 'is-idle'
+                }`}
+                d={segment.path}
+              />
+            ))}
+          </svg>
+        </div>
+        <div className="am-retro-player__knob" style={{ transform: `rotate(${knobAngle}deg)` }}>
+          <span className="am-retro-player__knob-indicator" />
+        </div>
+      </div>
+      <div className="am-retro-player__knob-caption">
+        <span>{isMuted ? '00' : volumeDisplay}</span>
+      </div>
+    </div>
+  );
+}
+
+interface DeckProgressDialProps {
+  progressPercent: number;
+  currentLabel: string;
+  durationLabel: string;
+  duration: number;
+  currentTime: number;
+  disabled: boolean;
+  onSeek: (nextValue: number) => void;
+}
+
+function DeckProgressDial({
+  progressPercent,
+  currentLabel,
+  durationLabel,
+  duration,
+  currentTime,
+  disabled,
+  onSeek,
+}: DeckProgressDialProps) {
+  return (
+    <div className="am-retro-player__dial-wrap">
+      <div className="am-retro-player__dial">
+        <div className="am-retro-player__dial-lamp" />
+        <div
+          className="am-retro-player__dial-needle"
+          style={{ left: `calc(24px + (${progressPercent} * (100% - 48px) / 100))` }}
+        />
+        <div className="am-retro-player__dial-track">
+          <div className="am-retro-player__dial-scale" />
+          <div className="am-retro-player__dial-time">
+            <span>{currentLabel}</span>
+            <span>{durationLabel}</span>
+          </div>
+        </div>
+        <input
+          type="range"
+          className="am-retro-player__dial-input"
+          min={0}
+          max={duration || 0}
+          value={Math.min(currentTime, duration || 0)}
+          onChange={(event) => onSeek(Number(event.target.value))}
+          disabled={disabled || duration <= 0}
+          aria-label="播放进度"
+        />
+      </div>
+    </div>
+  );
+}
+
+interface PlayerBarProps {
+  localApiReady?: boolean;
+  onOpenLibrary?: () => void;
+  onTogglePlatform?: (platform: 'netease' | 'qq') => void;
+}
+
+export function PlayerBar({
+  localApiReady = false,
+  onOpenLibrary,
+  onTogglePlatform,
+}: PlayerBarProps = {}) {
+  const users = useAuthStore((state) => state.users);
   const cookies = useAuthStore((state) => state.cookies);
-
+  const localApiServiceState = useLocalApiStatusStore((state) => state.serviceState);
   const currentSong = usePlayerStore((state) => state.currentSong);
-  const queue = usePlayerStore((state) => state.queue);
   const currentIndex = usePlayerStore((state) => state.currentIndex);
-  const isPlaying = usePlayerStore((state) => state.isPlaying);
   const playMode = usePlayerStore((state) => state.playMode);
-  const volume = usePlayerStore((state) => state.volume);
-  const isMuted = usePlayerStore((state) => state.isMuted);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const isLoading = usePlayerStore((state) => state.isLoading);
   const currentTime = usePlayerStore((state) => state.currentTime);
   const duration = usePlayerStore((state) => state.duration);
-  const isLoading = usePlayerStore((state) => state.isLoading);
-  const error = usePlayerStore((state) => state.error);
-
+  const volume = usePlayerStore((state) => state.volume);
+  const isMuted = usePlayerStore((state) => state.isMuted);
   const togglePlay = usePlayerStore((state) => state.togglePlay);
-  const playNext = usePlayerStore((state) => state.playNext);
   const playPrevious = usePlayerStore((state) => state.playPrevious);
-  const playAt = usePlayerStore((state) => state.playAt);
-  const removeFromQueue = usePlayerStore((state) => state.removeFromQueue);
-  const clearQueue = usePlayerStore((state) => state.clearQueue);
+  const playNext = usePlayerStore((state) => state.playNext);
   const setVolume = usePlayerStore((state) => state.setVolume);
   const setIsMuted = usePlayerStore((state) => state.setIsMuted);
   const toggleMute = usePlayerStore((state) => state.toggleMute);
   const setPlayMode = usePlayerStore((state) => state.setPlayMode);
+  const resolveLiked = useSongLikeStore((state) => state.resolveLiked);
+  const likePendingByKey = useSongLikeStore((state) => state.pendingByKey);
 
-  const { seekTo, retryCurrent } = useAudioPlayer();
+  const { toggleSongLike } = useSongLikeAction();
+  const { seekTo } = useAudioPlayer();
 
+  const knobRef = useRef<HTMLDivElement | null>(null);
   const lyricRequestSeqRef = useRef(0);
-  const barLyricRequestSeqRef = useRef(0);
-  const activeLyricLineRef = useRef<HTMLParagraphElement | null>(null);
-  const volumePanelRef = useRef<HTMLDivElement | null>(null);
+  const [spectrumTick, setSpectrumTick] = useState(0);
+  const [lyricText, setLyricText] = useState('');
+  const [translatedLyricText, setTranslatedLyricText] = useState('');
+  const [lyricDisplayMode, setLyricDisplayMode] = useState<LyricDisplayMode>('bilingual');
 
   useEffect(() => {
-    if (!isVolumePanelOpen) {
+    if (!isPlaying && !isLoading) {
+      setSpectrumTick(0);
       return;
     }
 
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (volumePanelRef.current && !volumePanelRef.current.contains(target)) {
-        setIsVolumePanelOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsVolumePanelOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    const timer = window.setInterval(() => {
+      setSpectrumTick((prev) => prev + 1);
+    }, 150);
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      window.clearInterval(timer);
     };
-  }, [isVolumePanelOpen]);
-
-  const playModeLabel = playModeLabelMap[playMode];
-  const progressMax = Math.max(duration, 0);
-  const progressValue = Math.min(Math.max(currentTime, 0), progressMax || 0);
-
-  const currentPositionLabel = useMemo(() => formatDuration(progressValue), [progressValue]);
-  const durationLabel = useMemo(() => formatDuration(progressMax), [progressMax]);
-
-  const parsedOriginalLyric = useMemo(() => parseLyric(detailLyric), [detailLyric]);
-  const parsedTranslatedLyric = useMemo(() => parseLyric(detailTranslatedLyric), [detailTranslatedLyric]);
-  const parsedBarOriginalLyric = useMemo(() => parseLyric(barOriginalLyric), [barOriginalLyric]);
-  const parsedBarTranslatedLyric = useMemo(() => parseLyric(barTranslatedLyric), [barTranslatedLyric]);
-  const coverMarqueeText = useMemo(() => {
-    if (!currentSong) {
-      return 'ALLMusic Glam Mode';
-    }
-    return `${currentSong.name} - ${currentSong.artist || '未知歌手'} · 双平台聚合播放中`;
-  }, [currentSong]);
-
-  const activeOriginalLyricIndex = useMemo(
-    () => getActiveLyricIndex(parsedOriginalLyric, currentTime),
-    [currentTime, parsedOriginalLyric],
-  );
-  const activeTranslatedLyricIndex = useMemo(
-    () => getActiveLyricIndex(parsedTranslatedLyric, currentTime),
-    [currentTime, parsedTranslatedLyric],
-  );
-  const activeBarOriginalLyricIndex = useMemo(
-    () => getActiveLyricIndex(parsedBarOriginalLyric, currentTime),
-    [currentTime, parsedBarOriginalLyric],
-  );
-  const activeBarTranslatedLyricIndex = useMemo(
-    () => getActiveLyricIndex(parsedBarTranslatedLyric, currentTime),
-    [currentTime, parsedBarTranslatedLyric],
-  );
-
-  const detailDisplayLines = useMemo(() => {
-    if (lyricDisplayMode === 'original') {
-      return parsedOriginalLyric.lines.map((line) => ({
-        timeMs: line.timeMs,
-        line1: line.text,
-        line2: '',
-      }));
-    }
-    if (lyricDisplayMode === 'translated') {
-      return parsedTranslatedLyric.lines.map((line) => ({
-        timeMs: line.timeMs,
-        line1: line.text,
-        line2: '',
-      }));
-    }
-
-    if (parsedOriginalLyric.lines.length > 0) {
-      return parsedOriginalLyric.lines.map((line, index) => ({
-        timeMs: line.timeMs,
-        line1: line.text,
-        line2: findClosestLyricText(parsedTranslatedLyric, line.timeMs, index),
-      }));
-    }
-
-    return parsedTranslatedLyric.lines.map((line, index) => ({
-      timeMs: line.timeMs,
-      line1: findClosestLyricText(parsedOriginalLyric, line.timeMs, index),
-      line2: line.text,
-    }));
-  }, [lyricDisplayMode, parsedOriginalLyric, parsedTranslatedLyric]);
-
-  const activeDetailLyricIndex = useMemo(() => {
-    if (lyricDisplayMode === 'original') {
-      return activeOriginalLyricIndex;
-    }
-    if (lyricDisplayMode === 'translated') {
-      return activeTranslatedLyricIndex;
-    }
-    return parsedOriginalLyric.lines.length > 0 ? activeOriginalLyricIndex : activeTranslatedLyricIndex;
-  }, [activeOriginalLyricIndex, activeTranslatedLyricIndex, lyricDisplayMode, parsedOriginalLyric.lines.length]);
-
-  const barOriginalPair = useMemo(
-    () => resolveLyricPair(parsedBarOriginalLyric, activeBarOriginalLyricIndex, currentTime, ''),
-    [activeBarOriginalLyricIndex, currentTime, parsedBarOriginalLyric],
-  );
-  const barTranslatedPair = useMemo(
-    () => resolveLyricPair(parsedBarTranslatedLyric, activeBarTranslatedLyricIndex, currentTime, ''),
-    [activeBarTranslatedLyricIndex, currentTime, parsedBarTranslatedLyric],
-  );
-
-  const barLyricLines = useMemo(() => {
-    const originalLine = barOriginalPair[0] || '';
-    const translatedLine = barTranslatedPair[0] || '';
-
-    if (lyricDisplayMode === 'original') {
-      return {
-        line1: originalLine || translatedLine || '♪ 暂无歌词',
-        line2: '',
-      };
-    }
-
-    if (lyricDisplayMode === 'translated') {
-      return {
-        line1: translatedLine || originalLine || '♪ 暂无歌词',
-        line2: '',
-      };
-    }
-
-    const line1 = originalLine || translatedLine || '♪ 暂无歌词';
-    const line2 = translatedLine && translatedLine !== line1 ? translatedLine : '';
-    return { line1, line2 };
-  }, [barOriginalPair, barTranslatedPair, lyricDisplayMode]);
-
-  const closeDetail = useCallback(() => {
-    lyricRequestSeqRef.current += 1;
-    setIsDetailOpen(false);
-  }, []);
-
-  const openDetail = useCallback(() => {
-    if (!currentSong) {
-      return;
-    }
-    setShowQueue(false);
-    setIsDetailOpen(true);
-  }, [currentSong]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    window.localStorage.setItem(LYRIC_DISPLAY_MODE_STORAGE_KEY, lyricDisplayMode);
-  }, [lyricDisplayMode]);
+  }, [isLoading, isPlaying]);
 
   useEffect(() => {
     if (!currentSong) {
-      closeDetail();
-    }
-  }, [closeDetail, currentSong]);
-
-  useEffect(() => {
-    if (!currentSong) {
-      barLyricRequestSeqRef.current += 1;
-      setBarOriginalLyric('');
-      setBarTranslatedLyric('');
-      return;
-    }
-
-    const requestSeq = barLyricRequestSeqRef.current + 1;
-    barLyricRequestSeqRef.current = requestSeq;
-
-    const loadBarLyric = async () => {
-      try {
-        const result = await libraryService.loadSongLyrics(currentSong, {
-          neteaseCookie: cookies.netease,
-          qqCookie: cookies.qq,
-        });
-
-        if (barLyricRequestSeqRef.current !== requestSeq) {
-          return;
-        }
-
-        setBarOriginalLyric(result.lyric || '');
-        setBarTranslatedLyric(result.translatedLyric || '');
-      } catch {
-        if (barLyricRequestSeqRef.current !== requestSeq) {
-          return;
-        }
-        setBarOriginalLyric('');
-        setBarTranslatedLyric('');
-      }
-    };
-
-    void loadBarLyric();
-  }, [cookies.netease, cookies.qq, currentSong]);
-
-  useEffect(() => {
-    if (!isDetailOpen) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeDetail();
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [closeDetail, isDetailOpen]);
-
-  useEffect(() => {
-    if (!isDetailOpen || !currentSong) {
+      lyricRequestSeqRef.current += 1;
+      setLyricText('');
+      setTranslatedLyricText('');
       return;
     }
 
     const requestSeq = lyricRequestSeqRef.current + 1;
     lyricRequestSeqRef.current = requestSeq;
 
-    setDetailLyric('');
-    setDetailTranslatedLyric('');
-    setDetailLyricError(null);
-    setIsDetailLyricLoading(true);
-
-    const loadLyrics = async () => {
+    const loadLyrics = async (song: UnifiedSong) => {
       try {
-        const result = await libraryService.loadSongLyrics(currentSong, {
+        const result = await libraryService.loadSongLyrics(song, {
           neteaseCookie: cookies.netease,
           qqCookie: cookies.qq,
         });
@@ -620,482 +987,209 @@ export function PlayerBar() {
           return;
         }
 
-        setDetailLyric(result.lyric);
-        setDetailTranslatedLyric(result.translatedLyric);
-        const shouldShowWarning = !result.lyric && !result.translatedLyric && Boolean(result.warning);
-        setDetailLyricError(shouldShowWarning ? (result.warning || null) : null);
-      } catch (loadError) {
+        setLyricText(result.lyric || '');
+        setTranslatedLyricText(result.translatedLyric || '');
+      } catch {
         if (lyricRequestSeqRef.current !== requestSeq) {
           return;
         }
 
-        setDetailLyricError(loadError instanceof Error ? loadError.message : '歌词加载失败，请稍后重试。');
-      } finally {
-        if (lyricRequestSeqRef.current === requestSeq) {
-          setIsDetailLyricLoading(false);
-        }
+        setLyricText('');
+        setTranslatedLyricText('');
       }
     };
 
-    void loadLyrics();
-  }, [cookies.netease, cookies.qq, currentSong, isDetailOpen]);
+    void loadLyrics(currentSong);
+  }, [cookies.netease, cookies.qq, currentSong]);
 
-  useEffect(() => {
-    if (!isDetailOpen || activeDetailLyricIndex < 0) {
+  const hasSong = Boolean(currentSong);
+  const volumePercent = isMuted ? 0 : Math.round(volume * 100);
+  const knobAngle = KNOB_MIN_ANGLE + ((KNOB_MAX_ANGLE - KNOB_MIN_ANGLE) * volumePercent) / 100;
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+  const currentLabel = formatDuration(currentTime);
+  const durationLabel = formatDuration(duration);
+  const isQQConnected = Boolean(users.qq && cookies.qq && localApiServiceState.qq === 'ready');
+  const isNeteaseConnected = Boolean(users.netease && cookies.netease && localApiServiceState.netease === 'ready');
+  const titleLabel = currentSong?.name || 'INSERT TRACK TO START';
+  const artistLabel = currentSong?.artist || 'READY FOR PLAYBACK';
+  const coverUrl = currentSong?.coverUrl || '';
+  const parsedLyric = useMemo(() => parseLyric(lyricText), [lyricText]);
+  const parsedTranslatedLyric = useMemo(() => parseLyric(translatedLyricText), [translatedLyricText]);
+  const lyricLines = useMemo(
+    () => {
+      if (lyricDisplayMode === 'translated') {
+        if (parsedTranslatedLyric.lines.length === 0) {
+          return ['暂无中文歌词', '当前歌曲没有翻译歌词'] as [string, string];
+        }
+        return resolveLyricPair(parsedTranslatedLyric, currentTime);
+      }
+
+      if (lyricDisplayMode === 'bilingual') {
+        return resolveBilingualLyricPair(parsedLyric, parsedTranslatedLyric, currentTime);
+      }
+
+      if (parsedLyric.lines.length === 0) {
+        return ['暂无原文歌词', '等待歌曲开始播放'] as [string, string];
+      }
+      return resolveLyricPair(parsedLyric, currentTime);
+    },
+    [currentTime, lyricDisplayMode, parsedLyric, parsedTranslatedLyric],
+  );
+  const isLiked = currentSong ? resolveLiked(currentSong) : false;
+  const likePending = currentSong ? Boolean(likePendingByKey[getSongLikeKey(currentSong)]) : false;
+
+  const spectrumLevels = useMemo(() => {
+    if (!isPlaying && !isLoading) {
+      return Array.from({ length: SPECTRUM_BAR_COUNT }, () => 0);
+    }
+
+    const seed = Math.floor((currentTime / 120) + spectrumTick + ((currentIndex + 1) * 7));
+    return Array.from({ length: SPECTRUM_BAR_COUNT }, (_, index) => {
+      const wave = Math.abs(Math.sin((seed + index * 3) / 4));
+      const shimmer = Math.abs(Math.cos((seed + index * 5) / 6));
+      const base = isLoading ? 3 : 1;
+      return Math.max(base, Math.min(10, Math.round((wave * 6) + (shimmer * 3) + 1)));
+    });
+  }, [currentIndex, currentTime, isLoading, isPlaying, spectrumTick]);
+
+  const commitVolume = useCallback((nextPercent: number) => {
+    const safePercent = Math.max(0, Math.min(100, Math.round(nextPercent)));
+    const nextVolume = safePercent / 100;
+    setVolume(nextVolume);
+    if (safePercent <= 0) {
+      setIsMuted(true);
+      return;
+    }
+    if (isMuted) {
+      setIsMuted(false);
+    }
+  }, [isMuted, setIsMuted, setVolume]);
+
+  const updateVolumeFromPoint = useCallback((clientX: number, clientY: number) => {
+    if (!knobRef.current) {
       return;
     }
 
-    activeLyricLineRef.current?.scrollIntoView({
-      block: 'center',
-      behavior: 'smooth',
-    });
-  }, [activeDetailLyricIndex, isDetailOpen]);
+    const rect = knobRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
 
-  const handlePlayModeSwitch = () => {
-    const current = playModeOrder.indexOf(playMode);
-    const next = playModeOrder[(current + 1) % playModeOrder.length];
-    setPlayMode(next);
-  };
+    let normalized = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+    if (normalized < 0) {
+      normalized += 360;
+    }
+    const signed = normalized > 180 ? normalized - 360 : normalized;
+    const clamped = Math.max(KNOB_MIN_ANGLE, Math.min(KNOB_MAX_ANGLE, signed));
+    const nextPercent = ((clamped - KNOB_MIN_ANGLE) / (KNOB_MAX_ANGLE - KNOB_MIN_ANGLE)) * 100;
+    commitVolume(nextPercent);
+  }, [commitVolume]);
 
-  if (!currentSong && queue.length === 0) {
-    return null;
-  }
+  const handleKnobPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pointerId = event.pointerId;
+    knobRef.current = event.currentTarget;
+    event.currentTarget.setPointerCapture(pointerId);
+    updateVolumeFromPoint(event.clientX, event.clientY);
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      updateVolumeFromPoint(moveEvent.clientX, moveEvent.clientY);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+  }, [updateVolumeFromPoint]);
+
+  const handleToggleLike = useCallback(() => {
+    if (!currentSong || likePending) {
+      return;
+    }
+    void toggleSongLike(currentSong, { targetLike: !isLiked });
+  }, [currentSong, isLiked, likePending, toggleSongLike]);
 
   return (
-    <>
-      {isDetailOpen && currentSong && (
-        <div
-          className="fixed inset-x-0 bottom-[8.75rem] top-[4.5rem] z-[45] overflow-y-auto bg-slate-950/92 px-3 py-3 backdrop-blur-sm md:px-6 md:py-4"
-          onClick={closeDetail}
-        >
-          <div
-            className="mx-auto flex h-full min-h-0 max-w-7xl flex-col rounded-xl border border-slate-700 bg-slate-900/80 p-4 md:p-6"
-            onClick={(event) => event.stopPropagation()}
-          >
-              <div className="mb-4 flex items-center justify-between border-b border-slate-700 pb-3">
-                <div className="min-w-0">
-                  <p className="text-base font-semibold text-slate-100">播放详情</p>
-                  <p className="truncate text-xs text-slate-400">ESC 可关闭</p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={closeDetail}>
-                  关闭
-                </Button>
-              </div>
+    <DeckShell>
+      <div className="am-retro-player__layout">
+        <DeckDisplay
+          coverUrl={coverUrl}
+          titleLabel={titleLabel}
+          artistLabel={artistLabel}
+          isPlaying={isPlaying}
+          isLoading={isLoading}
+          spectrumLevels={spectrumLevels}
+          lyricLines={lyricLines}
+          lyricDisplayMode={lyricDisplayMode}
+        />
 
-              <div className="min-h-0 grid flex-1 grid-cols-1 gap-6 md:grid-cols-[360px_minmax(0,1fr)]">
-                <div className="flex flex-col items-center justify-center rounded-xl border border-slate-700 bg-slate-950/70 p-6">
-                  <div className="relative h-64 w-64 md:h-72 md:w-72">
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-500/30 via-blue-500/20 to-emerald-500/20 blur-2xl" />
-                    <img
-                      src={currentSong.coverUrl || 'https://p.qlogo.cn/gh/0/0/100'}
-                      alt={currentSong.name}
-                      className="relative z-10 h-full w-full rounded-full border-4 border-slate-700 object-cover shadow-2xl animate-[spin_18s_linear_infinite]"
-                      style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-                    />
-                  </div>
+        <div className="am-retro-player__mid">
+          <DeckTransportControls
+            disabled={!hasSong}
+            isPlaying={isPlaying}
+            isLoading={isLoading}
+            lyricDisplayMode={lyricDisplayMode}
+            modeControls={(
+              <DeckModeControls
+                hasSong={hasSong}
+                playMode={playMode}
+                isMuted={isMuted}
+                isLiked={isLiked}
+                likePending={likePending}
+                embedded
+                onSetPlayMode={setPlayMode}
+                onToggleMute={toggleMute}
+                onToggleLike={handleToggleLike}
+              />
+            )}
+            onOpenLibrary={onOpenLibrary}
+            onPrevious={playPrevious}
+            onTogglePlay={togglePlay}
+            onNext={playNext}
+            onLyricDisplayModeChange={setLyricDisplayMode}
+          />
+        </div>
 
-                  <div className="am-cover-marquee mt-4 w-full" aria-label="播放封面滚动字幕">
-                    <div className="am-cover-marquee-track">
-                      <span>{coverMarqueeText}</span>
-                      <span aria-hidden="true">{coverMarqueeText}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 w-full space-y-1 text-center">
-                    <p className="truncate text-lg font-semibold text-slate-100">{currentSong.name}</p>
-                    <p className="truncate text-sm text-slate-300">{currentSong.artist || '未知歌手'}</p>
-                    <p className="truncate text-xs text-slate-400">专辑：{currentSong.album || '未知专辑'}</p>
-                  </div>
-                </div>
-
-                <div className="flex min-h-0 h-full flex-col rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-4 md:px-4">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-200">滚动歌词</p>
-                    <div className="flex items-center gap-2">
-                      <div className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900/60 p-0.5">
-                        {(Object.keys(lyricDisplayModeLabelMap) as LyricDisplayMode[]).map((mode) => (
-                          <Button
-                            key={mode}
-                            variant={lyricDisplayMode === mode ? 'primary' : 'ghost'}
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => setLyricDisplayMode(mode)}
-                            title={`切换为${lyricDisplayModeLabelMap[mode]}歌词`}
-                          >
-                            {lyricDisplayModeLabelMap[mode]}
-                          </Button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-slate-400">{currentPositionLabel} / {durationLabel}</p>
-                    </div>
-                  </div>
-
-                  {isDetailLyricLoading ? (
-                    <div className="flex flex-1 items-center justify-center text-sm text-slate-300">正在加载歌词...</div>
-                  ) : detailLyricError ? (
-                    <div className="flex flex-1 items-center justify-center text-sm text-rose-300">{detailLyricError}</div>
-                  ) : detailDisplayLines.length === 0 ? (
-                    <div className="flex flex-1 items-center justify-center text-sm text-slate-400">暂无歌词</div>
-                  ) : (
-                    <div className="am-hide-scrollbar min-h-0 flex-1 overflow-y-auto pr-2">
-                      <div className="space-y-2 py-24">
-                        {detailDisplayLines.map((line, index) => {
-                          const active = index === activeDetailLyricIndex;
-                          const hasSecondLine = lyricDisplayMode === 'bilingual' && Boolean(line.line2);
-                          return (
-                            <div
-                              key={`${line.timeMs}_${line.line1}_${line.line2}_${index}`}
-                              ref={active ? activeLyricLineRef : null}
-                              className={`text-center transition-all ${
-                                active
-                                  ? 'scale-[1.02]'
-                                  : ''
-                              }`}
-                            >
-                              <p className={`text-sm leading-7 transition-all ${
-                                active
-                                  ? 'font-semibold text-emerald-300'
-                                  : 'text-slate-300'
-                              }`}
-                              >
-                                {line.line1}
-                              </p>
-                              {hasSecondLine && (
-                                <p className={`text-xs leading-6 transition-all ${
-                                  active
-                                    ? 'text-cyan-200'
-                                    : 'text-slate-400'
-                                }`}
-                                >
-                                  {line.line2}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Detail Playback Controls */}
-                <div className="mt-4 border-t border-slate-700 pt-4 md:mt-6">
-                  <div className="am-player-detail-controls-wrap mx-auto max-w-2xl">
-                    <div className="flex flex-col items-center gap-4 md:gap-6">
-                      <div className="flex w-full items-center gap-3">
-                        <span className="w-10 text-right text-xs font-mono text-slate-400">{currentPositionLabel}</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={progressMax || 0}
-                          value={progressValue}
-                          onChange={(event) => seekTo(Number(event.target.value))}
-                          className="am-player-progress-range flex-1"
-                        />
-                        <span className="w-10 text-xs font-mono text-slate-400">{durationLabel}</span>
-                      </div>
-                      <div className="flex w-full flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 md:gap-4">
-                          <Button variant="ghost" size="sm" onClick={playPrevious} className="h-10 w-10 p-0" title="上一首">
-                            <PrevIcon className="h-6 w-6" />
-                          </Button>
-                          <Button variant="primary" size="sm" onClick={togglePlay} disabled={isLoading} className="h-14 w-14 rounded-full p-0 shadow-lg" title={isPlaying ? '暂停' : '播放'}>
-                            {isLoading ? '…' : isPlaying ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8" />}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={playNext} className="h-10 w-10 p-0" title="下一首">
-                            <NextIcon className="h-6 w-6" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 md:gap-8">
-                          <Button variant="ghost" size="sm" onClick={handlePlayModeSwitch} className="flex h-auto flex-col items-center gap-1 py-1" title={playModeLabel}>
-                            <PlayModeIcon mode={playMode} className="h-5 w-5" />
-                            <span className="text-[10px] font-bold uppercase tracking-tighter opacity-70">{playModeLabel}</span>
-                          </Button>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={toggleMute} className="h-9 w-9 p-0" title={isMuted ? '取消静音' : '静音'}>
-                              <VolumeIcon className="h-5 w-5" level={volume} muted={isMuted} />
-                            </Button>
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              value={isMuted ? 0 : Math.round(volume * 100)}
-                              onChange={(event) => {
-                                const v = Number(event.target.value) / 100;
-                                setVolume(v);
-                                if (v > 0 && isMuted) setIsMuted(false);
-                              }}
-                              className="am-player-volume-range w-24 md:w-32"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <div className="am-retro-player__bottom">
+          <DeckVolumeKnob
+            volumePercent={volumePercent}
+            knobAngle={knobAngle}
+            isMuted={isMuted}
+            disabled={!hasSong}
+            onPointerDown={handleKnobPointerDown}
+          />
+          <DeckProgressDial
+            progressPercent={progressPercent}
+            currentLabel={currentLabel}
+            durationLabel={durationLabel}
+            duration={duration}
+            currentTime={currentTime}
+            disabled={!hasSong}
+            onSeek={seekTo}
+          />
+          <div className="am-retro-player__platform-switches-dock" aria-label="平台连接状态">
+            <PlatformPowerSwitch
+              label="QQ"
+              accent="green"
+              active={isQQConnected}
+              disabled={!localApiReady && !isQQConnected}
+              onToggle={onTogglePlatform ? () => onTogglePlatform('qq') : undefined}
+            />
+            <PlatformPowerSwitch
+              label="NCM"
+              accent="red"
+              active={isNeteaseConnected}
+              disabled={!localApiReady && !isNeteaseConnected}
+              onToggle={onTogglePlatform ? () => onTogglePlatform('netease') : undefined}
+            />
           </div>
         </div>
-      )}
-
-      <div className="am-player-shell fixed bottom-0 left-0 right-0 z-50 border-t border-slate-700 bg-slate-900/95 backdrop-blur">
-        <div className="container mx-auto space-y-1 px-4 py-2">
-          {error && (
-            <div className="flex items-center justify-between gap-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-              <span className="truncate">{error}</span>
-              <Button variant="ghost" size="sm" onClick={retryCurrent} className="inline-flex items-center gap-1">
-                <RetryIcon className="h-3.5 w-3.5" />
-                重试
-              </Button>
-            </div>
-          )}
-
-          {currentSong && (
-            <div className="flex flex-col gap-1 lg:flex-row lg:items-end">
-              <button
-                type="button"
-                onClick={openDetail}
-                className={`group relative flex min-w-0 items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/65 px-2 py-1.5 text-left transition-[padding,background-color,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-violet-400/45 hover:bg-slate-800/80 lg:min-h-[92px] lg:w-[360px] lg:overflow-visible ${
-                  isCoverExpanded ? 'lg:pl-[14.5rem]' : 'lg:pl-[10.75rem]'
-                }`}
-                title="打开播放详情"
-              >
-                <span
-                  className={`hidden lg:block absolute h-[22rem] w-[22rem] cursor-pointer transition-[left,top,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                    isCoverExpanded
-                      ? '-top-[13.25rem] left-0 scale-100 opacity-100'
-                      : '-top-[11.75rem] left-[-12.5rem] scale-[0.98] opacity-95'
-                  }`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setIsCoverExpanded((prev) => !prev);
-                  }}
-                  title={isCoverExpanded ? '点击恢复歌词信息布局' : '点击展开完整旋转封面'}
-                >
-                  <span className="absolute inset-0 rounded-full bg-violet-400/30 blur-3xl" />
-                  <img
-                    src={currentSong.coverUrl || 'https://p.qlogo.cn/gh/0/0/100'}
-                    alt={currentSong.name}
-                    className="relative h-full w-full rounded-full border-4 border-violet-300/70 object-cover shadow-[0_0_55px_rgba(167,139,250,0.6)] animate-[spin_18s_linear_infinite]"
-                    style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-                  />
-                </span>
-                <img
-                  src={currentSong.coverUrl || 'https://p.qlogo.cn/gh/0/0/100'}
-                  alt={currentSong.name}
-                  className="h-12 w-12 rounded-md object-cover lg:hidden animate-[spin_18s_linear_infinite]"
-                  style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-                />
-                <div
-                  className={`min-w-0 overflow-hidden transition-[max-width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:pt-2 ${
-                    isCoverExpanded
-                      ? 'lg:max-w-0 lg:scale-90 lg:-translate-x-2 lg:opacity-0'
-                      : 'lg:max-w-[12.5rem] lg:scale-100 lg:translate-x-0 lg:opacity-100'
-                  }`}
-                >
-                  <p className="truncate text-base font-semibold text-slate-100 md:text-lg">{currentSong.name}</p>
-                  <p className="truncate text-sm text-slate-400 md:text-base">{currentSong.artist || '未知歌手'}</p>
-                </div>
-              </button>
-
-              <div className="flex-1 min-w-0 space-y-2 lg:-translate-y-3">
-                <div className="space-y-0.5 text-center lg:mb-1" aria-label="播放栏歌词">
-                  <p className="truncate text-sm font-semibold tracking-wide text-emerald-200 md:text-base">
-                    {barLyricLines.line1}
-                  </p>
-                  {lyricDisplayMode === 'bilingual' && barLyricLines.line2 ? (
-                    <p className="truncate text-xs tracking-wide text-cyan-200 md:text-sm">
-                      {barLyricLines.line2}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-12 text-right text-xs text-slate-400">{currentPositionLabel}</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={progressMax || 0}
-                    value={progressValue}
-                    onChange={(event) => seekTo(Number(event.target.value))}
-                    className="am-player-progress-range flex-1"
-                  />
-                  <span className="w-12 text-xs text-slate-400">{durationLabel}</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handlePlayModeSwitch}
-                    className="inline-flex items-center gap-1"
-                    title={playModeLabel}
-                    aria-label={playModeLabel}
-                  >
-                    <PlayModeIcon mode={playMode} />
-                    <span className="hidden md:inline">{playModeLabel}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={playPrevious}
-                    className="h-9 w-9 p-0 inline-flex items-center justify-center"
-                    title="上一首"
-                    aria-label="上一首"
-                  >
-                    <PrevIcon />
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={togglePlay}
-                    disabled={isLoading}
-                    className="h-10 w-10 rounded-full p-0 inline-flex items-center justify-center"
-                    title={isPlaying ? '暂停' : '播放'}
-                    aria-label={isPlaying ? '暂停' : '播放'}
-                  >
-                    {isLoading ? '…' : isPlaying ? <PauseIcon /> : <PlayIcon />}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={playNext}
-                    className="h-9 w-9 p-0 inline-flex items-center justify-center"
-                    title="下一首"
-                    aria-label="下一首"
-                  >
-                    <NextIcon />
-                  </Button>
-                  <div ref={volumePanelRef} className="relative">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsVolumePanelOpen((prev) => !prev)}
-                      className="h-8 w-8 p-0"
-                      title="音量"
-                      aria-label="音量"
-                      aria-expanded={isVolumePanelOpen}
-                    >
-                      <VolumeIcon className="h-4 w-4 shrink-0 text-slate-300" level={volume} muted={isMuted} />
-                    </Button>
-                    {isVolumePanelOpen && (
-                      <div className="absolute bottom-full left-1/2 z-20 mb-2 w-44 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900/95 p-2 shadow-xl">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={isMuted ? 0 : Math.round(volume * 100)}
-                          onChange={(event) => {
-                            const v = Number(event.target.value) / 100;
-                            setVolume(v);
-                            if (v <= 0 && !isMuted) {
-                              setIsMuted(true);
-                            }
-                            if (v > 0 && isMuted) {
-                              setIsMuted(false);
-                            }
-                          }}
-                          className="am-player-volume-range w-full"
-                        />
-                        <p className="mt-1 text-right text-[11px] text-slate-400">
-                          {isMuted ? 0 : Math.round(volume * 100)}%
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 lg:w-[260px] lg:pl-2">
-                <div className="flex items-center justify-center lg:justify-end">
-                  <div className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900/60 p-0.5">
-                    {(Object.keys(lyricDisplayModeLabelMap) as LyricDisplayMode[]).map((mode) => (
-                      <Button
-                        key={mode}
-                        variant={lyricDisplayMode === mode ? 'primary' : 'ghost'}
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setLyricDisplayMode(mode)}
-                        title={`切换为${lyricDisplayModeLabelMap[mode]}歌词`}
-                      >
-                        {lyricDisplayModeLabelMap[mode]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-3 lg:justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={openDetail}
-                    className="h-8 w-8 p-0 inline-flex items-center justify-center"
-                    title="详情"
-                    aria-label="详情"
-                  >
-                    <InfoIcon />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowQueue((prev) => !prev)}
-                    className="inline-flex items-center gap-1 px-2.5"
-                    title={`队列(${queue.length})`}
-                    aria-label={`队列(${queue.length})`}
-                  >
-                    <QueueIcon />
-                    <span className="hidden sm:inline">队列</span>
-                    <span className="text-xs">({queue.length})</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearQueue}
-                    className="h-8 w-8 p-0 inline-flex items-center justify-center"
-                    title="清空队列"
-                    aria-label="清空队列"
-                  >
-                    <TrashIcon />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showQueue && (
-            <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950/70 p-2">
-              {queue.length === 0 ? (
-                <p className="px-2 py-1 text-xs text-slate-400">播放队列为空。</p>
-              ) : (
-                queue.map((song, index) => {
-                  const active = index === currentIndex;
-                  return (
-                    <div
-                      key={`${song.id}_${index}`}
-                      className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${
-                        active ? 'bg-blue-500/20 text-blue-100' : 'text-slate-300 hover:bg-slate-800/70'
-                      }`}
-                    >
-                      <button type="button" className="flex-1 truncate text-left" onClick={() => playAt(index)}>
-                        {active ? '▶ ' : ''}
-                        {song.name} - {song.artist || '未知歌手'}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-slate-400 hover:text-rose-300 inline-flex items-center justify-center"
-                        onClick={() => removeFromQueue(index)}
-                        title="移出队列"
-                        aria-label="移出队列"
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
       </div>
-    </>
+    </DeckShell>
   );
 }

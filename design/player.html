@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>复古车机音乐播放器</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-color: #2c2c2c;
+            --panel-light: #3a3a3a;
+            --panel-dark: #1e1e1e;
+            --vfd-cyan: #00ffcc;
+            --vfd-orange: #ff9900;
+            --vfd-red: #ff3300;
+            --vfd-bg: #050806;
+            --led-red: #ff0000;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: "Courier New", Courier, monospace;
+            user-select: none;
+        }
+
+        /* 车机主机外壳 */
+        .stereo-deck {
+            width: 800px;
+            background: linear-gradient(135deg, var(--panel-light), var(--panel-color), var(--panel-dark));
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.8),
+                inset 1px 1px 2px rgba(255, 255, 255, 0.1),
+                inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+            border: 1px solid #111;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 顶部区域：磁带与屏幕 */
+        .top-section {
+            display: flex;
+            gap: 20px;
+            height: 180px;
+        }
+
+        /* 磁带仓 */
+        .cassette-deck {
+            flex: 1;
+            background: #222;
+            border-radius: 5px;
+            box-shadow: inset 2px 2px 10px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #1a1a1a;
+        }
+
+        .cassette-window {
+            width: 140px;
+            height: 60px;
+            background: #000;
+            border-radius: 3px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reel {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #444;
+            border-radius: 50%;
+            position: absolute;
+            animation: spin 3s linear infinite;
+        }
+
+        .reel::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #444;
+            transform: translateY(-50%);
+        }
+
+        .reel.left {
+            left: 20px;
+        }
+
+        .reel.right {
+            right: 20px;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* VFD 屏幕区 */
+        .vfd-screen {
+            flex: 2;
+            background: var(--vfd-bg);
+            border-radius: 5px;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 1), 0 1px 1px rgba(255, 255, 255, 0.1);
+            border: 3px solid #111;
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vfd-screen::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(255, 255, 255, 0.03) 50%, transparent 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            /* 扫描线效果 */
+        }
+
+        .vfd-info {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .vfd-text-glow {
+            color: var(--vfd-cyan);
+            text-shadow: 0 0 5px var(--vfd-cyan), 0 0 10px var(--vfd-cyan);
+            font-weight: bold;
+        }
+
+        .vfd-volume {
+            font-size: 2.5em;
+            letter-spacing: 2px;
+        }
+
+        .vfd-track {
+            font-size: 1.2em;
+            color: var(--vfd-orange);
+            text-shadow: 0 0 5px var(--vfd-orange);
+        }
+
+        .vfd-artist {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        /* 频谱仪 */
+        .spectrum {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .bar {
+            flex: 1;
+            background: #111;
+            height: 100%;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 2px;
+        }
+
+        .segment {
+            height: 8px;
+            background: #222;
+            border-radius: 1px;
+            transition: background 0.1s;
+        }
+
+        .segment.active-cyan {
+            background: var(--vfd-cyan);
+            box-shadow: 0 0 4px var(--vfd-cyan);
+        }
+
+        .segment.active-orange {
+            background: var(--vfd-orange);
+            box-shadow: 0 0 4px var(--vfd-orange);
+        }
+
+        .segment.active-red {
+            background: var(--vfd-red);
+            box-shadow: 0 0 4px var(--vfd-red);
+        }
+
+        /* 中间控制区 */
+        .mid-section {
+            display: flex;
+            gap: 20px;
+        }
+
+        /* 播放控制按钮 (拟物+SVG图标) */
+        .controls {
+            flex: 1;
+            display: flex;
+            justify-content: space-around;
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, #444, #2a2a2a);
+            border: 1px solid #111;
+            border-radius: 4px;
+            width: 50px;
+            height: 40px;
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #aaa;
+            filter: drop-shadow(0 -1px 1px rgba(0, 0, 0, 0.8));
+        }
+
+        /* 红色LED指示灯 */
+        .led-indicator {
+            width: 6px;
+            height: 6px;
+            background: #440000;
+            border-radius: 50%;
+            position: absolute;
+            top: -12px;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn.playing .led-indicator {
+            background: var(--led-red);
+            box-shadow: 0 0 8px var(--led-red), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        /* 预设按键组 */
+        .preset-buttons {
+            flex: 2;
+            display: flex;
+            gap: 5px;
+        }
+
+        .preset-btn {
+            flex: 1;
+            background: linear-gradient(to bottom, #dcdcdc, #a0a0a0);
+            border: 1px solid #555;
+            border-bottom: 4px solid #777;
+            border-radius: 2px;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .preset-btn:active {
+            transform: translateY(3px);
+            border-bottom: 1px solid #777;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        .preset-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: #333;
+        }
+
+        /* 底部区域：旋钮与电台进度条 */
+        .bottom-section {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        /* 音量旋钮 */
+        .knob-container {
+            width: 80px;
+            height: 80px;
+            background: #111;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        .knob {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle at 30% 30%, #555, #111);
+            border-radius: 50%;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+            border: 1px solid #000;
+            position: relative;
+            transform: rotate(-45deg);
+        }
+
+        .knob-indicator {
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 12px;
+            background: var(--vfd-orange);
+            border-radius: 2px;
+            box-shadow: 0 0 5px var(--vfd-orange);
+        }
+
+        .knob-glow {
+            position: absolute;
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: conic-gradient(from -135deg, var(--vfd-orange) 0deg, transparent 40deg, transparent 320deg, var(--vfd-orange) 360deg);
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        /* 模拟电台表盘进度条 */
+        .analog-dial {
+            flex: 1;
+            height: 60px;
+            background: #1a1a1a;
+            border: 2px solid #000;
+            border-radius: 3px;
+            box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .dial-scale {
+            width: 100%;
+            height: 10px;
+            background-image: repeating-linear-gradient(to right, #555 0, #555 2px, transparent 2px, transparent 20px);
+            opacity: 0.7;
+        }
+
+        .dial-numbers {
+            display: flex;
+            justify-content: space-between;
+            color: #888;
+            font-size: 0.8em;
+            font-family: Arial, sans-serif;
+        }
+
+        .dial-needle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--vfd-red);
+            box-shadow: 0 0 6px var(--vfd-red);
+            left: 30%;
+            /* 进度 */
+            transition: left 0.1s linear;
+            z-index: 2;
+        }
+
+        .dial-needle::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -3px;
+            width: 10px;
+            height: 10px;
+            background: var(--vfd-red);
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="stereo-deck">
+        <div class="top-section">
+            <div class="cassette-deck">
+                <div style="color:#555; font-size: 10px; margin-bottom: 5px; letter-spacing: 1px;">MEMORY STOP SYSTEM
+                </div>
+                <div class="cassette-window">
+                    <div class="reel left"></div>
+                    <div class="reel right"></div>
+                </div>
+                <div style="color:#666; font-size: 10px; margin-top: 5px;">PLAY ▷</div>
+            </div>
+
+            <div class="vfd-screen">
+                <div class="vfd-info">
+                    <div class="vfd-text-glow vfd-volume">VOL <span id="vol-display">24</span></div>
+                    <div>
+                        <div class="vfd-text-glow vfd-track">TRACK 04</div>
+                        <div class="vfd-text-glow vfd-artist">PLASTIC LOVE - MARIYA TAKEUCHI</div>
+                    </div>
+                </div>
+                <div class="spectrum" id="spectrum">
+                </div>
+            </div>
+        </div>
+
+        <div class="mid-section">
+            <div class="controls">
+                <button class="btn" title="Previous">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                    </svg>
+                </button>
+                <button class="btn playing" id="play-btn" title="Play/Pause">
+                    <div class="led-indicator"></div>
+                    <svg viewBox="0 0 24 24" id="play-icon">
+                        <path d="M8 5v14l11-7z" />
+                    </svg>
+                </button>
+                <button class="btn" title="Next">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="preset-buttons">
+                <button class="preset-btn"><svg viewBox="0 0 24 24">
+                        <path
+                            d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                    </svg></button> <button class="preset-btn"><svg viewBox="0 0 24 24">
+                        <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+                    </svg></button> <button class="preset-btn"><svg viewBox="0 0 24 24">
+                        <path
+                            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg></button> <button class="preset-btn"><svg viewBox="0 0 24 24">
+                        <path
+                            d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                    </svg></button>
+            </div>
+        </div>
+
+        <div class="bottom-section">
+            <div class="knob-container">
+                <div class="knob-glow"></div>
+                <div class="knob" id="volume-knob">
+                    <div class="knob-indicator"></div>
+                </div>
+            </div>
+
+            <div class="analog-dial">
+                <div class="dial-scale"></div>
+                <div class="dial-needle" id="progress-needle"></div>
+                <div class="dial-numbers">
+                    <span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 频谱仪动效生成 ---
+        const spectrum = document.getElementById('spectrum');
+        const cols = 10; // 10格音频波谱
+        const rows = 10; // 每列10个小块
+
+        for (let i = 0; i < cols; i++) {
+            let bar = document.createElement('div');
+            bar.className = 'bar';
+            for (let j = 0; j < rows; j++) {
+                let seg = document.createElement('div');
+                seg.className = 'segment';
+                bar.appendChild(seg);
+            }
+            spectrum.appendChild(bar);
+        }
+
+        let isPlaying = true;
+
+        function updateSpectrum() {
+            if (!isPlaying) {
+                document.querySelectorAll('.segment').forEach(s => s.className = 'segment');
+                return;
+            }
+            const bars = document.querySelectorAll('.bar');
+            bars.forEach(bar => {
+                let segments = bar.querySelectorAll('.segment');
+                // 随机生成亮起的高度
+                let height = Math.floor(Math.random() * rows);
+                segments.forEach((seg, index) => {
+                    // 根据高度赋予不同颜色，模拟真实VFD：底部青色，中间橙色，顶部红色
+                    if (index < height) {
+                        if (index > 7) seg.className = 'segment active-red';
+                        else if (index > 4) seg.className = 'segment active-orange';
+                        else seg.className = 'segment active-cyan';
+                    } else {
+                        seg.className = 'segment';
+                    }
+                });
+            });
+        }
+
+        setInterval(updateSpectrum, 150); // 每150ms跳动一次
+
+        // --- 播放/暂停控制逻辑 ---
+        const playBtn = document.getElementById('play-btn');
+        const playIcon = document.getElementById('play-icon');
+        const reels = document.querySelectorAll('.reel');
+
+        playBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            playBtn.classList.toggle('playing', isPlaying);
+
+            // 切换图标 (播放 <-> 暂停)
+            if (isPlaying) {
+                playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; // Play SVG
+                reels.forEach(r => r.style.animationPlayState = 'running');
+            } else {
+                playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // Pause SVG
+                reels.forEach(r => r.style.animationPlayState = 'paused');
+                updateSpectrum(); // 清空频谱
+            }
+        });
+
+        // --- 进度条指针动效 ---
+        const needle = document.getElementById('progress-needle');
+        let progress = 30; // 初始进度 30%
+
+        setInterval(() => {
+            if (isPlaying) {
+                progress += 0.1;
+                if (progress > 100) progress = 0;
+                needle.style.left = progress + '%';
+            }
+        }, 100);
+    </script>
+
+</body>
+
+</html>

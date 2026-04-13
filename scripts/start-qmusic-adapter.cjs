@@ -15,7 +15,7 @@ const { ensurePortAvailable } = require('./port-utils.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const PYTHON_CMD = process.env.QQ_ADAPTER_PYTHON || 'python';
-const HOST = process.env.QQ_API_HOST || 'localhost';
+const HOST = process.env.QQ_API_HOST || '127.0.0.1';
 const PORT = String(process.env.QQ_API_PORT || 3001);
 const SKIP_INSTALL = process.env.QQ_ADAPTER_SKIP_INSTALL === '1';
 const isWin = process.platform === 'win32';

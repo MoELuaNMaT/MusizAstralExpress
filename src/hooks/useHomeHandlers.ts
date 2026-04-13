@@ -3,13 +3,22 @@ import {
   type FormEvent,
   type WheelEvent as ReactWheelEvent,
   useCallback,
+  useRef,
 } from 'react';
 import type { useHomeData } from './useHomeData';
 import { getSongLikeKey, isNeteaseLikedOrder } from '@/utils/home.utils';
 import { clearSearchHistory } from '@/lib/db/search-history';
 import type { UnifiedSong } from '@/types';
 
+const WHEEL_LINE_HEIGHT_PX = 16;
+const WHEEL_TOUCHPAD_SNAP_DELAY_MS = 90;
+
+type WheelState = {
+  snapTimer: number | null;
+};
+
 export function useHomeHandlers(data: ReturnType<typeof useHomeData>) {
+  const wheelCarryRef = useRef(new WeakMap<HTMLElement, WheelState>());
   const {
     keyword,
     setKeyword,
@@ -169,25 +178,52 @@ export function useHomeHandlers(data: ReturnType<typeof useHomeData>) {
     await loadDailyRecommendations({ forceRefresh: true });
   };
 
-  const handleScrollableWheel = useCallback((event: ReactWheelEvent<HTMLElement>) => {
+  const handleScrollableWheel = useCallback((event: ReactWheelEvent<HTMLElement>, itemHeight = 80) => {
     const container = event.currentTarget;
     if (container.scrollHeight <= container.clientHeight) {
       return;
     }
 
-    const baseDelta = event.deltaMode === 1
-      ? event.deltaY * 16
+    const pixelDelta = event.deltaMode === 1
+      ? event.deltaY * WHEEL_LINE_HEIGHT_PX
       : event.deltaMode === 2
         ? event.deltaY * container.clientHeight
         : event.deltaY;
 
-    if (!Number.isFinite(baseDelta) || baseDelta === 0) {
+    if (!Number.isFinite(pixelDelta) || pixelDelta === 0) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    container.scrollTop += baseDelta;
+    const step = Math.max(1, Math.round(itemHeight));
+    const direction = pixelDelta > 0 ? 1 : -1;
+    const previous = wheelCarryRef.current.get(container) ?? { snapTimer: null };
+    const isDiscreteWheel = event.deltaMode !== 0 || Math.abs(pixelDelta) >= Math.max(40, step * 0.8);
+
+    if (previous.snapTimer !== null) {
+      window.clearTimeout(previous.snapTimer);
+      previous.snapTimer = null;
+    }
+
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    if (isDiscreteWheel) {
+      container.scrollTop = Math.max(0, Math.min(maxScrollTop, container.scrollTop + (direction * step)));
+      wheelCarryRef.current.set(container, previous);
+      return;
+    }
+
+    container.scrollTop = Math.max(0, Math.min(maxScrollTop, container.scrollTop + pixelDelta));
+    previous.snapTimer = window.setTimeout(() => {
+      const settledMaxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const snapped = Math.round(container.scrollTop / step) * step;
+      container.scrollTop = Math.max(0, Math.min(settledMaxScrollTop, snapped));
+      const state = wheelCarryRef.current.get(container);
+      if (state) {
+        state.snapTimer = null;
+      }
+    }, WHEEL_TOUCHPAD_SNAP_DELAY_MS);
+    wheelCarryRef.current.set(container, previous);
   }, []);
 
   const handleForceRefreshNeteaseWebOrder = async () => {
