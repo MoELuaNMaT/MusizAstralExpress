@@ -7,6 +7,17 @@ use crate::constants::*;
 use crate::services::shutdown_local_services;
 use crate::utils::emit_media_control_event;
 
+// COM 线程公寓 RAII 守卫，确保 CoUninitialize 配对调用
+struct ComGuard;
+impl Drop for ComGuard {
+    fn drop(&mut self) {
+        unsafe { CoUninitialize() };
+    }
+}
+
+#[cfg(all(target_os = "windows", not(target_pointer_width = "64")))]
+compile_error!("Windows desktop integration requires 64-bit target");
+
 pub(crate) fn toggle_main_window_visibility<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -146,12 +157,12 @@ use windows::{
 pub(crate) fn setup_thumbnail_toolbar<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    // 初始化 COM
-    unsafe {
-        let result = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-        if result.is_err() {
-            return Err(format!("Failed to initialize COM: {:?}", result).into());
-        }
+    // 初始化 COM（RAII 守卫确保 CoUninitialize 配对调用）
+    let _com_guard = unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
+            .ok()
+            .map_err(|e| format!("Failed to initialize COM: {}", e))?;
+        ComGuard
     };
 
     // 创建 ITaskbarList3 实例

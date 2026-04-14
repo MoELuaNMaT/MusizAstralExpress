@@ -414,7 +414,7 @@ export function useHomeData() {
     if (isInitialPlaylistBootstrapPending || !playlistError) {
       return;
     }
-    notifyAlert('姝屽崟鍔犺浇澶辫触', playlistError, {
+    notifyAlert('歌单加载失败', playlistError, {
       source: 'home.playlists',
       dedupeKey: `home:playlist-error:${playlistError}`,
     });
@@ -439,7 +439,7 @@ export function useHomeData() {
     if (isInitialPlaylistBootstrapPending || !dailyError) {
       return;
     }
-    notifyAlert('姣忔棩鎺ㄨ崘鍔犺浇澶辫触', dailyError, {
+    notifyAlert('每日推荐加载失败', dailyError, {
       source: 'home.daily',
       dedupeKey: `home:daily-error:${dailyError}`,
     });
@@ -449,7 +449,7 @@ export function useHomeData() {
     if (isInitialPlaylistBootstrapPending || !playlistDetailError) {
       return;
     }
-    notifyAlert('姝屽崟璇︽儏鍔犺浇澶辫触', playlistDetailError, {
+    notifyAlert('歌单详情加载失败', playlistDetailError, {
       source: 'home.playlist-detail',
       dedupeKey: `home:playlist-detail-error:${playlistDetailError}`,
     });
@@ -635,7 +635,7 @@ export function useHomeData() {
 
     if (!isLocalApiReady) {
       setIsInitialPlaylistBootstrapPending(true);
-      setInitialPlaylistBootstrapMessage('姝ｅ湪绛夊緟鏈湴 API 鍚姩瀹屾垚...');
+      setInitialPlaylistBootstrapMessage('正在等待本地 API 启动完成...');
       setPlaylistError(null);
       return;
     }
@@ -647,7 +647,7 @@ export function useHomeData() {
 
     const bootstrapInitialPlaylists = async () => {
       setIsInitialPlaylistBootstrapPending(true);
-      setInitialPlaylistBootstrapMessage(`姝ｅ湪绛夊緟 ${expectedPlaylistPlatformLabel} 棣栨壒姝屽崟鍚屾...`);
+      setInitialPlaylistBootstrapMessage(`正在等待 ${expectedPlaylistPlatformLabel} 首批歌单同步...`);
 
       const startedAt = Date.now();
       let attempt = 0;
@@ -674,7 +674,7 @@ export function useHomeData() {
         const missingPlatformLabel = missingPlatforms.length > 0
           ? missingPlatforms.map((platform) => platformNameMap[platform]).join(' / ')
           : expectedPlaylistPlatformLabel;
-        setInitialPlaylistBootstrapMessage(`姝ｅ湪绛夊緟 ${missingPlatformLabel} 姝屽崟棣栨鍚屾锛堢 ${attempt} 娆★級...`);
+        setInitialPlaylistBootstrapMessage(`正在等待 ${missingPlatformLabel} 歌单首次同步（第 ${attempt} 次）...`);
 
         if (Date.now() - startedAt >= INITIAL_PLAYLIST_BOOTSTRAP_TIMEOUT_MS) {
           const timeoutMessage = `Timed out waiting for playlists from ${missingPlatformLabel}. Please verify local API status and retry.`;

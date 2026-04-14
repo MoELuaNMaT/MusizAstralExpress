@@ -21,12 +21,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import gzip
+import ipaddress
 import json
 import re
 import time
 from dataclasses import dataclass
 from threading import Lock
 from typing import Any
+from urllib.parse import urlparse
 from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import FastAPI, Query, Request
@@ -97,10 +99,15 @@ _disable_upstream_cache(get_detail, get_created_songlist, get_homepage)
 app = FastAPI(title="QQMusic Local Adapter", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=[
+        'http://localhost:1420',
+        'http://127.0.0.1:1420',
+        'tauri://localhost',
+        'https://tauri.localhost',
+    ],
     allow_credentials=False,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=['GET', 'POST'],
+    allow_headers=['Content-Type', 'Authorization', 'token', 'cookie'],
 )
 
 STREAM_FORWARD_HEADERS = {
@@ -303,11 +310,33 @@ def _get_httpx_client() -> httpx.AsyncClient:
         return _HTTPX_CLIENT
 
 
+_ALLOWED_STREAM_HOSTS = re.compile(
+    r'(?:.*\.)?(?:qqmusic\.qq\.com|qqmusic\.cn|qq\.com|qpic\.cn|gtimg\.cn|myqcloud\.com|tc\.qq\.com|stream\.qqmusic\.qq\.com|isure\.stream\.qqmusic\.qq\.com|dl\.stream\.qqmusic\.qq\.com|ws\.stream\.qqmusic\.qq\.com|ocmusicsrv\.filedr\.myqcloud\.com|c.y.qq\.com)$',
+    re.IGNORECASE,
+)
+
+
 def _sanitize_stream_target(target: str) -> str:
     value = _pick_text(target)
     if not value:
         return ''
     if not re.match(r'^https?://', value, re.IGNORECASE):
+        return ''
+    try:
+        parsed = urlparse(value)
+        hostname = parsed.hostname
+        if not hostname:
+            return ''
+        # IP 直连时拒绝私有/回环地址
+        try:
+            addr = ipaddress.ip_address(hostname)
+            if addr.is_private or addr.is_loopback or addr.is_link_local:
+                return ''
+        except ValueError:
+            pass  # hostname 是域名，非 IP，继续域名白名单检查
+        if not _ALLOWED_STREAM_HOSTS.match(hostname):
+            return ''
+    except Exception:
         return ''
     return value
 

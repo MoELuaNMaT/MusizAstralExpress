@@ -67,6 +67,9 @@ pub(crate) async fn cache_cover_image(
     let extension = infer_image_extension_from_url(normalized_url)
         .or_else(|| infer_image_extension_from_content_type(&content_type))
         .unwrap_or("jpg");
+    if !COVER_EXT_CANDIDATES.contains(&extension) {
+        return Err(format!("unsupported image format: {}", extension));
+    }
     let cache_file_path = cover_cache_dir.join(format!("{}.{}", cache_basename, extension));
     fs::write(&cache_file_path, &bytes)
         .map_err(|error| format!("failed to write cover cache file: {}", error))?;

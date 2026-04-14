@@ -99,7 +99,7 @@ export function parseLyric(rawLyric: string): ParsedLyric {
   };
 }
 
-function getActiveLyricIndex(parsedLyric: ParsedLyric, currentTimeMs: number): number {
+export function getActiveLyricIndex(parsedLyric: ParsedLyric, currentTimeMs: number): number {
   if (parsedLyric.lines.length === 0) {
     return -1;
   }
@@ -118,7 +118,7 @@ function getActiveLyricIndex(parsedLyric: ParsedLyric, currentTimeMs: number): n
   return parsedLyric.lines.length - 1;
 }
 
-function resolveLyricPair(parsedLyric: ParsedLyric, emptyLabel: [string, string], currentTimeMs: number): [string, string] {
+export function resolveLyricPair(parsedLyric: ParsedLyric, emptyLabel: [string, string], currentTimeMs: number): [string, string] {
   if (parsedLyric.lines.length === 0) {
     return emptyLabel;
   }

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { useSongLikeAction } from '@/hooks/useSongLikeAction';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { formatDuration } from '@/lib/utils';
+import { parseLyric, getActiveLyricIndex, resolveLyricPair } from '@/lib/lyrics';
+import type { ParsedLyric } from '@/lib/lyrics';
 import { libraryService } from '@/services/library.service';
 import { useAuthStore, useLocalApiStatusStore, usePlayerStore, useSongLikeStore } from '@/stores';
 import type { PlayMode, UnifiedSong } from '@/types';
@@ -18,16 +20,6 @@ const LYRIC_MODE_ANGLE: Record<LyricDisplayMode, number> = {
 };
 
 type LyricDisplayMode = (typeof LYRIC_MODE_ORDER)[number];
-
-interface TimedLyricLine {
-  timeMs: number;
-  text: string;
-}
-
-interface ParsedLyric {
-  lines: TimedLyricLine[];
-  hasTimeline: boolean;
-}
 
 interface VolumeSegmentSpec {
   active: boolean;
@@ -175,17 +167,6 @@ function PlatformPowerSwitch({ label, accent, active, disabled = false, onToggle
   );
 }
 
-function toMillis(minute: string, second: string, decimal: string | undefined): number {
-  const min = Number(minute);
-  const sec = Number(second);
-  if (!Number.isFinite(min) || !Number.isFinite(sec)) {
-    return 0;
-  }
-
-  const ms = decimal ? Number(decimal.padEnd(3, '0').slice(0, 3)) || 0 : 0;
-  return (min * 60 * 1000) + (sec * 1000) + ms;
-}
-
 function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
   const angleRad = ((angleDeg - 90) * Math.PI) / 180;
   return {
@@ -215,80 +196,6 @@ function describeRingArcPath(
     `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
     'Z',
   ].join(' ');
-}
-
-function parseLyric(rawLyric: string): ParsedLyric {
-  const lyric = rawLyric.trim();
-  if (!lyric) {
-    return { lines: [], hasTimeline: false };
-  }
-
-  const timeTagRegex = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
-  const timedLines: TimedLyricLine[] = [];
-  const plainLines: string[] = [];
-
-  for (const rawLine of lyric.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-
-    const matches = Array.from(line.matchAll(timeTagRegex));
-    const text = line.replace(timeTagRegex, '').trim();
-    if (!text) {
-      continue;
-    }
-
-    if (matches.length === 0) {
-      plainLines.push(text);
-      continue;
-    }
-
-    for (const match of matches) {
-      const [, minute, second, decimal] = match;
-      timedLines.push({ timeMs: toMillis(minute, second, decimal), text });
-    }
-  }
-
-  if (timedLines.length > 0) {
-    timedLines.sort((a, b) => a.timeMs - b.timeMs);
-    return { lines: timedLines, hasTimeline: true };
-  }
-
-  return {
-    lines: plainLines.map((text, index) => ({ timeMs: index * 3000, text })),
-    hasTimeline: false,
-  };
-}
-
-function getActiveLyricIndex(parsedLyric: ParsedLyric, currentTimeMs: number): number {
-  if (parsedLyric.lines.length === 0) {
-    return -1;
-  }
-
-  if (!parsedLyric.hasTimeline) {
-    return Math.floor(Math.max(0, currentTimeMs) / 3000) % parsedLyric.lines.length;
-  }
-
-  for (let index = 0; index < parsedLyric.lines.length; index += 1) {
-    const nextLine = parsedLyric.lines[index + 1];
-    if (!nextLine || currentTimeMs < nextLine.timeMs) {
-      return index;
-    }
-  }
-
-  return parsedLyric.lines.length - 1;
-}
-
-function resolveLyricPair(parsedLyric: ParsedLyric, currentTimeMs: number): [string, string] {
-  if (parsedLyric.lines.length === 0) {
-    return ['暂无歌词', '等待歌曲开始播放'];
-  }
-
-  const activeIndex = getActiveLyricIndex(parsedLyric, currentTimeMs);
-  const currentLine = parsedLyric.lines[activeIndex]?.text || parsedLyric.lines[0].text;
-  const nextLine = parsedLyric.lines[(activeIndex + 1) % parsedLyric.lines.length]?.text || currentLine;
-  return [currentLine, nextLine];
 }
 
 function resolveBilingualLyricPair(
@@ -1018,20 +925,14 @@ export function PlayerBar({
   const lyricLines = useMemo(
     () => {
       if (lyricDisplayMode === 'translated') {
-        if (parsedTranslatedLyric.lines.length === 0) {
-          return ['暂无中文歌词', '当前歌曲没有翻译歌词'] as [string, string];
-        }
-        return resolveLyricPair(parsedTranslatedLyric, currentTime);
+        return resolveLyricPair(parsedTranslatedLyric, ['暂无中文歌词', '当前歌曲没有翻译歌词'], currentTime);
       }
 
       if (lyricDisplayMode === 'bilingual') {
         return resolveBilingualLyricPair(parsedLyric, parsedTranslatedLyric, currentTime);
       }
 
-      if (parsedLyric.lines.length === 0) {
-        return ['暂无原文歌词', '等待歌曲开始播放'] as [string, string];
-      }
-      return resolveLyricPair(parsedLyric, currentTime);
+      return resolveLyricPair(parsedLyric, ['暂无原文歌词', '等待歌曲开始播放'], currentTime);
     },
     [currentTime, lyricDisplayMode, parsedLyric, parsedTranslatedLyric],
   );

@@ -18,7 +18,7 @@ function isTransientPlayerStartupError(message: string): boolean {
 }
 
 const AUTH_INVALIDATED_EVENT = 'allmusic:auth-invalidated';
-const AUTH_CHECK_INTERVAL_MS = 20_000;
+const AUTH_CHECK_INTERVAL_MS = 60_000;
 const LOCAL_API_HEALTH_CHECK_INTERVAL_MS = 15_000;
 const LOCAL_API_HEALTH_CHECK_TIMEOUT_MS = 2_500;
 const LOCAL_API_HEALTH_ENDPOINTS = {
