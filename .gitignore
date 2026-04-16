@@ -58,6 +58,16 @@ release/
 
 # Local temp/debug artifacts
 .tmp/
+.tmp-qqmusic-compare/
+.playwright-mcp/
 dist-portable/
+dist-win/
 artifacts/
 .codex_sdk_list.txt
+src-tauri/vendor.zip
+front/*.zip
+front/Doto,Jersey_10,Tiny5/
+front/fonts-DSEG_v046/
+front/fusion-pixel-font-10px-monospaced-otf-v2026.02.27/
+design/*.html
+design/*.zip

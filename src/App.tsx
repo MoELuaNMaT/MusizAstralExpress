@@ -21,12 +21,14 @@ const AUTH_INVALIDATED_EVENT = 'allmusic:auth-invalidated';
 const AUTH_CHECK_INTERVAL_MS = 60_000;
 const LOCAL_API_HEALTH_CHECK_INTERVAL_MS = 15_000;
 const LOCAL_API_HEALTH_CHECK_TIMEOUT_MS = 2_500;
+const LOCAL_API_HEALTH_CONFIRM_DELAY_MS = 3000;
+const LOCAL_API_HEALTH_GRACE_PERIOD_MS = 10_000;
 const LOCAL_API_HEALTH_ENDPOINTS = {
   netease: 'http://127.0.0.1:3000/login/status',
   qq: 'http://127.0.0.1:3001/health',
 } as const;
 
-async function probeLocalApiEndpoint(url: string): Promise<boolean> {
+async function probeLocalApiStatus(url: string): Promise<number | null> {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), LOCAL_API_HEALTH_CHECK_TIMEOUT_MS);
 
@@ -35,12 +37,20 @@ async function probeLocalApiEndpoint(url: string): Promise<boolean> {
       cache: 'no-store',
       signal: controller.signal,
     });
-    return response.ok;
+    return response.status;
   } catch {
-    return false;
+    return null;
   } finally {
     window.clearTimeout(timeoutId);
   }
+}
+
+async function probeLocalApiEndpoint(url: string): Promise<boolean> {
+  return (await probeLocalApiStatus(url)) === 200;
+}
+
+async function probeQQApiEndpoint(): Promise<boolean> {
+  return probeLocalApiEndpoint(LOCAL_API_HEALTH_ENDPOINTS.qq);
 }
 
 function App() {
@@ -55,6 +65,9 @@ function App() {
   const latestPlayerErrorRef = useRef<string | null>(null);
   const authCheckInFlightRef = useRef(false);
   const localApiRecoveryInFlightRef = useRef(false);
+  const localApiHasEverBeenReadyRef = useRef(false);
+  const localApiConsecutiveFailuresRef = useRef(0);
+  const localApiFirstReadyAtRef = useRef<number | null>(null);
 
   const notifyLocalApiReady = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -76,8 +89,11 @@ function App() {
     bootstrapLocalApis,
     handleRetryBootstrap,
     handleAutoFixLocalApi,
+    handleDismissOverlay,
     localApiOverlayHideTimerRef,
+    localApiDismissedUntilRef,
   } = useLocalApiBootstrap({ pushAlert });
+  const localApiServiceStateRef = useRef(localApiProgress.serviceState);
 
   useAppEventListeners({
     pushAlert,
@@ -89,6 +105,16 @@ function App() {
   const isLocalApiReady = localApiProgress.serviceState.netease === 'ready'
     && localApiProgress.serviceState.qq === 'ready'
     && !localApiProgress.failed;
+
+  useEffect(() => {
+    if (isLocalApiReady) {
+      localApiHasEverBeenReadyRef.current = true;
+      localApiConsecutiveFailuresRef.current = 0;
+      if (localApiFirstReadyAtRef.current === null) {
+        localApiFirstReadyAtRef.current = Date.now();
+      }
+    }
+  }, [isLocalApiReady]);
 
   useEffect(() => {
     void loadStoredCredentials().then(() => setMounted(true));
@@ -103,6 +129,7 @@ function App() {
 
   useEffect(() => {
     setLocalApiServiceState(localApiProgress.serviceState);
+    localApiServiceStateRef.current = localApiProgress.serviceState;
   }, [localApiProgress.serviceState, setLocalApiServiceState]);
 
   useEffect(() => {
@@ -130,13 +157,20 @@ function App() {
     }
 
     let cancelled = false;
+    const MAX_CONSECUTIVE_RECOVERIES = 3;
 
     const ensureLocalApisHealthy = async () => {
       if (localApiRecoveryInFlightRef.current) {
         return;
       }
 
-      const serviceStates = Object.values(localApiProgress.serviceState);
+      // Bootstrap 刚完成后的 grace period 内跳过健康检查，避免误判
+      const firstReadyAt = localApiFirstReadyAtRef.current;
+      if (firstReadyAt !== null && Date.now() - firstReadyAt < LOCAL_API_HEALTH_GRACE_PERIOD_MS) {
+        return;
+      }
+
+      const serviceStates = Object.values(localApiServiceStateRef.current);
       const isBootstrapping = serviceStates.some((state) =>
         state === 'pending' || state === 'starting' || state === 'installing',
       );
@@ -144,33 +178,69 @@ function App() {
         return;
       }
 
-      const [neteaseOk, qqOk] = await Promise.all([
+      let [neteaseOk, qqOk] = await Promise.all([
         probeLocalApiEndpoint(LOCAL_API_HEALTH_ENDPOINTS.netease),
-        probeLocalApiEndpoint(LOCAL_API_HEALTH_ENDPOINTS.qq),
+        probeQQApiEndpoint(),
       ]);
+
+      if (!neteaseOk || !qqOk) {
+        await new Promise((resolve) => window.setTimeout(resolve, LOCAL_API_HEALTH_CONFIRM_DELAY_MS));
+        const [confirmedNeteaseOk, confirmedQqOk] = await Promise.all([
+          neteaseOk ? Promise.resolve(true) : probeLocalApiEndpoint(LOCAL_API_HEALTH_ENDPOINTS.netease),
+          qqOk ? Promise.resolve(true) : probeQQApiEndpoint(),
+        ]);
+        neteaseOk = confirmedNeteaseOk;
+        qqOk = confirmedQqOk;
+      }
 
       if (cancelled || (neteaseOk && qqOk)) {
         return;
       }
+
+      const isDismissed = (localApiDismissedUntilRef.current ?? 0) > Date.now();
+      const isRuntimeFailure = localApiHasEverBeenReadyRef.current;
+      const exceededMaxRetries = localApiConsecutiveFailuresRef.current >= MAX_CONSECUTIVE_RECOVERIES;
 
       if (typeof window !== 'undefined') {
         const runtimeWindow = window as Window & { __ALLMUSIC_LOCAL_API_READY__?: boolean };
         runtimeWindow.__ALLMUSIC_LOCAL_API_READY__ = false;
       }
 
-      setLocalApiProgress((prev) => ({
-        ...prev,
-        visible: true,
-        failed: false,
-        percent: Math.min(prev.percent, 18),
-        message: '检测到本地 API 已断开，正在尝试恢复...',
-        logs: [...prev.logs, '检测到本地 API 掉线，开始自动重启。'].slice(-10),
-        serviceState: {
-          netease: neteaseOk ? prev.serviceState.netease : 'error',
-          qq: qqOk ? prev.serviceState.qq : 'error',
-        },
-      }));
+      // 运行时故障（非首次启动）：仅 toast 提醒，不弹全屏 overlay
+      if (isRuntimeFailure && !exceededMaxRetries && !isDismissed) {
+        pushAlert({
+          level: 'warning',
+          title: '本地 API 重连中',
+          message: '检测到服务掉线，正在后台尝试恢复...',
+          source: 'local-api.health',
+          dedupeKey: 'local-api-runtime-recovery',
+        });
+      }
 
+      // 首次启动故障或未超过重试上限时才显示 overlay
+      if (!isRuntimeFailure && !isDismissed) {
+        setLocalApiProgress((prev) => ({
+          ...prev,
+          visible: true,
+          failed: false,
+          percent: Math.min(prev.percent, 18),
+          message: '检测到本地 API 已断开，正在尝试恢复...',
+          logs: [...prev.logs, '检测到本地 API 掉线，开始自动重启。'].slice(-10),
+          serviceState: {
+            netease: neteaseOk ? prev.serviceState.netease : 'error',
+            qq: qqOk ? prev.serviceState.qq : 'error',
+          },
+        }));
+      }
+
+      if (exceededMaxRetries) {
+        if (!cancelled) {
+          console.warn('[ALLMusic] health check: exceeded max recovery attempts, silent monitoring');
+        }
+        return;
+      }
+
+      localApiConsecutiveFailuresRef.current += 1;
       localApiRecoveryInFlightRef.current = true;
       try {
         await invoke('ensure_local_api_services');
@@ -201,8 +271,8 @@ function App() {
       window.clearInterval(timer);
     };
   }, [
-    localApiProgress.serviceState,
     mounted,
+    pushAlert,
     setLocalApiProgress,
   ]);
 
@@ -377,6 +447,7 @@ function App() {
         isAutoFixing={isAutoFixingLocalApi}
         onAutoFix={handleAutoFixLocalApi}
         onRetry={handleRetryBootstrap}
+        onDismiss={handleDismissOverlay}
       />
       <TopToastViewport />
       <GlobalAlertModal />

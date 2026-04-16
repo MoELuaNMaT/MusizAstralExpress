@@ -155,18 +155,29 @@ export async function resolveDailyRecommendationsWithBridgeCache(
 
   const loadFromNetwork = async (notifyUpdate: boolean): Promise<BridgeDailyResult> => {
     const result = await libraryService.loadDailyRecommendations(context, limit);
-    const writeResult = writeBridgeCache('daily-recommend', cacheKey, authFingerprint, result);
 
-    writeDailyRecommendCache(context, { songs: result.songs, warnings: result.warnings });
+    // 空结果不缓存——通常表示瞬态失败（如 QQ 适配器未就绪），
+    // 缓存后后续请求会直接返回空数据导致日推永久加载不出来。
+    const hasSongs = result.songs.length > 0;
+    if (hasSongs) {
+      const writeResult = writeBridgeCache('daily-recommend', cacheKey, authFingerprint, result);
+      writeDailyRecommendCache(context, { songs: result.songs, warnings: result.warnings });
 
-    if (notifyUpdate && writeResult.hasChanged) {
-      emitCacheUpdate({
-        resource: 'daily-recommend',
-        cacheKey,
-        updatedAt: writeResult.entry.updatedAt,
-        source: 'network',
-      });
+      if (notifyUpdate && writeResult.hasChanged) {
+        emitCacheUpdate({
+          resource: 'daily-recommend',
+          cacheKey,
+          updatedAt: writeResult.entry.updatedAt,
+          source: 'network',
+        });
+      }
+    } else if (!silent) {
+      console.warn(
+        '[ALLMusic][BridgeCache] daily recommend returned 0 songs, skipping cache write.',
+        'Warnings:', result.warnings,
+      );
     }
+
     return result;
   };
 

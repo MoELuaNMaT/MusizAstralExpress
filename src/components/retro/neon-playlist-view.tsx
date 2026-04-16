@@ -1,6 +1,7 @@
 import { memo, useMemo, type FormEvent } from 'react';
 import type { UnifiedSong } from '@/types';
 import { normalizeImageUrl } from '@/lib/image-url';
+import { useCachedCoverUrl } from '@/hooks/useCachedCoverUrl';
 
 export interface NeonPlaylistViewProps {
   activeTape: string;
@@ -44,6 +45,8 @@ const TAPE_TITLES: Record<string, string> = {
   'history': '历史记录'
 };
 
+const DEFAULT_NEON_COVER = 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2070&auto=format&fit=crop';
+
 /** Resolve a human-readable platform badge for the current tape + source */
 function resolvePlatformLabel(activeTape: string, likedSource: string, dailySource: string): { text: string; color: string } {
   if (activeTape === 'liked-stack') {
@@ -74,6 +77,26 @@ function resolveSourceTag(tapeId: string, likedSource: string, dailySource: stri
     return 'MIX';
   }
   return null;
+}
+
+function NeonSongCover({
+  song,
+  isCurrent,
+}: {
+  song: UnifiedSong;
+  isCurrent: boolean;
+}) {
+  const coverUrl = useCachedCoverUrl(song.coverUrl, DEFAULT_NEON_COVER);
+  const normalizedFallback = normalizeImageUrl(DEFAULT_NEON_COVER);
+
+  return (
+    <img
+      src={coverUrl || normalizedFallback}
+      alt={`${song.name} 封面`}
+      className={`cover-img w-full h-full object-cover ${isCurrent ? 'is-current scale-105' : ''}`}
+      loading="lazy"
+    />
+  );
 }
 
 export const NeonPlaylistView = memo(({
@@ -413,7 +436,6 @@ export const NeonPlaylistView = memo(({
           {/* Library Grid */}
           <div className="neon-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-10 pt-4">
             {displaySongs.map((song, idx) => {
-              const coverUrl = normalizeImageUrl(song.coverUrl) || 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2070&auto=format&fit=crop';
               const isCurrent = currentSongId === song.id;
 
               return (
@@ -429,10 +451,7 @@ export const NeonPlaylistView = memo(({
                       </span>
                     </div>
                     <div className="w-full h-full overflow-hidden bg-surface-container">
-                      <img 
-                        src={coverUrl} 
-                        className={`cover-img w-full h-full object-cover ${isCurrent ? 'is-current scale-105' : ''}`}
-                      />
+                      <NeonSongCover song={song} isCurrent={isCurrent} />
                     </div>
                     {isCurrent && (
                         <div className="absolute inset-0 z-30 border-4 border-secondary pointer-events-none rounded shadow-[0_0_20px_rgba(15,206,255,0.6)]"></div>

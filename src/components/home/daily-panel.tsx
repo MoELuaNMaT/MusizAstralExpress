@@ -72,6 +72,11 @@ export function DailyPanel({
   onScrollableWheel,
 }: DailyPanelProps) {
   const resolveLiked = useSongLikeStore((state) => state.resolveLiked);
+  const activeSourceWarning = dailySourceTab === 'merged'
+    ? (dailyWarnings[0] || null)
+    : (dailyWarnings.find((item) => (
+      dailySourceTab === 'qq' ? item.includes('QQ') : item.includes('网易云')
+    )) || null);
 
   if (panelTab !== 'daily') {
     return null;
@@ -182,7 +187,7 @@ export function DailyPanel({
               <p className="text-sm text-rose-300">{dailyError}</p>
             ) : activeDailySongs.length === 0 ? (
               <div className="am-empty-state">
-                <p className="text-sm text-slate-300">{text.noDailySongsInSource}</p>
+                <p className="text-sm text-slate-300">{activeSourceWarning || text.noDailySongsInSource}</p>
               </div>
             ) : (
               <div

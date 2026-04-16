@@ -392,6 +392,62 @@ class AuthService {
     return 801;
   }
 
+  private async fetchQQApiStatus(path: string, signal?: AbortSignal): Promise<number | null> {
+    try {
+      const response = await fetch(`${QQ_API_CONFIG.baseUrl}${path}`, {
+        cache: 'no-store',
+        signal,
+      });
+      return response.status;
+    } catch {
+      return null;
+    }
+  }
+
+  private async probeQQApiReadiness(signal?: AbortSignal): Promise<'ready' | 'pending' | 'incompatible'> {
+    const healthStatus = await this.fetchQQApiStatus('/health', signal);
+    if (healthStatus !== 200) {
+      return 'pending';
+    }
+
+    // 不传 key，让 FastAPI 直接返回 422；只要不是 404，就说明扫码路由已注册。
+    const qrCapabilityStatus = await this.fetchQQApiStatus('/connect/qr/create', signal);
+    if (qrCapabilityStatus === 404) {
+      return 'incompatible';
+    }
+    if (qrCapabilityStatus === null) {
+      return 'pending';
+    }
+
+    return 'ready';
+  }
+
+  private async waitForQQApiReady(
+    onStatusChange?: (status: string) => void,
+    signal?: AbortSignal,
+  ): Promise<'ready' | 'cancelled' | 'timeout' | 'incompatible'> {
+    const maxAttempts = 12;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (signal?.aborted) {
+        return 'cancelled';
+      }
+
+      const readiness = await this.probeQQApiReadiness(signal);
+      if (readiness === 'ready') {
+        return 'ready';
+      }
+      if (readiness === 'incompatible') {
+        return 'incompatible';
+      }
+
+      onStatusChange?.('正在等待 QQ 本地服务就绪...');
+      await this.delay(500);
+    }
+
+    return signal?.aborted ? 'cancelled' : 'timeout';
+  }
+
 
   /**
    * NetEase Cloud Music - Cellphone login
@@ -906,6 +962,18 @@ class AuthService {
       return {
         success: false,
         error: 'QQ 扫码登录已取消。',
+      };
+    }
+
+    const qqApiReady = await this.waitForQQApiReady(onStatusChange, signal);
+    if (qqApiReady !== 'ready') {
+      return {
+        success: false,
+        error: qqApiReady === 'cancelled'
+          ? 'QQ 扫码登录已取消。'
+          : qqApiReady === 'incompatible'
+            ? '检测到 3001 端口上的 QQ 本地服务不是当前版本适配器，缺少扫码登录路由。请先关闭旧版 ALLMusic 或开发中的本地 QQ 服务后重试。'
+            : `无法连接 QQ 接口（${QQ_API_CONFIG.baseUrl}），请确认 QQ API 服务已启动。`,
       };
     }
 

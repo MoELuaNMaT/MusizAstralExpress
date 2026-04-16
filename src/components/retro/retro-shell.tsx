@@ -26,6 +26,7 @@ import {
   type LyricDisplayMode as ImportedLyricDisplayMode,
 } from '@/lib/lyrics';
 import { formatDuration } from '@/lib/utils';
+import { playSfx } from '@/lib/sfx';
 import { authService } from '@/services/auth.service';
 import { libraryService } from '@/services/library.service';
 import { useAlertStore, useAuthStore, useLocalApiStatusStore, usePlayerStore, useSongLikeStore } from '@/stores';
@@ -303,7 +304,7 @@ function ModeSlotButton({
       <button
         type="button"
         className={`mode-btn ${active ? `active phase-${phase}` : ''}`}
-        onClick={onClick}
+        onClick={() => { playSfx('button-click'); onClick(); }}
         disabled={disabled}
       >
         {children}
@@ -317,6 +318,9 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
   const abortRef = useRef<AbortController | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationRef = useRef<number | null>(null);
+  const authStageRef = useRef<'qr' | 'sync' | 'success' | 'error'>('qr');
+  const onCloseRef = useRef(onClose);
+  const onSuccessRef = useRef(onSuccess);
   const syncProgressRef = useRef(0);
   const phaseTargetRef = useRef(0);
   const phaseCurrentRef = useRef(Math.PI);
@@ -329,6 +333,14 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
   const [screenMode, setScreenMode] = useState<'qr' | 'sync' | 'success' | 'error'>('qr');
   const [statusText, setStatusText] = useState('');
   const [ledState, setLedState] = useState<[boolean, boolean]>([false, false]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   const drawWaveform = useCallback(() => {
     const canvas = canvasRef.current;
@@ -429,6 +441,7 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
       abortRef.current = null;
       setQrCodeUrl(null);
       setScreenMode('qr');
+      authStageRef.current = 'qr';
       setStatusText('');
       setLedState([false, false]);
       syncLockingRef.current = false;
@@ -439,6 +452,7 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
     abortRef.current = controller;
     setQrCodeUrl(null);
     setScreenMode('qr');
+    authStageRef.current = 'qr';
     setStatusText('等待扫码连接');
     setLedState([false, false]);
     syncLockingRef.current = false;
@@ -454,6 +468,9 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
             if (controller.signal.aborted) {
               return;
             }
+            if (authStageRef.current !== 'qr') {
+              return;
+            }
             setQrCodeUrl(url);
             setScreenMode('qr');
           },
@@ -464,11 +481,15 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
             setStatusText(status);
 
             if (/已扫码|确认|授权/.test(status)) {
+              authStageRef.current = 'sync';
               setScreenMode((prev) => (prev === 'success' ? prev : 'sync'));
               return;
             }
 
             if (/过期|等待扫码/.test(status)) {
+              if (authStageRef.current !== 'qr') {
+                return;
+              }
               setScreenMode('qr');
               setLedState([false, false]);
               syncLockingRef.current = false;
@@ -488,12 +509,15 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
         }
 
         await setUser(platform, result.user, result.cookie);
+        await Promise.resolve();
+        await sleep(0);
         setStatusText('登录成功，正在同步资料源');
         setScreenMode('sync');
+        authStageRef.current = 'sync';
         setLedState([false, false]);
         syncLockingRef.current = true;
 
-        await onSuccess?.(platform, (task) => {
+        await onSuccessRef.current?.(platform, (task) => {
           setLedState((previous) => (task === 'playlist'
             ? [true, previous[1]]
             : [previous[0], true]));
@@ -504,15 +528,17 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
         }
 
         setScreenMode('success');
+        authStageRef.current = 'success';
         setStatusText('资料同步完成');
         await sleep(700);
-        onClose();
+        onCloseRef.current();
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
         syncLockingRef.current = false;
         setScreenMode('error');
+        authStageRef.current = 'error';
         setStatusText(error instanceof Error ? error.message : '二维码登录失败');
       }
     };
@@ -525,7 +551,7 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
         abortRef.current = null;
       }
     };
-  }, [onClose, onSuccess, platform, setUser]);
+  }, [platform, setUser]);
 
   if (!platform) {
     return null;
@@ -542,7 +568,7 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           abortRef.current?.abort();
-          onClose();
+          onCloseRef.current();
         }
       }}
     >
@@ -552,7 +578,7 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
           className="osc-close"
           onClick={() => {
             abortRef.current?.abort();
-            onClose();
+            onCloseRef.current();
           }}
           aria-label="关闭扫码弹层"
         >
@@ -566,9 +592,15 @@ function Player4AuthOverlay({ platform, onClose, onSuccess }: AuthOverlayProps) 
               <div className="osc-crt-glare" />
               <div className="osc-screen-content">
                 {screenMode === 'qr' && (
-                  <div className="osc-qr-code" title={statusText || '扫码登录'}>
-                    {qrCodeUrl ? <img src={qrCodeUrl} alt="登录二维码" /> : null}
-                  </div>
+                  qrCodeUrl ? (
+                    <div className="osc-qr-code" title={statusText || '扫码登录'}>
+                      <img src={qrCodeUrl} alt="登录二维码" />
+                    </div>
+                  ) : (
+                    <div className="osc-qr-loading" aria-live="polite">
+                      <span>LOADING QR</span>
+                    </div>
+                  )
                 )}
                 {screenMode === 'sync' && <canvas ref={canvasRef} className="osc-wave" />}
                 {showText && <div className="osc-crt-text">{screenText}</div>}
@@ -649,9 +681,13 @@ export function RetroShell() {
   const stageRef = useRef<HTMLElement | null>(null);
   const scaledSurfaceRef = useRef<HTMLElement | null>(null);
   const transitionTimerRef = useRef<number | null>(null);
+  const lastLoadedPlaylistIdRef = useRef<string | null>(null);
 
 
   const currentSongId = currentSong?.id ?? null;
+  const hasAnyAuthenticatedPlatform = Boolean(
+    (data.users.qq && data.cookies.qq) || (data.users.netease && data.cookies.netease),
+  );
   const isQQConnected = Boolean(data.users.qq && data.cookies.qq && localApiServiceState.qq === 'ready');
   const isNeteaseConnected = Boolean(data.users.netease && data.cookies.netease && localApiServiceState.netease === 'ready');
   const currentLikeKey = currentSong ? getSongLikeKey(currentSong) : null;
@@ -666,6 +702,19 @@ export function RetroShell() {
     }),
     [data.playlists],
   );
+
+  const preferredLikedSource = useMemo<LikedTapeSource | null>(() => {
+    if (playlistByTape.mixed) {
+      return 'mixed';
+    }
+    if (playlistByTape['netease-liked']) {
+      return 'netease-liked';
+    }
+    if (playlistByTape['qq-liked']) {
+      return 'qq-liked';
+    }
+    return null;
+  }, [playlistByTape]);
 
   const activeThemeKey = useMemo<TapeThemeKey>(() => {
     if (activeTape === 'liked-stack') {
@@ -701,11 +750,39 @@ export function RetroShell() {
   }, [activeTape, likedSource, playlistByTape]);
 
   useEffect(() => {
+    if (!preferredLikedSource) {
+      return;
+    }
+
+    setLikedSource((previous) => {
+      if (previous === 'mixed' && playlistByTape.mixed) {
+        return previous;
+      }
+      if (previous === 'qq-liked' && playlistByTape['qq-liked']) {
+        return previous;
+      }
+      if (previous === 'netease-liked' && playlistByTape['netease-liked']) {
+        return previous;
+      }
+      return preferredLikedSource;
+    });
+  }, [playlistByTape, preferredLikedSource]);
+
+  useEffect(() => {
     if (data.dailySourceTab === dailySource) {
       return;
     }
     data.setDailySourceTab(dailySource);
   }, [dailySource, data]);
+
+  useEffect(() => {
+    if (currentView !== 'playlist' || hasAnyAuthenticatedPlatform) {
+      return;
+    }
+
+    setCurrentView('deck');
+    setTapeEjected(false);
+  }, [currentView, hasAnyAuthenticatedPlatform]);
 
   useEffect(() => {
     if (!currentSong) {
@@ -714,6 +791,12 @@ export function RetroShell() {
       setTranslatedLyricText('');
       setLyricLoadState('idle');
       lyricModeSyncRef.current = null;
+      return;
+    }
+
+    // API 未就绪时跳过歌词加载，避免 bootstrap 期间产生 ERR_CONNECTION_REFUSED
+    const songPlatform = currentSong.platform as 'netease' | 'qq';
+    if (localApiServiceState[songPlatform] !== 'ready') {
       return;
     }
 
@@ -747,7 +830,7 @@ export function RetroShell() {
     };
 
     void loadLyrics(currentSong);
-  }, [currentSong, data.cookies.netease, data.cookies.qq]);
+  }, [currentSong, data.cookies.netease, data.cookies.qq, localApiServiceState]);
 
   useEffect(() => {
     if (!isPlaying && !isLoading && !deckTransitionBusy) {
@@ -764,14 +847,22 @@ export function RetroShell() {
     };
   }, [deckTransitionBusy, isLoading, isPlaying]);
 
+  // 从 data 解构出 effect 实际需要的原子值，避免 data 对象引用变化导致无限循环
+  const selectedPlaylistId = data.selectedPlaylist?.id ?? null;
+  const playlistDetailSongsLength = data.playlistDetailSongs.length;
+  const isDailyLoading = data.isDailyLoading;
+  const dailySongsLength = data.dailySongs.length;
+  const loadPlaylistDetail = data.loadPlaylistDetail;
+  const loadDailyRecommendations = data.loadDailyRecommendations;
+
   useEffect(() => {
     if (currentView !== 'playlist') {
       return;
     }
 
     if (activeTape === 'daily-stack') {
-      if (!data.isDailyLoading && data.dailySongs.length === 0) {
-        void data.loadDailyRecommendations();
+      if (!isDailyLoading && dailySongsLength === 0) {
+        void loadDailyRecommendations();
       }
       return;
     }
@@ -788,11 +879,13 @@ export function RetroShell() {
       return;
     }
 
-    if (data.selectedPlaylist?.id === activePlaylist.id && data.playlistDetailSongs.length > 0) {
+    // 用 ref 做同步守卫，避免 React 异步状态更新导致重复加载
+    if (lastLoadedPlaylistIdRef.current === activePlaylist.id) {
       return;
     }
-    void data.loadPlaylistDetail(activePlaylist);
-  }, [activePlaylist, activeTape, currentView, data, isNeteaseConnected, isQQConnected, likedSource]);
+    lastLoadedPlaylistIdRef.current = activePlaylist.id;
+    void loadPlaylistDetail(activePlaylist);
+  }, [activePlaylist, activeTape, currentView, dailySongsLength, isDailyLoading, isNeteaseConnected, isQQConnected, likedSource, loadDailyRecommendations, loadPlaylistDetail, playlistDetailSongsLength, selectedPlaylistId]);
 
   useEffect(() => {
     return () => {
@@ -999,15 +1092,27 @@ export function RetroShell() {
   }, [activePlaylist, activeTape, data.activeDailySongs, data.filteredSearchResults, data.playerHistory, data.playlistDetailSongs, data.selectedPlaylist?.id]);
 
   const openPlaylistView = useCallback(() => {
+    if (!hasAnyAuthenticatedPlatform) {
+      pushAlert({
+        level: 'warning',
+        title: '请先登录账号',
+        message: '当前没有可用登录账号，禁止打开歌单资料库。',
+        source: 'player4.library.auth-required',
+        dedupeKey: 'player4-library-auth-required',
+      });
+      return;
+    }
+
     if (transitionTimerRef.current !== null) {
       window.clearTimeout(transitionTimerRef.current);
     }
     setTapeEjected(true);
+    playSfx('tape-insert');
     transitionTimerRef.current = window.setTimeout(() => {
       setCurrentView('playlist');
       transitionTimerRef.current = null;
     }, 600);
-  }, []);
+  }, [hasAnyAuthenticatedPlatform, pushAlert]);
 
   const returnToDeckWithInsert = useCallback(() => {
     if (transitionTimerRef.current !== null) {
@@ -1017,7 +1122,9 @@ export function RetroShell() {
     setDeckTransitionBusy(true);
     setCurrentView('deck');
     setTapeEjected(true);
+    playSfx('tape-insert');
     transitionTimerRef.current = window.setTimeout(() => {
+      playSfx('tape-insert');
       setTapeEjected(false);
       transitionTimerRef.current = window.setTimeout(() => {
         setDeckTransitionBusy(false);
@@ -1025,6 +1132,29 @@ export function RetroShell() {
       }, 520);
     }, 50);
   }, []);
+
+  /** 上一首/下一首：弹出磁带 → 切歌 → 插入磁带 */
+  const playTrackWithTapeTransition = useCallback((direction: 'next' | 'prev') => {
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+    }
+    setTapeEjected(true);
+    playSfx('tape-insert');
+    transitionTimerRef.current = window.setTimeout(() => {
+      // 磁带弹出后切换曲目（此时磁带已遮住封面，用户看不到切换）
+      if (direction === 'next') {
+        playNext();
+      } else {
+        playPrevious();
+      }
+      // 短暂延迟后插入磁带
+      transitionTimerRef.current = window.setTimeout(() => {
+        playSfx('tape-insert');
+        setTapeEjected(false);
+        transitionTimerRef.current = null;
+      }, 150);
+    }, 350);
+  }, [playNext, playPrevious]);
 
   const handleTapeSelect = useCallback((nextTape: Player4Tape) => {
     if (nextTape === activeTape) {
@@ -1336,7 +1466,7 @@ export function RetroShell() {
               <section className="transport">
                 <div className="transport-segment controls">
                   <div className="transport-buttons">
-                    <button type="button" className="transport-btn" title="上一首" onClick={playPrevious} disabled={!currentSong}>
+                    <button type="button" className="transport-btn" title="上一首" onClick={() => playTrackWithTapeTransition('prev')} disabled={!currentSong}>
                       <svg viewBox="0 0 24 24" className="icon" aria-hidden="true"><path d="M7 5h2v14H7zM11 12l8 6V6z" fill="currentColor" /></svg>
                     </button>
                     <button type="button" className={`transport-btn primary ${isPlaying ? 'playing' : ''}`} title="播放/暂停" onClick={togglePlay} disabled={!currentSong}>
@@ -1347,11 +1477,19 @@ export function RetroShell() {
                         <svg viewBox="0 0 24 24" className="icon" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
                       )}
                     </button>
-                    <button type="button" className="transport-btn" title="下一首" onClick={playNext} disabled={!currentSong}>
+                    <button type="button" className="transport-btn" title="下一首" onClick={() => playTrackWithTapeTransition('next')} disabled={!currentSong}>
                       <svg viewBox="0 0 24 24" className="icon" aria-hidden="true"><path d="M15 12L7 6v12zM17 5h2v14h-2z" fill="currentColor" /></svg>
                     </button>
                   </div>
-                  <button type="button" className="eject-btn" title="弹出磁带并选择资料源" onClick={openPlaylistView}>⏏ EJECT</button>
+                  <button
+                    type="button"
+                    className="eject-btn"
+                    title={hasAnyAuthenticatedPlatform ? '弹出磁带并选择资料源' : '请先登录至少一个音乐平台'}
+                    onClick={openPlaylistView}
+                    disabled={!hasAnyAuthenticatedPlatform}
+                  >
+                    ⏏ EJECT
+                  </button>
                 </div>
 
                 <div className="transport-segment">

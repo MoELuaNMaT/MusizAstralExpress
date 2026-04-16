@@ -309,6 +309,7 @@ class LibraryService {
       const response = await this.fetchJson<any>(endpoint, {
         method: 'POST',
         cache: 'no-store',
+        headers: this.buildNeteaseAuthHeaders(cookie),
       });
 
       if (response.ok && response.data && (response.data.code === 200 || response.data.code === 0)) {
@@ -446,6 +447,12 @@ class LibraryService {
       });
     }
 
+    // 诊断：打印 QQ cookie 状态，定位日推不加载的原因
+    const qqCookiePreview = context.qqCookie
+      ? `${context.qqCookie.slice(0, 40)}...(${context.qqCookie.length} chars)`
+      : null;
+    console.info('[ALLMusic][Daily] QQ cookie:', qqCookiePreview ?? 'NULL (QQ login missing or not loaded)');
+
     if (context.qqCookie) {
       requests.push({
         platform: 'qq',
@@ -472,12 +479,18 @@ class LibraryService {
   }
 
   async loadSongLyrics(song: UnifiedSong, context: LibraryContext): Promise<SongLyricResult> {
+    const t0 = performance.now();
+
     if (song.platform === 'netease') {
-      return this.fetchNeteaseSongLyrics(song, context.neteaseCookie || undefined);
+      const result = await this.fetchNeteaseSongLyrics(song, context.neteaseCookie || undefined);
+      console.info(`[ALLMusic][Lyric] netease done: ${(performance.now() - t0).toFixed(0)}ms`);
+      return result;
     }
 
     if (song.platform === 'qq') {
-      return this.fetchQQSongLyrics(song, context.qqCookie || undefined);
+      const result = await this.fetchQQSongLyrics(song, context.qqCookie || undefined);
+      console.info(`[ALLMusic][Lyric] qq done: ${(performance.now() - t0).toFixed(0)}ms`);
+      return result;
     }
 
     return {
@@ -549,11 +562,13 @@ class LibraryService {
 
     const endpoint = this.buildNeteaseUrl('/user/playlist', {
       uid: resolvedUserId,
+      limit: '1000',
       timestamp: String(Date.now()),
     }, cookie);
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (!response.ok || !response.data || response.data.code !== 200) {
@@ -650,40 +665,13 @@ class LibraryService {
       return { platform: 'qq', playlists };
     }
 
-    if (!inferredUserId) {
-      const missingUinMessage = this.normalizeQQMissingUinMessage(adapterResponse.error);
-      return {
-        platform: 'qq',
-        playlists: [],
-        warning: `QQ: ${missingUinMessage}`,
-      };
-    }
-
-    const legacyEndpoint = `${getQQApiBaseUrl()}/user/songlist?id=${encodeURIComponent(inferredUserId)}&pageNo=1&pageSize=200&timestamp=${Date.now()}`;
-    const legacyResponse = await this.fetchJson<any>(legacyEndpoint, {
-      headers: this.buildQQAuthHeaders(cookie),
-      cache: 'no-store',
-    });
-
-    if (legacyResponse.ok && legacyResponse.data && legacyResponse.data.result === 100) {
-      const rawPlaylists = Array.isArray(legacyResponse.data.data?.list)
-        ? legacyResponse.data.data.list
-        : [];
-
-      const playlists = rawPlaylists
-        .map((item: any) => this.mapQQPlaylist(item))
-        .filter((item: UnifiedPlaylist | null): item is UnifiedPlaylist => Boolean(item));
-
-      return { platform: 'qq', playlists };
-    }
-
+    // adapter 请求失败 → 直接返回错误，不再尝试不存在的 legacy 端点
     return {
       platform: 'qq',
       playlists: [],
       warning: `QQ: ${
-        this.normalizeQQMissingUinMessage(adapterResponse.error)
-        || legacyResponse.error
-        || '\u672a\u80fd\u83b7\u53d6 QQ \u6b4c\u5355\uff0c\u8bf7\u786e\u8ba4 api:qq \u670d\u52a1\u5df2\u542f\u52a8\u3002'
+        adapterResponse.error
+        || '\u672a\u80fd\u83b7\u53d6 QQ \u6b4c\u5355\uff0c\u8bf7\u786e\u8ba4 QQ \u767b\u5f55\u72b6\u6001\u53ca api \u670d\u52a1\u5df2\u542f\u52a8\u3002'
       }`,
     };
   }
@@ -700,12 +688,21 @@ class LibraryService {
     // cache it once, then keep incremental updates by prepending newly liked songs.
     if (playlist.type === 'liked' && cookie) {
       const accountUserId = await this.resolveNeteaseUserId(cookie);
+      console.info('[ALLMusic][Liked-Debug] resolveNeteaseUserId:', accountUserId || '(empty)');
+      if (!accountUserId) {
+        // resolveNeteaseUserId 返回空说明是匿名会话或 cookie 失效
+        return {
+          songs: [],
+          warning: '网易云登录已过期，请重新登录后加载喜欢歌单。',
+        };
+      }
       if (accountUserId) {
         const officialLikedPlaylistId = await this.resolveNeteaseLikedPlaylistId(
           accountUserId,
           cookie,
           resolvedPlaylistId,
         );
+        console.info('[ALLMusic][Liked-Debug] officialLikedPlaylistId:', officialLikedPlaylistId || '(empty)', 'originalId:', resolvedPlaylistId);
         if (officialLikedPlaylistId) {
           resolvedPlaylistId = officialLikedPlaylistId;
         }
@@ -718,9 +715,11 @@ class LibraryService {
           forceRefreshWebOrder,
           includePlaylistHint: true,
         });
+        console.info('[ALLMusic][Liked-Debug] orderedSongIds count:', neteaseOrder.orderedSongIds.length);
 
         if (neteaseOrder.orderedSongIds.length > 0) {
           const likedSongs = await this.fetchNeteaseSongsByIds(neteaseOrder.orderedSongIds, cookie);
+          console.info('[ALLMusic][Liked-Debug] fetchNeteaseSongsByIds returned:', likedSongs.length);
           if (likedSongs.length > 0) {
             return {
               songs: likedSongs,
@@ -732,12 +731,14 @@ class LibraryService {
     }
 
     if (!resolvedPlaylistId) {
+      console.warn('[ALLMusic][Liked-Debug] resolvedPlaylistId is empty, returning early');
       return {
         songs: [],
         warning: '网易云我喜欢歌单 ID 解析失败，请重新连接网易云后重试。',
       };
     }
 
+    console.info('[ALLMusic][Liked-Debug] generic path with playlistId:', resolvedPlaylistId);
     const endpoint = this.buildNeteaseUrl('/playlist/track/all', {
       id: resolvedPlaylistId,
       limit: '500',
@@ -746,7 +747,9 @@ class LibraryService {
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
+    console.info('[ALLMusic][Liked-Debug] /playlist/track/all ok:', response.ok, 'code:', response.data?.code, 'songs:', Array.isArray(response.data?.songs) ? response.data.songs.length : 'n/a');
 
     if (response.ok && response.data && response.data.code === 200) {
       const rawSongs = Array.isArray(response.data.songs) ? response.data.songs : [];
@@ -765,6 +768,7 @@ class LibraryService {
 
     const fallbackResponse = await this.fetchJson<any>(fallbackEndpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (fallbackResponse.ok && fallbackResponse.data && fallbackResponse.data.code === 200) {
@@ -837,40 +841,12 @@ class LibraryService {
       return { songs };
     }
 
-    const legacyPlaylistId = playlist.qqSonglistId || playlist.originalId || playlist.qqDirId;
-    if (!legacyPlaylistId) {
-      return {
-        songs: [],
-        warning:
-          adapterResponse.error
-          || '\u65e0\u6cd5\u8bc6\u522b QQ \u6b4c\u5355 ID\uff0c\u8bf7\u5237\u65b0\u6b4c\u5355\u540e\u91cd\u8bd5\u3002',
-      };
-    }
-
-    const legacyEndpoint = `${getQQApiBaseUrl()}/songlist?id=${encodeURIComponent(legacyPlaylistId)}&timestamp=${Date.now()}`;
-    const legacyResponse = await this.fetchJson<any>(legacyEndpoint, {
-      headers: cookie ? this.buildQQAuthHeaders(cookie) : undefined,
-      cache: 'no-store',
-    });
-
-    if (legacyResponse.ok && legacyResponse.data && legacyResponse.data.result === 100) {
-      const rawSongs = Array.isArray(legacyResponse.data.data?.songlist)
-        ? legacyResponse.data.data.songlist
-        : [];
-
-      const songs = rawSongs
-        .map((item: any) => this.mapQQSong(item))
-        .filter((item: UnifiedSong | null): item is UnifiedSong => Boolean(item));
-
-      return { songs };
-    }
-
+    // adapter 请求失败 → 直接返回错误，不再尝试不存在的 /songlist 端点
     return {
       songs: [],
       warning:
         adapterResponse.error
-        || legacyResponse.error
-        || '\u672a\u80fd\u83b7\u53d6 QQ \u6b4c\u5355\u8be6\u60c5\uff0c\u8bf7\u91cd\u542f QQ API \u670d\u52a1\u540e\u91cd\u8bd5\u3002',
+        || '\u672a\u80fd\u83b7\u53d6 QQ \u6b4c\u5355\u8be6\u60c5\uff0c\u8bf7\u786e\u8ba4 QQ \u767b\u5f55\u72b6\u6001\u53ca api \u670d\u52a1\u5df2\u542f\u52a8\u3002',
     };
   }
 
@@ -884,10 +860,11 @@ class LibraryService {
       type: '1',
       limit: String(limit),
       timestamp: String(Date.now()),
-    }, cookie);
+    });
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (!response.ok || !response.data || response.data.code !== 200) {
@@ -931,31 +908,13 @@ class LibraryService {
       return { platform: 'qq', songs };
     }
 
-    const legacyEndpoint = `${getQQApiBaseUrl()}/search?key=${encodeURIComponent(keyword)}&t=0&pageNo=1&pageSize=${limit}&timestamp=${Date.now()}`;
-    const legacyResponse = await this.fetchJson<any>(legacyEndpoint, {
-      headers: this.buildQQAuthHeaders(cookie),
-      cache: 'no-store',
-    });
-
-    if (legacyResponse.ok && legacyResponse.data && legacyResponse.data.result === 100) {
-      const rawSongs = Array.isArray(legacyResponse.data.data?.list)
-        ? legacyResponse.data.data.list
-        : [];
-
-      const songs = rawSongs
-        .map((item: any) => this.mapQQSong(item))
-        .filter((item: UnifiedSong | null): item is UnifiedSong => Boolean(item));
-
-      return { platform: 'qq', songs };
-    }
-
+    // adapter 搜索失败 → 直接返回错误，不再尝试不存在的 /search 端点
     return {
       platform: 'qq',
       songs: [],
       warning:
         adapterResponse.error
-        || legacyResponse.error
-        || 'QQ \u641c\u7d22\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002',
+        || 'QQ 搜索失败，请稍后重试。',
     };
   }
 
@@ -966,10 +925,11 @@ class LibraryService {
     const endpoint = this.buildNeteaseUrl('/recommend/songs', {
       limit: String(limit),
       timestamp: String(Date.now()),
-    }, cookie);
+    });
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (!response.ok || !response.data || response.data.code !== 200) {
@@ -1008,6 +968,7 @@ class LibraryService {
     });
 
     if (!response.ok || !response.data || response.data.code !== 0) {
+      console.warn('[ALLMusic][QQ Daily] request failed:', response.error, 'endpoint:', endpoint);
       return {
         platform: 'qq',
         songs: [],
@@ -1025,6 +986,15 @@ class LibraryService {
       .filter((item: UnifiedSong | null): item is UnifiedSong => Boolean(item))
       .slice(0, limit);
 
+    if (songs.length === 0 && rawSongs.length > 0) {
+      console.warn(
+        '[ALLMusic][QQ Daily] backend returned',
+        rawSongs.length,
+        'raw tracks but 0 survived mapQQSong. First raw track keys:',
+        Object.keys(rawSongs[0]),
+      );
+    }
+
     return {
       platform: 'qq',
       songs,
@@ -1036,10 +1006,11 @@ class LibraryService {
     const endpoint = this.buildNeteaseUrl('/lyric', {
       id: song.originalId,
       timestamp: String(Date.now()),
-    }, cookie);
+    });
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (!response.ok || !response.data || response.data.code !== 200) {
@@ -1561,6 +1532,7 @@ class LibraryService {
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (!response.ok || !response.data || response.data.code !== 200) {
@@ -1659,11 +1631,13 @@ class LibraryService {
   private async resolveNeteaseLikedPlaylistId(userId: string, cookie: string, fallbackPlaylistId: string): Promise<string> {
     const endpoint = this.buildNeteaseUrl('/user/playlist', {
       uid: userId,
+      limit: '1000',
       timestamp: String(Date.now()),
     }, cookie);
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
 
     if (!response.ok || !response.data || response.data.code !== 200) {
@@ -1962,7 +1936,29 @@ class LibraryService {
 
     const accountResponse = await this.fetchJson<any>(accountEndpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
+
+    const hasMusicU = cookie?.includes('MUSIC_U') ?? false;
+    const hasMusicUExact = /(?:^|;\s*)MUSIC_U=/.test(cookie ?? '');
+    const cleanedCookie = LibraryService.cleanCookieString(cookie ?? '');
+    const cleanedHasMusicU = /(?:^|;\s*)MUSIC_U=/.test(cleanedCookie);
+    const semicolonSpaceCount = (cookie?.match(/; /g) || []).length;
+    const semicolonNoSpaceCount = (cookie?.match(/;[^ ]/g) || []).length;
+    const anonimousUser = accountResponse.data?.account?.anonimousUser;
+    console.info('[ALLMusic][Liked-Debug] /user/account ok:', accountResponse.ok, 'code:', accountResponse.data?.code, 'profile.userId:', accountResponse.data?.profile?.userId, 'account.id:', accountResponse.data?.account?.id, 'anonimousUser:', anonimousUser, 'hasMusicU:', hasMusicU, 'hasMusicUExact:', hasMusicUExact, 'cleanedHasMusicU:', cleanedHasMusicU, 'cookieLen:', cookie?.length ?? 0, 'cleanedLen:', cleanedCookie.length, 'semicolonSpace:', semicolonSpaceCount, 'semicolonNoSpace:', semicolonNoSpaceCount, 'cleanedPreview:', cleanedCookie.slice(0, 300));
+    // 详细诊断：打印顶层键和 profile/account 的所有字段名
+    const topKeys = accountResponse.data ? Object.keys(accountResponse.data) : [];
+    const profileKeys = accountResponse.data?.profile ? Object.keys(accountResponse.data.profile) : [];
+    const accountKeys = accountResponse.data?.account ? Object.keys(accountResponse.data.account) : [];
+    console.info('[ALLMusic][Liked-Debug] response topKeys:', topKeys, 'profileKeys:', profileKeys.slice(0, 20), 'accountKeys:', accountKeys.slice(0, 20));
+
+    // 匿名会话（anonimousUser=true）即使有 account.id 也不是真实登录用户，
+    // /likelist 和 /playlist/track/all 对匿名用户返回空结果。
+    if (anonimousUser === true) {
+      console.warn('[ALLMusic][Liked-Debug] 匿名会话，跳过喜欢歌单解析。请重新登录网易云。');
+      return '';
+    }
 
     const fromAccount = this.normalizeNumericId(this.toText(
       accountResponse.data?.profile?.userId
@@ -2035,7 +2031,10 @@ class LibraryService {
 
     const response = await this.fetchJson<any>(endpoint, {
       cache: 'no-store',
+      headers: this.buildNeteaseAuthHeaders(cookie),
     });
+
+    console.info('[ALLMusic][Liked-Debug] /likelist uid:', userId, 'ok:', response.ok, 'code:', response.data?.code, 'ids count:', Array.isArray(response.data?.ids) ? response.data.ids.length : 'n/a', 'cookieLen:', cookie?.length ?? 0);
 
     if (!response.ok || !response.data || response.data.code !== 200) {
       return [];
@@ -2047,7 +2046,7 @@ class LibraryService {
       .filter((item: string): item is string => Boolean(item));
   }
 
-  private async fetchNeteaseSongsByIds(songIds: string[], cookie: string, maxCount = 500): Promise<UnifiedSong[]> {
+  private async fetchNeteaseSongsByIds(songIds: string[], cookie: string, maxCount = 1000): Promise<UnifiedSong[]> {
     const ids = songIds.slice(0, maxCount);
     if (ids.length === 0) {
       return [];
@@ -2069,6 +2068,7 @@ class LibraryService {
 
       const response = await this.fetchJson<any>(endpoint, {
         cache: 'no-store',
+        headers: this.buildNeteaseAuthHeaders(cookie),
       });
 
       if (!response.ok || !response.data || response.data.code !== 200) {
@@ -2099,10 +2099,62 @@ class LibraryService {
 
   private buildNeteaseUrl(path: string, params: Record<string, string>, cookie?: string): string {
     const searchParams = new URLSearchParams(params);
-    if (cookie?.trim()) {
-      searchParams.set('cookie', cookie.trim());
+    const normalizedCookie = LibraryService.cleanCookieString(cookie || '');
+    if (normalizedCookie) {
+      searchParams.set('cookie', normalizedCookie);
     }
     return `${getNeteaseApiBaseUrl()}${path}?${searchParams.toString()}`;
+  }
+
+  private buildNeteaseAuthHeaders(cookie?: string): Record<string, string> {
+    if (!cookie?.trim()) {
+      return {};
+    }
+    return { Cookie: LibraryService.cleanCookieString(cookie) };
+  }
+
+  /**
+   * 清洗 cookie 字符串：
+   * 1. 移除 Set-Cookie 响应头属性（Max-Age, Expires, Path 等）
+   * 2. 修复分隔符格式（;; → ; ）
+   * 3. 去重（同名 cookie 只保留第一次出现）
+   * NeteaseCloudMusicApi 的 cookie 解析器对格式敏感，重复条目会导致 MUSIC_U 解析失败。
+   */
+  private static cleanCookieString(raw: string): string {
+    const SET_COOKIE_ATTRS = new Set([
+      'max-age', 'expires', 'path', 'domain', 'httponly', 'secure',
+      'samesite', 'comment', 'version', 'priority', 'partitioned',
+    ]);
+
+    const seen = new Set<string>();
+    const kept: string[] = [];
+
+    for (const part of raw.split(/;\s*/)) {
+      const trimmed = part.trim();
+      if (!trimmed) {
+        continue;
+      }
+      // 无等号的 flag 属性（HttpOnly, Secure）
+      if (!trimmed.includes('=')) {
+        if (!SET_COOKIE_ATTRS.has(trimmed.toLowerCase())) {
+          kept.push(trimmed);
+        }
+        continue;
+      }
+      const eqIdx = trimmed.indexOf('=');
+      const name = trimmed.slice(0, eqIdx).trim();
+      if (SET_COOKIE_ATTRS.has(name.toLowerCase())) {
+        continue;
+      }
+      // 去重：同名 cookie 只保留第一次出现
+      if (seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      kept.push(trimmed);
+    }
+
+    return kept.join('; ');
   }
 
   private buildQQAuthHeaders(cookie?: string): Record<string, string> {
@@ -2159,18 +2211,6 @@ class LibraryService {
 
     // Keep stored state as the final fallback only; stale state should not override live cookie/session.
     return this.normalizeNumericId(userId);
-  }
-
-  private normalizeQQMissingUinMessage(message?: string): string {
-    if (!message) {
-      return '\u65e0\u6cd5\u89e3\u6790 QQ \u7528\u6237 ID\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55 QQ \u97f3\u4e50\u540e\u91cd\u8bd5\u3002';
-    }
-
-    if (message.toLowerCase().includes('missing uin')) {
-      return '\u7f3a\u5c11 QQ \u7528\u6237 ID\uff08uin\uff09\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55 QQ \u97f3\u4e50\u3002';
-    }
-
-    return message;
   }
 
   private normalizeNumericId(value: string | null | undefined): string {

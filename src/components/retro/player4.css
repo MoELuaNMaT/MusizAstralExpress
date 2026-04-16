@@ -2353,14 +2353,29 @@
 .osc-qr-code {
   width: 140px;
   height: 140px;
-  background-image:
-    repeating-linear-gradient(45deg, var(--osc-crt-green) 0, var(--osc-crt-green) 8px, transparent 8px, transparent 16px),
-    repeating-linear-gradient(-45deg, var(--osc-crt-green) 0, var(--osc-crt-green) 8px, transparent 8px, transparent 16px);
+  background: rgba(7, 26, 7, 0.88);
   border: 3px solid var(--osc-crt-green);
   box-shadow: 0 0 15px var(--osc-crt-green);
   transition: opacity 0.3s;
   position: relative;
   overflow: hidden;
+}
+
+.osc-qr-loading {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid rgba(57, 255, 20, 0.55);
+  box-shadow: inset 0 0 18px rgba(57, 255, 20, 0.14), 0 0 15px rgba(57, 255, 20, 0.2);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(57, 255, 20, 0.08), rgba(7, 26, 7, 0.92) 70%);
+  color: var(--osc-crt-green);
+  font-size: 13px;
+  font-family: monospace;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 8px var(--osc-crt-green);
 }
 
 .osc-qr-code::before {

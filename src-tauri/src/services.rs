@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, Once, OnceLock};
 use std::time::{Duration, Instant};
+use std::time::UNIX_EPOCH;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -28,8 +29,11 @@ pub(crate) fn local_service_manager() -> &'static Mutex<LocalServiceManager> {
 
 pub(crate) fn service_is_ready(service: &str) -> bool {
     match service {
-        "netease" => can_connect_to_port(NETEASE_API_PORT),
-        "qq" => can_connect_to_port(QQ_API_PORT),
+        "netease" => can_get_ok_from_local_api(NETEASE_API_PORT, "/login/status"),
+        "qq" => {
+            can_get_ok_from_local_api(QQ_API_PORT, "/health")
+                && local_api_route_exists(QQ_API_PORT, "/connect/qr/create")
+        }
         _ => false,
     }
 }
@@ -66,7 +70,52 @@ pub(crate) fn resolve_project_root_for_manager(manager: &mut LocalServiceManager
     }
 }
 
-pub(crate) fn detect_node_runtime() -> LocalApiRuntimeStatus {
+fn find_bundled_node_command(project_root: Option<&Path>) -> Option<PathBuf> {
+    let root = project_root?;
+    let executable = if cfg!(target_os = "windows") {
+        "node.exe"
+    } else {
+        "node"
+    };
+    let candidate = root.join("runtime").join("node").join(executable);
+    if candidate.exists() {
+        return Some(candidate);
+    }
+    None
+}
+
+fn find_bundled_qq_adapter_binary(project_root: Option<&Path>) -> Option<PathBuf> {
+    let root = project_root?;
+    let executable = if cfg!(target_os = "windows") {
+        "ALLMusicQQAdapter.exe"
+    } else {
+        "ALLMusicQQAdapter"
+    };
+    let candidate = root.join("runtime").join("qq-adapter").join(executable);
+    if candidate.exists() {
+        return Some(candidate);
+    }
+    None
+}
+
+pub(crate) fn detect_node_runtime(project_root: Option<&Path>) -> LocalApiRuntimeStatus {
+    if let Some(command_path) = find_bundled_node_command(project_root) {
+        let command = command_path.display().to_string();
+        let (available, version, error) = probe_runtime_command(command.as_str(), &["--version"]);
+        return LocalApiRuntimeStatus {
+            name: "Node.js".to_string(),
+            command,
+            available,
+            version,
+            hint: if available {
+                Some("已检测到随包 Node.js 运行时。".to_string())
+            } else {
+                error
+            },
+            install_url: NODEJS_INSTALL_URL.to_string(),
+        };
+    }
+
     let (available, version, error) = probe_runtime_command("node", &["--version"]);
     LocalApiRuntimeStatus {
         name: "Node.js".to_string(),
@@ -78,7 +127,21 @@ pub(crate) fn detect_node_runtime() -> LocalApiRuntimeStatus {
     }
 }
 
-pub(crate) fn detect_python_runtime() -> (LocalApiRuntimeStatus, Option<String>) {
+pub(crate) fn detect_python_runtime(project_root: Option<&Path>) -> (LocalApiRuntimeStatus, Option<String>) {
+    if let Some(adapter_binary) = find_bundled_qq_adapter_binary(project_root) {
+        return (
+            LocalApiRuntimeStatus {
+                name: "Python".to_string(),
+                command: adapter_binary.display().to_string(),
+                available: true,
+                version: Some("bundled-qq-adapter".to_string()),
+                hint: Some("已检测到随包 QQ 适配器，无需系统 Python。".to_string()),
+                install_url: PYTHON_INSTALL_URL.to_string(),
+            },
+            None,
+        );
+    }
+
     let (available, version, error) = probe_runtime_command("python", &["--version"]);
     if available {
         return (
@@ -158,8 +221,8 @@ pub(crate) fn ensure_node_modules(project_root: &Path) -> Result<(), String> {
 }
 
 pub(crate) fn inspect_local_api_environment(project_root: Option<&Path>) -> LocalApiEnvironmentInspection {
-    let node = detect_node_runtime();
-    let (python, python_command) = detect_python_runtime();
+    let node = detect_node_runtime(project_root);
+    let (python, python_command) = detect_python_runtime(project_root);
 
     let mut missing = Vec::new();
     if !node.available {
@@ -240,7 +303,12 @@ pub(crate) fn spawn_node_script(
         return Err(format!("script not found: {}", script_path.display()));
     }
 
-    let mut command = Command::new("node");
+    let bundled_node = find_bundled_node_command(Some(project_root));
+    let node_command = bundled_node
+        .as_ref()
+        .map(|path| path.as_os_str())
+        .unwrap_or_else(|| std::ffi::OsStr::new("node"));
+    let mut command = Command::new(node_command);
     command
         .arg(script_path)
         .current_dir(project_root)
@@ -489,6 +557,153 @@ pub(crate) fn install_local_service_cleanup_hook() {
     });
 }
 
+fn vendor_stamp_path(vendor_base: &Path) -> PathBuf {
+    vendor_base.join(".vendor-stamp")
+}
+
+fn sanitize_vendor_resource_stamp(stamp: &str) -> String {
+    stamp
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect()
+}
+
+fn expected_vendor_entries(vendor_base: &Path) -> Vec<PathBuf> {
+    let node_executable = if cfg!(target_os = "windows") {
+        "node.exe"
+    } else {
+        "node"
+    };
+    let qq_executable = if cfg!(target_os = "windows") {
+        "ALLMusicQQAdapter.exe"
+    } else {
+        "ALLMusicQQAdapter"
+    };
+
+    vec![
+        vendor_base.join("scripts").join("start-netease-api.cjs"),
+        vendor_base.join("scripts").join("start-qmusic-adapter.cjs"),
+        vendor_base.join("runtime").join("node").join(node_executable),
+        vendor_base.join("runtime").join("qq-adapter").join(qq_executable),
+        vendor_base
+            .join("node_modules")
+            .join("NeteaseCloudMusicApi")
+            .join("app.js"),
+    ]
+}
+
+fn build_vendor_resource_stamp(zip_path: &Path) -> Result<String, String> {
+    let metadata = std::fs::metadata(zip_path)
+        .map_err(|error| format!("failed to read vendor.zip metadata: {}", error))?;
+    let modified = metadata
+        .modified()
+        .map_err(|error| format!("failed to read vendor.zip modified time: {}", error))?;
+    let modified_epoch = modified
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("invalid vendor.zip modified time: {}", error))?
+        .as_secs();
+
+    Ok(format!("{}:{}", metadata.len(), modified_epoch))
+}
+
+fn extracted_vendor_is_current(vendor_base: &Path, expected_stamp: &str) -> bool {
+    let stamp_matches = std::fs::read_to_string(vendor_stamp_path(vendor_base))
+        .ok()
+        .map(|content| content.trim().to_string())
+        .as_deref()
+        == Some(expected_stamp);
+
+    stamp_matches && expected_vendor_entries(vendor_base).iter().all(|path| path.exists())
+}
+
+fn preferred_service_root(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
+    if cfg!(debug_assertions) {
+        if let Some(workspace_root) = find_project_root() {
+            return Ok(Some(workspace_root));
+        }
+    }
+
+    match ensure_vendor_extracted(app) {
+        Ok(dir) => Ok(Some(dir)),
+        Err(error) if error.contains("vendor.zip not found in resources") => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+/// 从嵌入式 vendor.zip 解压运行时资源到 app_local_data_dir/vendor/。
+/// 仅在安装版首次启动时触发；开发模式下 vendor.zip 不存在，返回 Err 让调用方 fallback。
+pub(crate) fn ensure_vendor_extracted(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("failed to resolve resource dir: {}", e))?;
+    let zip_path = resource_dir.join("vendor.zip");
+    if !zip_path.exists() {
+        return Err("vendor.zip not found in resources (development mode)".to_string());
+    }
+    let resource_stamp = build_vendor_resource_stamp(&zip_path)?;
+
+    let vendor_root = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("failed to resolve app local data dir: {}", e))?
+        .join("vendor");
+    let vendor_base = vendor_root.join(format!(
+        "bundle_{}",
+        sanitize_vendor_resource_stamp(resource_stamp.as_str())
+    ));
+
+    if extracted_vendor_is_current(&vendor_base, resource_stamp.as_str()) {
+        return Ok(vendor_base);
+    }
+
+    emit_local_api_progress(
+        app,
+        "prepare",
+        None,
+        "正在同步随包运行时资源...",
+        3,
+        "info",
+    );
+
+    std::fs::create_dir_all(&vendor_base)
+        .map_err(|e| format!("failed to create vendor dir: {}", e))?;
+
+    let mut cmd = Command::new("powershell");
+    cmd.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        &format!(
+            "Expand-Archive -LiteralPath '{}' -DestinationPath '{}' -Force",
+            zip_path.display(),
+            vendor_base.display()
+        ),
+    ]);
+    cmd.stdout(Stdio::null());
+    cmd.stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("failed to run PowerShell for extraction: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("vendor.zip extraction failed: {}", stderr.trim()));
+    }
+
+    std::fs::write(vendor_stamp_path(&vendor_base), resource_stamp)
+        .map_err(|error| format!("failed to write vendor stamp: {}", error))?;
+
+    Ok(vendor_base)
+}
+
 pub(crate) fn ensure_local_api_services_inner(app: tauri::AppHandle) -> Result<String, String> {
     emit_local_api_progress(
         &app,
@@ -499,10 +714,30 @@ pub(crate) fn ensure_local_api_services_inner(app: tauri::AppHandle) -> Result<S
         "info",
     );
 
+    // 调试环境优先工作区源码，安装版再回落到 vendor 运行时。
+    let service_root = match preferred_service_root(&app) {
+        Ok(dir) => dir,
+        Err(error) => {
+            emit_local_api_progress(
+                &app,
+                "runtime_check_error",
+                None,
+                error.clone(),
+                stage_percent("runtime_check_error", 100),
+                "error",
+            );
+            return Err(error);
+        }
+    };
+
     let manager_mutex = local_service_manager();
     let mut manager = manager_mutex
         .lock()
         .map_err(|_| "failed to lock local service manager".to_string())?;
+
+    if let Some(dir) = service_root {
+        manager.project_root = Some(dir);
+    }
 
     clean_exited_processes(&mut manager);
 
@@ -660,8 +895,19 @@ pub(crate) fn ensure_local_api_services_inner(app: tauri::AppHandle) -> Result<S
     let mut qq_ready_notified = qq_was_ready;
 
     for _ in 0..960 {
-        let netease_ready = can_connect_to_port(NETEASE_API_PORT);
-        let qq_ready = can_connect_to_port(QQ_API_PORT);
+        let netease_ready = service_is_ready("netease");
+        let qq_ready = service_is_ready("qq");
+
+        if started_services.iter().any(|service| *service == "qq") && !qq_ready {
+            if let Ok(mut manager) = local_service_manager().lock() {
+                clean_exited_processes(&mut manager);
+                if manager.qq_child.is_none() {
+                    let startup_error = "QQ 本地 API 启动失败：3001 端口可能已被旧版 ALLMusic / 开发服务占用，或当前占用者不是支持扫码登录的 QQ 适配器。".to_string();
+                    emit_local_api_progress(&app, "error", Some("qq"), startup_error.clone(), 100, "error");
+                    return Err(startup_error);
+                }
+            }
+        }
 
         if netease_ready && !netease_ready_notified {
             emit_local_api_progress(

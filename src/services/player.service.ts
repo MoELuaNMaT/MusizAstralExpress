@@ -42,6 +42,10 @@ interface QQUrlResponse {
 }
 
 class PlayerService {
+  private qqUrlCache = new Map<string, { url: string; expires: number }>();
+  private static readonly QQ_URL_CACHE_TTL = 30 * 60 * 1000;
+  private static readonly QQ_URL_CACHE_MAX = 200;
+
   private getConnectionIssueMessage(): string {
     if (resolveRuntimeTarget() === 'tauri-mobile') {
       return '\u68C0\u6D4B\u5230 Android \u7AEF\u672C\u5730\u64AD\u653E\u670D\u52A1\u4E0D\u53EF\u8FBE\uFF1A\u8BF7\u5148\u5728\u5BBF\u4E3B\u673A\u8FD0\u884C `npm run dev:services`\uFF08\u6216 `npm run android:dev`\uFF09\uFF0C\u5E76\u786E\u4FDD 10.0.2.2:3000/3001 \u53EF\u8BBF\u95EE\u3002';
@@ -54,16 +58,24 @@ class PlayerService {
     if (song.playUrl && !context.forceRefresh) {
       return {
         success: true,
-        url: song.platform === 'qq' ? this.buildQQStreamProxyUrl(song.playUrl) : song.playUrl,
+        url: song.platform === 'qq' ? this.normalizeQQResolvedUrl(song.playUrl) : song.playUrl,
       };
     }
+
+    const t0 = performance.now();
 
     if (song.platform === 'netease') {
       return this.resolveNeteaseSongUrl(song, context.neteaseCookie, context.quality || '320');
     }
 
     if (song.platform === 'qq') {
-      return this.resolveQQSongUrl(song, context.qqCookie, context.quality || '320');
+      console.info(
+        '[ALLMusic][Player] resolveQQSongUrl start:',
+        { qqSongMid: song.qqSongMid, qqSongId: song.qqSongId, originalId: song.originalId },
+      );
+      const result = await this.resolveQQSongUrl(song, context.qqCookie, context.quality || '320');
+      console.info(`[ALLMusic][Player] resolveQQSongUrl done: ${(performance.now() - t0).toFixed(0)}ms`, result.success ? 'OK' : `FAIL: ${result.error}`);
+      return result;
     }
 
     return {
@@ -181,6 +193,13 @@ class PlayerService {
       };
     }
 
+    const cacheKey = `${identity.songMid || ''}:${identity.songId || ''}`;
+    const cached = this.qqUrlCache.get(cacheKey);
+    if (cached && Date.now() < cached.expires) {
+      return { success: true, url: cached.url };
+    }
+    this.qqUrlCache.delete(cacheKey);
+
     const qualityFallbacks = this.buildQQQualityFallbacks(quality);
     let latestError = '';
 
@@ -204,7 +223,9 @@ class PlayerService {
 
       const url = this.toText(response.data?.data?.url ?? response.data?.url);
       if (response.ok && url) {
-        return { success: true, url: this.buildQQStreamProxyUrl(url) };
+        const resolvedUrl = this.normalizeQQResolvedUrl(url);
+        this.setQQUrlCache(cacheKey, resolvedUrl);
+        return { success: true, url: resolvedUrl };
       }
       latestError = response.error || latestError;
     }
@@ -264,17 +285,23 @@ class PlayerService {
     return ['128'];
   }
 
-  private buildQQStreamProxyUrl(targetUrl: string): string {
-    const normalizedTarget = this.toText(targetUrl);
-    if (!normalizedTarget) {
-      return normalizedTarget;
+  private normalizeQQResolvedUrl(rawUrl: string): string {
+    const normalizedUrl = this.toText(rawUrl);
+    if (!normalizedUrl) {
+      return normalizedUrl;
     }
 
-    if (normalizedTarget.startsWith(`${QQ_API_BASE_URL}/song/stream?`)) {
-      return normalizedTarget;
+    if (!normalizedUrl.startsWith(`${QQ_API_BASE_URL}/song/stream?`)) {
+      return normalizedUrl;
     }
 
-    return `${QQ_API_BASE_URL}/song/stream?target=${encodeURIComponent(normalizedTarget)}`;
+    try {
+      const parsed = new URL(normalizedUrl);
+      const directTarget = this.toText(parsed.searchParams.get('target'));
+      return directTarget || normalizedUrl;
+    } catch {
+      return normalizedUrl;
+    }
   }
 
   private buildNeteaseQualityFallbacks(
@@ -359,6 +386,26 @@ class PlayerService {
     const candidate = payload as { message?: unknown; error?: unknown; msg?: unknown; errMsg?: unknown };
     const message = candidate.message ?? candidate.error ?? candidate.msg ?? candidate.errMsg;
     return typeof message === 'string' && message.trim() ? message : undefined;
+  }
+
+  private setQQUrlCache(key: string, url: string): void {
+    if (this.qqUrlCache.size >= PlayerService.QQ_URL_CACHE_MAX) {
+      const oldest = this.qqUrlCache.keys().next().value;
+      if (oldest) this.qqUrlCache.delete(oldest);
+    }
+    this.qqUrlCache.set(key, { url, expires: Date.now() + PlayerService.QQ_URL_CACHE_TTL });
+  }
+
+  async prefetchQQSongUrl(song: UnifiedSong, context: ResolvePlayUrlContext): Promise<void> {
+    if (song.platform !== 'qq') return;
+    const identity = this.resolveQQSongIdentity(song);
+    const cacheKey = `${identity.songMid || ''}:${identity.songId || ''}`;
+    if (this.qqUrlCache.has(cacheKey)) return;
+    try {
+      await this.resolveQQSongUrl(song, context.qqCookie, context.quality || '320');
+    } catch {
+      // 预解析失败不影响主流程
+    }
   }
 
   private toText(value: unknown): string {

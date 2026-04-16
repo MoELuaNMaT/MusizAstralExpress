@@ -239,3 +239,175 @@
 - 同一套代码下，手动以 `npm run dev -- --host 127.0.0.1` 启动后，`curl http://127.0.0.1:1420` 与 `curl http://localhost:1420` 都立即返回 `200`，说明问题不在 React 编译或页面代码，而在监听地址。
 - 考虑到项目还存在 `src-tauri/tauri.android.conf.json -> http://10.0.2.2:1420` 的移动端调试链路，最终修复不能把 host 永久写死为单一地址；更稳妥的做法是“桌面默认 `127.0.0.1`，若 Tauri CLI 注入 `TAURI_DEV_HOST` 则优先使用该值”。
 - `npm run dev:all` 本身只会并发启动网易云 API、QQ 适配器和 Vite，不包含 Tauri 窗口或浏览器打开动作；它不是 `tauri:dev` 的等价替代，所以“不会弹出前端界面”是脚本语义问题，不是前端页面渲染问题。
+
+## 2026-04-15（歌单门禁 / 我喜欢失败 / 扫码闪烁排查）
+- 当前 `player_4` 壳层已经不再由 `App` 决定“未登录进 Login、已登录进 Home”，而是固定进入 `RetroShell`；但 `src/components/retro/retro-shell.tsx` 中 `openPlaylistView()` 没有任何登录态门禁，`EJECT` 按钮也未禁用，因此未登录时仍可直接切到资料库视图。
+- `RetroShell` 的喜欢磁带默认源仍是 `likedSource='mixed'`。当用户只登录单平台时，`activePlaylist` 会解析为 `null`，而 `activeSongs` 又只在 `activePlaylist` 与 `selectedPlaylist` 匹配时返回 `playlistDetailSongs`；结果是单平台“我喜欢”在当前 UI 中没有真实绑定到可用歌单。
+- `useHomeData` 仍会在后台自动选中首个喜欢歌单并调用 `loadPlaylistDetail()`，失败后通过全局告警抛出“歌单详情加载失败”。因此当前用户会同时看到“资料库能打开但当前磁带没有数据”和“后台详情请求报错”两层错位体验。
+- `src/components/retro/neon-playlist-view.tsx` 直接把 `normalizeImageUrl(song.coverUrl)` 喂给 `<img>`，没有复用现成的 `useCachedCoverUrl -> resolveCachedCoverUrl -> cache_cover_image` 封面缓存链路；这会让 `player_4` 资料库重新暴露远程封面直连问题，而旧 Home 列表已经绕过了这类问题。
+- 扫码弹层 `Player4AuthOverlay` 当前在 `screenMode='qr'` 时无论真实二维码是否已到位，都会先渲染 `.osc-qr-code` 的绿色占位图；真实二维码 `<img>` 只是叠在占位图之上，所以会出现“绿色示意图和真实二维码来回闪”的观感。
+- 扫码状态机目前不是单向推进：收到“已扫码/确认/授权”时会切到 `sync`，但只要后续又收到“等待扫码/过期”文案，就会被拉回 `qr`。这使得扫码后到资料同步完成前的阶段存在状态回退，波形匹配动画会被重新切回二维码屏。
+
+## 2026-04-15（歌单门禁 / 我喜欢 / 扫码问题已修复）
+- `src/components/retro/retro-shell.tsx` 已为 `EJECT` 和 `openPlaylistView()` 同时补上登录门禁：没有任何已登录平台时按钮禁用，并在壳层内 fail-fast 拦截；若用户在资料库内登出最后一个账号，也会自动退回 deck。
+- `RetroShell` 已不再把 `likedSource='mixed'` 当作固定真值，而是根据当前真实存在的喜欢歌单派生首选源：有 merged 用 merged；否则退到网易云或 QQ 的单平台喜欢。这样单平台登录时“我喜欢”会自动绑定到可用歌单。
+- `src/components/retro/neon-playlist-view.tsx` 已切回封面缓存链路，新增局部 `NeonSongCover` 组件复用 `useCachedCoverUrl()`；当前 `player_4` 资料库与旧 Home 列表重新共享同一套封面加载策略。
+- `Player4AuthOverlay` 已把扫码阶段改成单向推进：一旦从二维码阶段进入 `sync`，后续“等待扫码/过期”类轮询文案不会再把界面拉回二维码页，直到显式成功或失败为止。
+- 绿色示意二维码已从运行时流程中移除：真实二维码未到位前只显示 `LOADING QR` 占位，不再显示假的绿色二维码底图，因此扫码阶段不会再出现“示意图 / 真二维码”交替闪烁。
+- 构建验证已通过：`npm run build` 成功。
+
+## 2026-04-15（运行时联调补充）
+- 已通过本地 `dev:all` + 浏览器联调验证未登录场景：主界面 `EJECT` 在运行时为禁用态，无法直接进入资料库。
+- 已通过请求拦截伪造网易云 `802 -> 801 -> 803` 扫码序列验证弹层状态机。第一次联调暴露新的真实根因：`Player4AuthOverlay` 的 effect 依赖了不稳定的 `onSuccess/onClose` 回调，而父层 `handleAuthSuccess` 又会立即使用旧一帧的 `data.loadPlaylists()` 闭包，导致弹层 effect 被重新执行并回退到二维码页，同时可能弹出一次“未检测到可用登录状态”的旧上下文告警。
+- 当前已在 `retro-shell.tsx` 中把 `onSuccess/onClose` 改为 ref 持有的最新回调，并将弹层登录主 effect 的依赖收敛到 `platform + setUser`；在 `setUser()` 后额外让出一个 tick，再调用最新的同步回调。
+- 修复后再次联调结果：扫码弹层不再回退到二维码页，最终直接关闭；单平台登录完成后，资料库默认进入 `NCM Favorites`，并能展示网易云喜欢歌曲列表与封面。
+- 联调结束后已清理 `1420 / 3000 / 3001` 端口监听，未留下后台开发进程。
+
+## 2026-04-15（QQ 0.4.1 能力核对）
+- 当前仓库代码层面已经把 QQ Python 适配器依赖钉到 `qqmusic-api-python==0.4.1`，位置在 [scripts/start-qmusic-adapter.cjs](</F:/AI Project/ALLMusic/scripts/start-qmusic-adapter.cjs:51>)；因此“升级到 0.4.1”本身不是待做改造，而是既有声明状态。
+- 但本项目当前 QQ 日推并没有接入 `qqmusic_api.recommend` 新模块。前端仍调用 [library.service.ts](</F:/AI Project/ALLMusic/src/services/library.service.ts:1004>) 的 `/recommend/daily`，后端在 [qmusic_adapter_server.py](</F:/AI Project/ALLMusic/scripts/qmusic_adapter_server.py:1581>) 里通过抓取 QQ Mac 首页 HTML，再用 [qmusic_adapter_server.py](</F:/AI Project/ALLMusic/scripts/qmusic_adapter_server.py:472>) 提取“今日私享”歌单 ID，最后按普通歌单详情读取歌曲。
+- `qqmusic-api-python 0.4.1` 新增了 `qqmusic_api/recommend.py`，提供 `get_home_feed / get_guess_recommend / get_radar_recommend / get_recommend_songlist / get_recommend_newsong` 这类读取型推荐接口，但当前适配器未导入也未使用这些接口。
+- 就 `0.4.1` 源码而言，未发现现成的“对日推歌曲点不喜欢/讨厌”写接口。项目当前 QQ 收藏能力仍是把歌曲加到或从 dirid=201 的“我喜欢”歌单移除，对应 [qmusic_adapter_server.py](</F:/AI Project/ALLMusic/scripts/qmusic_adapter_server.py:1333>) 的 `/playlist/like`。
+- 结论：如果目标只是把“QQ 日推来源”从抓首页改为 `0.4.1` 推荐接口，改动主要集中在 `scripts/qmusic_adapter_server.py` 一个模块；如果目标是补“QQ 日推歌曲不喜欢”，`0.4.1` 不能直接提供，需要继续确认 QQ 上游是否存在独立的负反馈接口，否则只能停留在“收藏/取消收藏”，不能等价替代“不喜欢”。
+
+## 2026-04-15（QQ 日推已切换到 0.4.1 推荐接口）
+- `scripts/qmusic_adapter_server.py` 已导入 `qqmusic_api.recommend.get_home_feed`，并将 `/recommend/daily` 的上游来源从“抓 QQ Mac 首页 HTML”切换为“读取 `0.4.1` 推荐 feed”。
+- 新实现不再依赖 HTML 结构和“今日私享”页面文案的正则抓取，而是在推荐 feed 中递归定位标题包含“今日私享”的节点，再从同一节点内提取 `playlistId / dirid / songlistId` 候选值。
+- 旧的 `_fetch_qq_mac_homepage()` 与 `_extract_personal_daily_playlist()` 已删除，避免后续再次回退到抓页面方案。
+- 为验证“日推歌单是否可写”，后端新增只读探针接口 `/recommend/daily/probe`：它会返回推荐 feed 中命中的节点路径、候选 ID、详情接口里的 `dirid / songlistId / creator` 等元数据，以及一个仅供判断的写入启发式结果。
+- 已完成最小静态验证：`python -m py_compile scripts/qmusic_adapter_server.py` 通过；并在项目 QQ 适配器虚拟环境中成功导入模块，确认 `get_home_feed` 可用，且 `/recommend/daily`、`/recommend/daily/probe` 两个路由都已注册。
+- 尚未完成的唯一验证是“带真实 QQ 登录态执行探针并观察返回值”，这一步需要有效用户 Cookie，当前会话无法自动代替用户完成。
+
+## 2026-04-15（QQ 0.4.1 日推实测修正结论）
+- 带真实 QQ 登录态联调后，前一版“用 `get_home_feed` 定位今日私享歌单”的假设被证伪：该账号的 `get_home_feed` 返回结构中没有可稳定提取的“今日私享”歌单入口，因此这条实现路径不成立。
+- 同一真实账号下，`qqmusic_api.recommend.get_guess_recommend()` 能稳定返回个性化歌曲流，结构中包含 `id=99 / name=猜你喜欢 / tracks=[...]`；因此当前项目的 `/recommend/daily` 已进一步改为直接消费这个歌曲流，而不是继续伪装成“可写歌单”。
+- 新的 `/recommend/daily/probe` 实测返回：`source=api.guess_recommend`、`sourceKind=song-stream`、`hasPlaylistId=false`、`hasDirid=false`。这说明 `0.4.1` 当前接到的是推荐歌曲流，不是歌单详情上下文。
+- 新增的 `/recommend/daily/write-probe` 在真实 QQ 会话下连续 3 次返回同一结论：未执行任何写操作，原因是 `get_guess_recommend()` 不暴露 `dirid/songlistId`，因此无法验证“QQ 日推不喜欢 = 从日推歌单删歌”。
+- 同次联调中，`/recommend/daily?limit=5` 已能在真实 QQ 会话下返回 5 首个性化推荐歌曲，说明“切到 0.4.1 API”本身已跑通；但它在语义上更接近“猜你喜欢歌曲流”，不再是旧实现里的“今日私享歌单”。
+
+## 2026-04-15（Windows 安装包 / 便携包打包链路修复）
+- 旧安装包“安装后缺依赖、功能起不来”的真实根因不是 NSIS/MSI 本身，而是本地 API 运行时没有随包闭环：应用首启后仍依赖系统 `Node`、系统 `Python` 和在线 `npm/pip` 安装。
+- 当前打包链路已改为把运行时直接封进 `src-tauri/vendor.zip`：其中包含 `runtime/node/node.exe`、`runtime/qq-adapter/ALLMusicQQAdapter.exe` 以及网易云 API 所需的生产 `node_modules`。
+- 已验证新的 `vendor.zip` 可脱离宿主环境独立工作：从压缩包解出后，`runtime/qq-adapter/ALLMusicQQAdapter.exe` 可直接监听 `127.0.0.1:3104`，`scripts/start-qmusic-adapter.cjs` 在显式伪造无 Python 环境时仍会优先拉起内置 `ALLMusicQQAdapter.exe` 并成功监听 `127.0.0.1:3105`。
+- 本轮正式构建已完成：`src-tauri/target/release/bundle/nsis/ALLMusic_0.1.0_x64-setup.exe`、`src-tauri/target/release/bundle/msi/ALLMusic_0.1.0_x64_en-US.msi`、`dist-portable/ALLMusic-0.1.0-portable-win64.zip` 均已生成。
+- 当前便携包脚本不再单独拼装另一套依赖，而是直接复用同一份 `vendor.zip` 解包；这样安装包与便携包共享同一运行时来源，避免后续再出现“一边能跑、一边缺依赖”的分叉。
+- 当前已完成的验证属于“运行时闭环验证 + 构建产物验证”；尚未完成的是“在一台未装开发环境的全新 Windows 机器上做完整安装回归”，因此剩余风险主要集中在目标机器是否已具备 WebView2，而不是 Node/Python 依赖缺失。
+
+## 2026-04-15（NSIS 安装版 QQ API 假启动根因）
+- 用户反馈的“安装版启动提示 QQ API 已启动，但点击登录提示无法连接 `127.0.0.1:3001`”不是前端按钮问题，真实根因在安装版运行时缓存刷新策略。
+- `src-tauri/src/services.rs` 里的 `ensure_vendor_extracted()` 之前只要看到 `AppData/Local/com.allmusic.app/vendor/scripts/start-netease-api.cjs` 存在，就会直接跳过解压；这会让新安装包继续复用旧版 `vendor` 目录。
+- 实机排查已证实该问题：安装版本地 `vendor/scripts/build-vendor.cjs` 仍是旧版 `2288` 字节，且 `vendor/runtime/node/node.exe`、`vendor/runtime/qq-adapter/ALLMusicQQAdapter.exe` 都不存在，说明应用确实没有吃到新包内的随包运行时。
+- 旧缓存刷新失败后，安装版会继续沿用历史 QQ 适配器环境；这会造成“健康探针与实际登录链路不一致”的错觉，表面看像服务已启动，实际仍在跑过期后端。
+- 修复后已用当前这台机器做回归：保留旧 `vendor` 缓存，静默覆盖安装新 NSIS 包，再启动安装版。结果是旧 `vendor` 被自动清理并重解压，新目录内已出现 `.vendor-stamp`、`runtime/node/node.exe`、`runtime/qq-adapter/ALLMusicQQAdapter.exe`。
+- 回归同时确认：安装版当前 `3001` 端口对应进程已变为 `AppData/Local/com.allmusic.app/vendor/runtime/qq-adapter/ALLMusicQQAdapter.exe`，`/health` 与 `/connect/qr/key` 均返回 `200`，QQ 扫码登录关键入口恢复可用。
+
+## 2026-04-15（QQ 启动成功提示过早 / 自修复弹窗闪烁）
+- 新一轮实机复现说明，安装版 QQ 适配器在进程层真正启动后，`/health` 与 `/connect/qr/key` 仍会有一个短暂准备窗口；本机回归中，启动后的前两轮探测（约前 6 秒）均失败，第三轮开始才稳定返回 `200`。
+- 旧逻辑的真实问题有两层：
+  - Rust 侧 `ensure_local_api_services_inner()` 只用“3001 端口能连通”判断 QQ 已就绪，没有等到 `HTTP /health` 真正可用。
+  - 前端 `App.tsx` 的健康检查 effect 依赖 `localApiProgress.serviceState`，每次服务状态变化都会立即重跑一次探测；再叠加“单次探测失败立即标红并触发自修复”，会把同一份遮罩在 `QQ 异常` / `QQ 已就绪` 之间来回切换。
+- 当前修复已做两件事：
+  - Rust 侧本地服务 readiness 统一收敛到 HTTP 健康接口：网易云用 `/login/status`，QQ 用 `/health`，不再把“端口开了”当成“服务可用了”。
+  - 前端健康检查改为常驻单实例轮询，不再因为 `serviceState` 变化反复重建 effect；且对失败服务增加一次短延迟复探，只在二次确认仍失败时才进入自动恢复。
+- 同一轮安装版回归结果：QQ 适配器在真正 ready 后连续 4 轮探测均保持 `HealthOk=True`、`QrKeyOk=True`，且进程 PID 恒定不变，说明当前没有再发生反复重启或就绪状态抖动。
+
+## 2026-04-15（QQ 扫码弹窗仍报接口不可达）
+- 用户继续反馈：即便安装版启动阶段的本地 API 状态不再来回闪，点击 QQ 登录按钮后，扫码弹窗仍会直接显示“无法连接 QQ 接口（http://127.0.0.1:3001）”。
+- 进一步溯源后确认，`player_4` 的 `Player4AuthOverlay` 在挂载后会立刻调用 `authService.qqQRCodeLogin()`；它虽然依赖外层 `data.isLocalApiReady` 才允许打开，但并不会在扫码流程内部再次等待 QQ API 真正 ready。
+- 这会和上一条问题形成残留竞态：只要用户点登录的时机恰好落在 QQ 适配器 `3001` 端口已起、但 `/health` 与 `/connect/qr/key` 仍在 warm-up 的窗口里，弹窗就会首发请求失败并直接显示“无法连接 QQ 接口”。
+- 当前已在 `src/services/auth.service.ts` 为 QQ 扫码登录补充启动前等待逻辑：真正请求 `/connect/qr/key` 之前，先轮询 `QQ_API_CONFIG.baseUrl + /health`，最多等待约 6 秒；等待期间通过弹窗状态文案提示“正在等待 QQ 本地服务就绪...”。
+- 这次修复的目标不是吞掉真实错误，而是消除“服务仍在启动窗口内就被过早点击”的竞态；如果超时后仍不可达，仍会按原路径给出明确的接口不可达错误。
+
+## 2026-04-15（安装版误报“未找到项目目录”）
+- 用户继续反馈：新包启动后直接报“运行环境未就绪 -> 未找到项目目录”，点击自动修复又提示 `project root not found. Make sure ALLMusic is started from project workspace.`。
+- 进一步实机排查确认，真实根因不是安装包缺少 `vendor.zip`，也不是 `scripts/` 真不存在，而是安装版资源解压策略和旧子进程占用发生冲突：
+  - 安装目录 `D:\\APP\\ALLMusic\\vendor.zip` 实际存在，且手动解压后确认包含 `scripts/`、`runtime/`、`node_modules/NeteaseCloudMusicApi/app.js`。
+  - 但本机当时仍有旧的 `ALLMusicQQAdapter.exe` 正在从 `AppData\\Local\\com.allmusic.app\\vendor\\runtime\\qq-adapter\\ALLMusicQQAdapter.exe` 运行。
+  - 旧逻辑会尝试先删除固定的 `AppData\\...\\vendor` 目录再重新解压；目录被旧 QQ 进程占用时，删除失败，而 `check_local_api_environment()` / `install_local_api_requirements()` 又把 `ensure_vendor_extracted()` 的错误用 `.ok()` 吞掉，最终才退化成误导性的“未找到项目目录”。
+- 当前修复已改为：
+  - 安装版资源不再解压到固定 `vendor` 根目录，而是按资源指纹解压到 `vendor/bundle_<stamp>/` 独立目录，避免被旧进程占用的旧目录卡住。
+  - `ensure_vendor_extracted()` 的失败不再被静默吞掉；安装版资源解压失败时，会直接把真实错误返回给前端，而不是继续误报“请从项目根目录启动 ALLMusic”。
+- 本机回归结果：在保留旧 `ALLMusicQQAdapter.exe` 仍占用旧目录的前提下，覆盖安装并启动新版本后，`AppData\\Local\\com.allmusic.app\\vendor\\bundle_64862174_1776247946\\` 已成功生成，说明新版本已经能绕过旧目录占用并解析到新的随包运行时。
+
+## 2026-04-15（QQ 扫码失败的最终根因：3001 被旧 Node 版服务冒充）
+- 用户继续反馈：QQ 扫码弹窗先显示“正在等待 QQ 本地服务就绪...”，随后又回到“FAILED 无法连接 QQ 接口”，但外层自检始终判定 QQ API 正常。
+- 本机实机排查确认，这次不是二维码弹窗单独失效，而是 `127.0.0.1:3001` 上跑的根本不是当前安装包自带的 `ALLMusicQQAdapter.exe`：
+  - `Get-NetTCPConnection -LocalPort 3001` 对应 PID 实际是 `node.exe`，命令行为 `node server/index.js`。
+  - 父进程链路为 `cmd.exe -> npm run dev`，说明它是一个外部 Node 开发服务，而不是安装版随包 QQ 适配器。
+  - 该进程的 `/health` 返回 `200`，但 `/connect/qr/key` 返回 `404`；与此同时，当前 bundle 内的 `qmusic_adapter_server.py` 明确已注册 `/connect/qr/key /connect/qr/create /connect/qr/check` 三个路由。
+- 结论：旧逻辑只拿 `/health` 当 QQ 就绪标准，导致“占着 3001 的旧服务/开发服务”会被误判成正常 QQ API；真正的扫码能力并不存在，所以登录弹窗最终拿不到二维码。
+- 当前修复收敛到三处：
+  - Rust 侧 `service_is_ready("qq")` 改为同时要求 `/health` 为 `200` 且 `/connect/qr/create` 路由存在；后者故意不传 `key`，以 `422 != 404` 判断“扫码路由已注册”。
+  - 前端 `App.tsx` 的桌面端自检改为复用同一标准，不再把“只有 health、没有扫码路由”的旧服务标成 `QQ 已就绪`。
+  - `auth.service.ts` 的扫码前等待逻辑也改为同一标准；如果命中“3001 上是旧版/不兼容服务”，直接给出明确错误，而不是继续泛化成“QQ API 不可达”。
+- 同时补了一条 fail-fast：如果桌面端尝试拉起 QQ 本地服务后，子进程在 ready 前立刻退出，会直接报”3001 端口可能被旧版 ALLMusic / 开发服务占用，或占用者不是支持扫码登录的 QQ 适配器”，不再傻等到统一超时。
+
+## 2026-04-16（歌单视图无限循环 + 网易云巨型 URL 修复）
+- **问题 1：切换到歌单视图触发 `Maximum update depth exceeded`**
+  - 根因：`retro-shell.tsx` 歌单加载 effect 的依赖数组包含 `data`（不稳定对象引用），每次渲染都产生新引用导致 effect 无限重执行。
+  - 修复：在 effect 前提取原子值（`selectedPlaylistId`、`playlistDetailSongsLength`、`isDailyLoading`、`dailySongsLength`、`loadPlaylistDetail`、`loadDailyRecommendations`），用这些稳定原始值替换 `data` 对象进入依赖数组。
+- **问题 2：网易云歌单触发 `ERR_INSUFFICIENT_RESOURCES` 导致本地 API 崩溃**
+  - 根因：`library.service.ts` 的 `buildNeteaseUrl` 把完整 cookie（数千字符）拼入 URL query string；当问题 1 的无限循环触发时，几十条巨型 URL 同时发出，浏览器资源耗尽。
+- 修复：`buildNeteaseUrl` 不再接受 cookie 参数，新增 `buildNeteaseAuthHeaders` 辅助方法；全部 12 个调用点改为通过 HTTP `Cookie` header 传递认证信息（与 `player.service.ts` 保持一致）。
+- **QQ 播放延迟分析结论**：歌词加载（~2s）与音频播放已经是独立的 effect 链路，互不阻塞。播放延迟来自 QQ 代理流缓冲，非代码层面可优化的范围。
+
+## 2026-04-17（双平台回归排查：网易云喜欢 / QQ 日推 / QQ 播放延迟）
+- 当前分支相对 `codex/newUI` 的三个关键回归点已经锁定在 `src/services/library.service.ts`、`src/services/player.service.ts`、`scripts/qmusic_adapter_server.py`，不是 UI 展示层问题。
+- **网易云喜欢歌单回归**：
+  - 当前实现已不再沿用旧分支“URL query 携带 cookie”的方式，而是把网易云认证统一改为 `buildNeteaseAuthHeaders() + cleanCookieString()` 走请求头。
+  - 喜欢歌单链路（`/user/account -> /user/playlist -> /likelist -> /playlist/track/all`）比普通列表更依赖完整登录态；一旦请求头中的 cookie 被 webview 忽略、或 `cleanCookieString()` 在重复 cookie 场景下保留了旧值，就会退化成匿名会话，直接导致“我喜欢”链路为空。
+  - 旧分支在同一位置仍通过 URL 参数传 cookie，所以不存在这条回归；但旧做法会重新引入“超长 URL / 资源耗尽”风险，不能整套无脑回滚。
+- **QQ 日推回归**：
+  - 旧分支 `/recommend/daily` 的后端语义是“先解析 QQ Mac 首页里的今日私享歌单 ID，再用歌单详情接口拉歌曲”，返回的是真实日推歌单上下文。
+  - 当前分支已经把后端改成 `get_radar_recommend()/get_guess_recommend()` 的推荐歌曲流；源码里的 `/recommend/daily/probe` 与 `/recommend/daily/write-probe` 也明确承认“没有可写的 `dirid/songlistId` 上下文”。
+  - 当前 `/recommend/daily` 还存在一个显式运行时缺陷：外层日志直接引用了只在内层函数里定义的 `page` 变量，成功取数后仍可能因为 `NameError` 把整个请求打成 500。
+- **QQ 播放延迟回归**：
+  - 旧分支 `player.service.ts` 对 QQ 直接返回 CDN 播放地址；当前分支把 QQ 播放 URL 统一包装成 `/song/stream?target=...` 本地代理流。
+  - 这次改动引入了一跳额外的本地 Python 转发和上游建连，首播/切歌都会比旧分支多一次代理缓冲与 Range 协商，属于结构性延迟，不是 UI 或歌词阻塞导致。
+
+## 2026-04-17（已执行修复：QQ 日推回退 + QQ 播放直连 + 网易云喜欢链路补强）
+- `scripts/qmusic_adapter_server.py` 的 `/recommend/daily` 已从当前分支的 `radar/guess recommend` 歌曲流实现，回退为旧分支 `codex/newUI` 的“抓取 QQ Mac 首页 -> 解析 今日私享 playlistId -> songlist detail 拉歌”实现。
+- 同一文件已补回日推来源缓存与首页解析辅助函数，避免每次刷新都重新抓页面；这次没有继续沿用当前分支里那套 `write-probe` 语义来驱动主功能。
+- `src/services/player.service.ts` 已取消 QQ 播放链路的本地 `/song/stream` 代理包装，恢复直接消费后端返回的 QQ CDN 播放地址；同时对内存里可能残留的旧代理 URL 增加了解包逻辑，避免本次启动仍沿用旧代理地址。
+- `src/services/library.service.ts` 没有整块回滚到旧分支，但已对网易云“我喜欢”相关链路补回 URL `cookie` 透传后备：`/user/account`、`/user/playlist`、`/likelist`、`/playlist/track/all`、`/playlist/detail`、`/song/detail`、`/like` 等关键请求现在同时保留现有 header 方案与 query 方案，降低 webview 对 `Cookie` 头处理差异导致的匿名会话风险。
+- 最小验证已通过：
+  - `python -m py_compile scripts/qmusic_adapter_server.py` 通过。
+  - `npm run build` 通过（`tsc + vite build` 成功）。
+
+## 2026-04-17（真实回归复测后的补充修复：QQ 日推空白 + QQ 播放 404）
+- 新测试说明网易云喜欢歌单链路已恢复，剩余问题收敛为两点：
+  - QQ 日推分栏空白时，前端只按“整组 daily songs 是否为空”决定是否显示错误；当网易云有日推、QQ 单平台失败时，QQ 分栏会变成“空白但不报错”。
+  - QQ `/song/url` 当前只取 `get_song_urls()` 返回数组的第一个条目；一旦首项没有可用 `purl`，即使后续条目可播也会直接 404。
+- 本轮修复：
+  - `src/components/home/daily-panel.tsx` 增加按当前分栏匹配的 warning 文案；`QQ` 或 `网易云` 分栏为空时，直接在列表区展示该平台错误，不再只给通用空状态。
+  - `scripts/qmusic_adapter_server.py` 的 `_extract_personal_daily_playlist()` 改为“严格模式 + 标题回溯最近 rid”的双阶段解析，降低 QQ Mac 页面模板插入包裹层后导致旧正则失效的概率。
+  - 同一文件的 `/song/url` 改为：
+    - 遍历返回数组里的第一个可播放 URL，而不是只看 `items[0]`。
+    - 同一请求内按 `128/320/flac/ogg` 做更完整的文件类型回退。
+    - 首轮失败后，用 `song id -> detail -> fresh mid` 再重试一轮，避免前端传入旧 `mid` 时随机 404。
+
+## 2026-04-17（运行环境溯源：真实测试命中的是旧 bundle，不是工作区代码）
+- 当前桌面端真实测试命中的 QQ 适配器进程是：
+  - `C:\Users\乱码碳\AppData\Local\com.allmusic.app\vendor\bundle_64861886_1776256295\runtime\qq-adapter\ALLMusicQQAdapter.exe`
+  - 对应源码文件是 `C:\Users\乱码碳\AppData\Local\com.allmusic.app\vendor\bundle_64861886_1776256295\runtime\qq-adapter\_internal\scripts\qmusic_adapter_server.py`
+- 这份运行中源码的 `/recommend/daily` 仍然是旧实现：
+  - 依赖 `get_guess_recommend()`
+  - 返回标题默认值 `猜你喜欢`
+  - `playlistId = null`
+- 与工作区 [scripts/qmusic_adapter_server.py](/F:/AI%20Project/ALLMusic/scripts/qmusic_adapter_server.py:1275) 当前实现的“QQ Mac 首页 -> 今日私享歌单 -> songlist detail”完全不是同一条链路。
+- 用桌面端真实 QQ cookie 直接请求 `http://127.0.0.1:3001/recommend/daily?limit=30`，后端实际返回 `code=0`、`total=5`，说明“当前运行环境里的后端并没有获取失败”，问题不在后端拿不到日推，而在前端未把已返回的 QQ 日推显示出来，或当前界面同样跑的是旧前端 bundle。
+
+## 2026-04-17（进一步溯源：工作区 QQ 日推链路正确，真正错在桌面端服务根目录选择）
+- 直接用工作区 [scripts/qmusic_adapter_server.py](/F:/AI%20Project/ALLMusic/scripts/qmusic_adapter_server.py:1275) 做真实链路验证：
+  - `QQ Mac 首页 HTML` 长度约 `40179`
+  - `_extract_personal_daily_playlist()` 成功解析出 `playlistId=5870518700`
+  - `songlist.get_detail(..., num=30)` 成功得到 `30` 首歌曲
+- 这说明“切换到 今日私享 / 每日 30 首接口”在工作区源码里已经成立，后端实现本身没有回退到 `猜你喜欢`。
+- 真正根因在桌面端 [services.rs](/F:/AI%20Project/ALLMusic/src-tauri/src/services.rs:703)：当前分支只要资源目录存在 `vendor.zip`，就会优先解压 vendor 并把它覆盖为服务根目录，导致调试态桌面端继续启动包内旧版 QQ 适配器。
+- `codex/newUI` 的服务启动逻辑没有这层“调试态优先 vendor”的覆盖，因此旧分支测试结果与工作区源码保持一致。
+
+## 2026-04-17（桌面端 dev 缓存治理）
+- 为了让 `npm run tauri:dev` 在本机始终对应工作区最新代码，当前已做两层治理：
+  - 启动期根目录选择：调试态优先工作区源码，不再优先 `vendor.zip`。
+  - 命令入口前置清理：`package.json` 的 `tauri:dev / tauri:dev:legacy` 现在会先执行 `scripts/clean-tauri-dev-cache.cjs`，主动删除 `%LOCALAPPDATA%/com.allmusic.app/vendor` 下的旧 `bundle_* / runtime / scripts` 桌面端缓存包体。
+- 清理范围刻意不碰 `%LOCALAPPDATA%/com.allmusic.app/.vendor/qq-adapter-venv`，因为它是当前 dev QQ 适配器复用的 Python 虚拟环境，不属于“旧 bundle 误用”根因。

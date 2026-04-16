@@ -13,6 +13,7 @@ export interface LocalApiOverlayProps {
   isAutoFixing: boolean;
   onAutoFix: () => void;
   onRetry: () => void;
+  onDismiss?: () => void;
 }
 
 const SERVICE_LABEL: Record<LocalApiServiceState, string> = {
@@ -43,6 +44,7 @@ export function LocalApiOverlay({
   isAutoFixing,
   onAutoFix,
   onRetry,
+  onDismiss,
 }: LocalApiOverlayProps) {
   if (!visible) return null;
 
@@ -119,6 +121,16 @@ export function LocalApiOverlay({
         {/* Action buttons (only when failed) */}
         {failed && (
           <div className="mt-4 flex flex-wrap justify-end gap-2">
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                disabled={isAutoFixing}
+                className="am-touch-target touch-manipulation rounded-lg border border-slate-400/40 bg-slate-500/20 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:bg-slate-500/30"
+              >
+                跳过
+              </button>
+            )}
             {missingRequirements.length > 0 && (
               <button
                 type="button"

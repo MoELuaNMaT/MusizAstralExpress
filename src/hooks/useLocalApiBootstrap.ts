@@ -51,16 +51,24 @@ export function useLocalApiBootstrap({
   const [localApiProgress, setLocalApiProgress] = useState<LocalApiProgressState>(INITIAL_PROGRESS);
   const [isAutoFixingLocalApi, setIsAutoFixingLocalApi] = useState(false);
   const localApiBootstrappedRef = useRef(false);
+  const bootstrapInFlightRef = useRef(false);
   const localApiOverlayHideTimerRef = useRef<number | null>(null);
+  const localApiDismissedUntilRef = useRef<number | null>(null);
   const runtimeWindow = typeof window === 'undefined'
     ? null
     : (window as Window & { __ALLMUSIC_LOCAL_API_READY__?: boolean });
 
   const bootstrapLocalApis = useCallback(async () => {
-    if (!canUseTauriInvoke() || isLikelyTauriMobileRuntime() || localApiBootstrappedRef.current) {
+    if (
+      !canUseTauriInvoke()
+      || isLikelyTauriMobileRuntime()
+      || localApiBootstrappedRef.current
+      || bootstrapInFlightRef.current
+    ) {
       return;
     }
 
+    bootstrapInFlightRef.current = true;
     localApiBootstrappedRef.current = true;
     if (runtimeWindow) {
       runtimeWindow.__ALLMUSIC_LOCAL_API_READY__ = false;
@@ -137,10 +145,6 @@ export function useLocalApiBootstrap({
         errorType: null,
         message: '本地 API 已就绪',
         missingRequirements: [],
-        serviceState: {
-          netease: 'ready',
-          qq: 'ready',
-        },
         logs: [...prev.logs, status].slice(-10),
       }));
     } catch (error) {
@@ -181,6 +185,8 @@ export function useLocalApiBootstrap({
         runtimeWindow.__ALLMUSIC_LOCAL_API_READY__ = false;
       }
       localApiBootstrappedRef.current = false;
+    } finally {
+      bootstrapInFlightRef.current = false;
     }
   }, [pushAlert]);
 
@@ -288,6 +294,11 @@ export function useLocalApiBootstrap({
     pushAlert,
   ]);
 
+  const handleDismissOverlay = useCallback(() => {
+    setLocalApiProgress((prev) => ({ ...prev, visible: false }));
+    localApiDismissedUntilRef.current = Date.now() + 5 * 60 * 1000;
+  }, []);
+
   return {
     localApiProgress,
     setLocalApiProgress,
@@ -295,6 +306,8 @@ export function useLocalApiBootstrap({
     bootstrapLocalApis,
     handleRetryBootstrap,
     handleAutoFixLocalApi,
+    handleDismissOverlay,
     localApiOverlayHideTimerRef,
+    localApiDismissedUntilRef,
   };
 }

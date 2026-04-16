@@ -121,6 +121,14 @@ export function useAppEventListeners({
           source: payload.service ? `local-api.${payload.service}` : 'local-api.progress',
           dedupeKey: `local-api-progress:${payload.service || 'shared'}:${stage}:${nextMessage}`,
         });
+        // 延迟5秒自动关闭阻塞 overlay，保留 toast 提醒
+        if (localApiOverlayHideTimerRef.current !== null) {
+          window.clearTimeout(localApiOverlayHideTimerRef.current);
+        }
+        localApiOverlayHideTimerRef.current = window.setTimeout(() => {
+          setLocalApiProgress((prev) => ({ ...prev, visible: false }));
+          localApiOverlayHideTimerRef.current = null;
+        }, 5000);
       }
 
       if (isReadyStage && !isError) {

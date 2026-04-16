@@ -3,16 +3,12 @@
   ALLMusic Windows portable package builder
 .DESCRIPTION
   Build Tauri release and assemble a portable zip.
-  Prerequisites: Node.js, Rust toolchain, npm deps installed.
+  Portable package reuses src-tauri/vendor.zip so runtime dependencies stay consistent with installer build.
 .PARAMETER SkipBuild
   Skip Tauri build, use existing release exe.
-.PARAMETER IncludeNodeModules
-  Bundle node_modules (faster first launch, larger package).
-  Default: true. Pass -IncludeNodeModules:$false to disable.
 #>
 param(
-  [switch]$SkipBuild,
-  [bool]$IncludeNodeModules = $true
+  [switch]$SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +19,7 @@ $OutDir = Join-Path $Root "dist-portable\$OutName"
 $StagingDir = Join-Path $Root "dist-portable\.staging-$OutName"
 $ZipPath = Join-Path $Root "dist-portable\${OutName}.zip"
 $ReleaseExe = Join-Path $Root "src-tauri\target\release\allmusic.exe"
+$VendorZip = Join-Path $Root "src-tauri\vendor.zip"
 $NpmCmd = (Get-Command 'npm.cmd' -ErrorAction Stop).Source
 
 Write-Host "`n=== ALLMusic Portable Builder ===" -ForegroundColor Cyan
@@ -53,52 +50,31 @@ if (-not $SkipBuild) {
 if (-not (Test-Path $ReleaseExe)) {
   throw "Release exe not found: $ReleaseExe`nRun without -SkipBuild first."
 }
+if (-not (Test-Path $VendorZip)) {
+  throw "vendor.zip not found: $VendorZip`nRun npm run build:vendor first."
+}
 
 # -- Step 2: Assemble portable folder -----------------------------
 Write-Host "`n[2/4] Assembling portable folder..." -ForegroundColor Yellow
 
 if (Test-Path $StagingDir) { Remove-Item $StagingDir -Recurse -Force }
-New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir\scripts" -Force | Out-Null
+Expand-Archive -LiteralPath $VendorZip -DestinationPath $StagingDir -Force
 
 Copy-Item $ReleaseExe "$StagingDir\ALLMusic.exe"
 Write-Host "  + ALLMusic.exe ($('{0:N1} MB' -f ((Get-Item $ReleaseExe).Length / 1MB)))"
+Write-Host "  + vendor runtime extracted"
 
-# Required script files for local API services
-$requiredScripts = @('start-netease-api.cjs', 'start-qmusic-adapter.cjs', 'port-utils.cjs', 'qmusic_adapter_server.py')
-foreach ($s in $requiredScripts) {
-  $src = Join-Path $Root "scripts\$s"
-  if (Test-Path $src) {
-    Copy-Item $src "$StagingDir\scripts\$s"
-    Write-Host "  + scripts\$s"
-  } else {
-    Write-Warning "Missing script: $src"
-  }
-}
-
-Copy-Item "$Root\package.json" "$StagingDir\package.json"
-Copy-Item "$Root\package-lock.json" "$StagingDir\package-lock.json"
-Write-Host "  + package.json, package-lock.json"
-
-# -- Step 3: node_modules -----------------------------------------
-if ($IncludeNodeModules) {
-  Write-Host "`n[3/4] Installing production node_modules..." -ForegroundColor Yellow
-  Push-Location $StagingDir
-  try {
-    $ErrorActionPreference = 'Continue'
-    & $NpmCmd ci --omit=dev --registry https://registry.npmmirror.com --no-fund --no-audit 2>&1 | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) {
-      Write-Warning "npm ci failed, falling back to npm install"
-      & $NpmCmd install --omit=dev --registry https://registry.npmmirror.com --no-fund --no-audit 2>&1 | ForEach-Object { Write-Host $_ }
-      if ($LASTEXITCODE -ne 0) { throw "npm install failed (exit $LASTEXITCODE)" }
-    }
-    $ErrorActionPreference = 'Stop'
-    $nmSize = (Get-ChildItem "$StagingDir\node_modules" -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
-    Write-Host "  + node_modules ($('{0:N1} MB' -f $nmSize))"
-  } finally { Pop-Location }
-} else {
-  Write-Host "`n[3/4] Skipping node_modules (will auto-install on first launch)" -ForegroundColor DarkGray
-}
+# -- Step 3: Runtime summary --------------------------------------
+Write-Host "`n[3/4] Verifying bundled runtime..." -ForegroundColor Yellow
+$nodeExe = Join-Path $StagingDir "runtime\node\node.exe"
+$qqAdapterExe = Join-Path $StagingDir "runtime\qq-adapter\ALLMusicQQAdapter.exe"
+$neteaseEntry = Join-Path $StagingDir "node_modules\NeteaseCloudMusicApi\app.js"
+if (-not (Test-Path $nodeExe)) { throw "Bundled node.exe missing: $nodeExe" }
+if (-not (Test-Path $qqAdapterExe)) { throw "Bundled QQ adapter missing: $qqAdapterExe" }
+if (-not (Test-Path $neteaseEntry)) { throw "Bundled NeteaseCloudMusicApi missing: $neteaseEntry" }
+Write-Host "  + runtime\node\node.exe"
+Write-Host "  + runtime\qq-adapter\ALLMusicQQAdapter.exe"
+Write-Host "  + node_modules\NeteaseCloudMusicApi\app.js"
 
 # -- Step 4: Zip ---------------------------------------------------
 Write-Host "`n[4/4] Creating zip archive..." -ForegroundColor Yellow
@@ -130,5 +106,5 @@ if ($deployedToOutput) {
 }
 Write-Host "`nRecipients need:"
 Write-Host "  - Windows 10 1803+ or Windows 11 (for WebView2)"
-Write-Host "  - Internet on first launch (auto-installs Node/Python via winget)"
+Write-Host "  - No extra Node/Python install for local API runtime"
 Write-Host ""

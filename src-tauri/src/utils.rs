@@ -1,5 +1,6 @@
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -57,6 +58,46 @@ pub(crate) fn emit_media_control_event<R: tauri::Runtime>(
 pub(crate) fn can_connect_to_port(port: u16) -> bool {
     let loopback = SocketAddr::from(([127, 0, 0, 1], port));
     TcpStream::connect_timeout(&loopback, Duration::from_millis(250)).is_ok()
+}
+
+pub(crate) fn get_local_api_status_code(port: u16, path: &str) -> Option<u16> {
+    let loopback = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = match TcpStream::connect_timeout(&loopback, Duration::from_millis(500)) {
+        Ok(stream) => stream,
+        Err(_) => return None,
+    };
+
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\nAccept: application/json\r\n\r\n",
+        path, port
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return None;
+    }
+
+    let mut buffer = [0_u8; 256];
+    let bytes_read = match stream.read(&mut buffer) {
+        Ok(bytes) if bytes > 0 => bytes,
+        _ => return None,
+    };
+
+    let response_head = String::from_utf8_lossy(&buffer[..bytes_read]);
+    response_head
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|token| token.parse::<u16>().ok())
+}
+
+pub(crate) fn can_get_ok_from_local_api(port: u16, path: &str) -> bool {
+    matches!(get_local_api_status_code(port, path), Some(200))
+}
+
+pub(crate) fn local_api_route_exists(port: u16, path: &str) -> bool {
+    matches!(get_local_api_status_code(port, path), Some(status) if status != 404)
 }
 
 pub(crate) fn measure_tcp_connect_latency_ms(host: &str, port: u16, timeout: Duration) -> Option<u128> {

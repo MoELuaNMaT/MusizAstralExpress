@@ -1137,6 +1137,17 @@ export function useAudioPlayer(): { seekTo: (ms: number) => void; retryCurrent: 
       try {
         resumeSharedAnalyserContext();
         await audio.play();
+
+        // 当前歌曲开始播放后，预解析下一首 QQ 歌曲的 URL
+        const playerState = usePlayerStore.getState();
+        const nextIndex = playerState.currentIndex + 1;
+        const nextSong = playerState.queue[nextIndex];
+        if (nextSong && nextSong.platform === 'qq') {
+          void playerService.prefetchQQSongUrl(nextSong, {
+            qqCookie: cookies.qq,
+            quality: preferredQuality,
+          });
+        }
       } catch (error) {
         if (!mountedRef.current || requestSeqRef.current !== sequence) {
           return;

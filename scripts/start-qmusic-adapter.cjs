@@ -44,12 +44,19 @@ const PIP_INDEX_URL = process.env.QQ_ADAPTER_PIP_INDEX_URL || 'https://pypi.tuna
 const PIP_TRUSTED_HOST = process.env.QQ_ADAPTER_PIP_TRUSTED_HOST || 'pypi.tuna.tsinghua.edu.cn';
 const PIP_OFFICIAL_INDEX_URL = process.env.QQ_ADAPTER_PIP_OFFICIAL_INDEX_URL || 'https://pypi.org/simple';
 const SERVER_FILE = path.join(ROOT, 'scripts', 'qmusic_adapter_server.py');
+const PACKAGED_ADAPTER_EXE = isWin
+  ? path.join(ROOT, 'runtime', 'qq-adapter', 'ALLMusicQQAdapter.exe')
+  : path.join(ROOT, 'runtime', 'qq-adapter', 'ALLMusicQQAdapter');
 const INSTALL_MARKER = path.join(VENV_DIR, '.deps.sha256');
 const DEP_SPEC = [
   'fastapi==0.109.2',
   'uvicorn==0.27.1',
-  'qqmusic-api-python==0.3.4',
+  'qqmusic-api-python==0.5.1',
 ].join('\n');
+
+function hasPackagedAdapter() {
+  return fs.existsSync(PACKAGED_ADAPTER_EXE);
+}
 
 function runOrThrow(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -258,6 +265,53 @@ async function ensureDependencies() {
 }
 
 function startServer() {
+  if (hasPackagedAdapter()) {
+    console.log(`[QQ Adapter] Starting bundled adapter at http://${HOST}:${PORT}`);
+    const child = spawn(
+      PACKAGED_ADAPTER_EXE,
+      [],
+      {
+        cwd: path.dirname(PACKAGED_ADAPTER_EXE),
+        stdio: isWin ? ['ignore', 'ignore', 'ignore'] : ['ignore', 'pipe', 'pipe'],
+        shell: false,
+        windowsHide: true,
+        env: {
+          ...process.env,
+          PYTHONUTF8: '1',
+          QQ_API_HOST: HOST,
+          QQ_API_PORT: PORT,
+        },
+      }
+    );
+
+    if (!isWin && child.stdout) {
+      child.stdout.on('data', (chunk) => {
+        process.stdout.write(chunk);
+      });
+    }
+    if (!isWin && child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        process.stderr.write(chunk);
+      });
+    }
+
+    const shutdown = () => {
+      if (!child.killed) {
+        child.kill('SIGTERM');
+      }
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    process.on('SIGBREAK', shutdown);
+    process.on('exit', shutdown);
+
+    child.on('exit', (code) => {
+      process.exit(code ?? 0);
+    });
+    return;
+  }
+
   if (!fs.existsSync(SERVER_FILE)) {
     throw new Error(`Server file not found: ${SERVER_FILE}`);
   }
@@ -309,6 +363,12 @@ function startServer() {
 async function main() {
   if (!ensurePortAvailable({ port: PORT, host: HOST, serviceName: 'QQ Adapter' })) {
     process.exit(1);
+  }
+
+  if (hasPackagedAdapter()) {
+    console.log(`[QQ Adapter] Bundled adapter found: ${PACKAGED_ADAPTER_EXE}`);
+    startServer();
+    return;
   }
 
   console.log(`[QQ Adapter] Venv dir: ${VENV_DIR}`);

@@ -592,10 +592,13 @@ export function useHomeData() {
       if (result.songs.length === 0 && result.warnings.length > 0) {
         setDailyError(result.warnings[0]);
       }
-      writeDailyRecommendCache(dailyRecommendCacheScope, {
-        songs: result.songs,
-        warnings: result.warnings,
-      });
+      // 仅缓存有效结果，避免空结果阻塞当日后续重试
+      if (result.songs.length > 0) {
+        writeDailyRecommendCache(dailyRecommendCacheScope, {
+          songs: result.songs,
+          warnings: result.warnings,
+        });
+      }
       return {
         ...result,
         success: true,

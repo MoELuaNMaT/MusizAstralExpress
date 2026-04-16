@@ -7,12 +7,25 @@ use crate::types::*;
 use crate::utils::*;
 
 #[tauri::command]
-pub(crate) fn check_local_api_environment() -> Result<LocalApiEnvironmentCheckResult, String> {
+pub(crate) fn check_local_api_environment(
+    app: tauri::AppHandle,
+) -> Result<LocalApiEnvironmentCheckResult, String> {
+    // 尝试解压嵌入式 vendor 资源（安装版首次启动）
+    let vendor_dir = match ensure_vendor_extracted(&app) {
+        Ok(dir) => Some(dir),
+        Err(error) if error.contains("vendor.zip not found in resources") => None,
+        Err(error) => return Err(error),
+    };
+
     let manager_mutex = local_service_manager();
     let mut manager = manager_mutex
         .lock()
         .map_err(|_| "failed to lock local service manager".to_string())?;
     clean_exited_processes(&mut manager);
+
+    if let Some(dir) = vendor_dir {
+        manager.project_root = Some(dir);
+    }
 
     let project_root = resolve_project_root_for_manager(&mut manager);
     let inspection = inspect_local_api_environment(project_root.as_deref());
@@ -34,11 +47,22 @@ pub(crate) fn install_local_api_requirements(
         "info",
     );
 
+    // 尝试解压嵌入式 vendor 资源（安装版首次启动）
+    let vendor_dir = match ensure_vendor_extracted(&app) {
+        Ok(dir) => Some(dir),
+        Err(error) if error.contains("vendor.zip not found in resources") => None,
+        Err(error) => return Err(error),
+    };
+
     let manager_mutex = local_service_manager();
     let mut manager = manager_mutex
         .lock()
         .map_err(|_| "failed to lock local service manager".to_string())?;
     clean_exited_processes(&mut manager);
+
+    if let Some(dir) = vendor_dir {
+        manager.project_root = Some(dir);
+    }
 
     let root = resolve_project_root_for_manager(&mut manager).ok_or_else(|| {
         "project root not found. Make sure ALLMusic is started from project workspace.".to_string()
