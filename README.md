@@ -2,19 +2,17 @@
 
 一个基于 **Tauri + React + TypeScript** 的桌面应用，用于聚合网易云音乐与 QQ 音乐账号，提供统一的登录、歌单浏览、搜索与收藏操作。
 
-## 当前状态（2026-02-23）
+## 当前状态（2026-04-17）
 
-- 前端构建可通过：`npm run build`（2026-02-23 已验证）
-- 服务最小链路可通过：`npm run smoke:services`（2026-02-23 已验证 3/3）
-- Android 环境检查可通过：`npm run android:check`（2026-02-23 已修复）
-- Android 工程已初始化：`npm run android:init`（已生成 `src-tauri/gen/android`）
-- Android 打包可通过：`npx tauri android build -v --target aarch64`（2026-02-23 已产出 APK/AAB）
-- Android Maven 下载稳定性已增强：`src-tauri/gen/android` 已增加可访问镜像仓库配置（优先阿里云镜像）
-- Android 运行时适配已完成首批：`isMobile` 检测 + 动态 `baseUrl`（按平台环境解析）+ 移动端 Safe Area / 44x44 触控目标
-- Android 真机/模拟器运行待验证：当前 `adb devices` 暂无在线设备，且本机 SDK 尚未安装 `emulator` / `system-images`
-- iOS 规划命令可用：`npm run ios:plan`
+- 前端构建可通过：`npm run build`（2026-04-17 已验证）
+- 桌面端 Rust 侧检查可通过：`cargo check --manifest-path src-tauri/Cargo.toml`（2026-04-17 已验证）
+- 桌面端默认主界面为 `player_4 / RetroShell`，主链路围绕“登录、我喜欢、日推、播放、歌词”维护
+- `npm run tauri:dev` 现在会先清理桌面端旧缓存包体，再启动 Tauri；调试态优先使用工作区源码，不再误命中历史 `vendor` bundle
+- 网易云“我喜欢”链路已恢复，QQ 日推当前走“QQ Mac 首页 -> 今日私享歌单 -> 30 首歌曲”的真实日推语义
+- QQ 播放已恢复直接消费后端返回的 CDN 地址，不再默认走本地代理流
 - 桌面端本地存储使用 Tauri Store（`auth_store.json`）
-- 已支持每日推荐聚合（网易云 + QQ 个性化推荐）与歌曲详情歌词展示
+- 安装版 / 便携包依赖 `src-tauri/vendor.zip` 随包运行时；调试态与发布态的运行时来源已明确分离
+- Android / iOS 相关脚本仍保留，但本轮未做重新验证
 - 默认本地端口：
   - 前端：`1420`
   - 网易 API：`3000`
@@ -32,9 +30,18 @@
 
 ## 快速开始
 
+浏览器联调：
+
 ```bash
 npm install
 npm run dev:all
+```
+
+桌面端调试：
+
+```bash
+npm install
+npm run tauri:dev
 ```
 
 启动后访问：
@@ -42,7 +49,7 @@ npm run dev:all
 - 前端：<http://localhost:1420>
 - 网易 API：<http://localhost:3000>
 - QQ 适配服务：<http://localhost:3001/health>
-- QQ 个性化推荐接口：<http://localhost:3001/recommend/daily?limit=10>
+- QQ 个性化日推接口：<http://localhost:3001/recommend/daily?limit=30>
 - QQ 歌词接口：<http://localhost:3001/song/lyric?mid=00265JxS3JzUtw>
 
 ## 常用命令
@@ -51,11 +58,14 @@ npm run dev:all
 - `npm run api:netease`：仅启动网易 API
 - `npm run api:qq`：仅启动 QQ 适配服务（Python + FastAPI）
 - `npm run ports:clean`：清理 3000/3001 端口占用进程（用于处理端口冲突）
+- `npm run desktop:cache:clean`：清理桌面端 `%LOCALAPPDATA%/com.allmusic.app/vendor` 下的旧 bundle / runtime 缓存
 - `npm run dev:services`：仅启动网易 API + QQ 适配服务（不启动前端）
 - `npm run dev:services:clean`：先清理端口再启动双 API
 - `npm run dev:all`：启动网易 API + QQ 适配服务 + 前端
-- `npm run tauri:dev`：启动桌面端调试（含双 API）
+- `npm run tauri:dev`：启动桌面端调试；会先清理旧桌面 bundle 缓存，再按当前工作区代码拉起本地 API
+- `npm run tauri:dev:legacy`：显式并发拉起网易 API、QQ API 和 Tauri，便于排查服务启动问题
 - `npm run build`：TypeScript 检查并打包前端
+- `npm run build:vendor`：构建安装版 / 便携包使用的 `src-tauri/vendor.zip`
 - `npm run android:check`：检查 Android 必需环境变量与命令
 - `npm run android:init`：初始化 Android 工程（需先通过环境检查）
 - `npm run android:dev`：启动安卓调试（含双 API）
@@ -93,8 +103,9 @@ npm run smoke:services
 - `src/pages`：页面层（`Login.tsx`、`Home.tsx`）
 - `src/services`：业务与 API 聚合逻辑（当前主入口）
 - `src/stores`：Zustand 状态管理
+- `src/components/retro`：当前桌面主 UI（`player_4 / RetroShell`）
 - `src-tauri`：桌面端 Rust 代码与 Tauri 配置
-- `scripts`：本地 API 启动与 smoke 测试脚本
+- `scripts`：本地 API 启动、缓存清理、vendor 打包与诊断脚本
 
 ## 常见问题
 
@@ -121,6 +132,16 @@ npm run smoke:services
    - 先确认 `node -v`、`python --version` 可用。
    - 在项目根目录执行 `npm install` 以确保 `node_modules` 完整。
    - 首次启动 QQ 适配器会自动安装 Python 依赖，耗时可能较长（应用会显示启动进度与日志）。
+
+7. **为什么 `npm run tauri:dev` 有时像是在跑旧代码？**
+   - 当前版本已默认修复这类问题：`tauri:dev` 会先执行 `desktop:cache:clean`，清掉桌面端旧 `vendor` 缓存。
+   - 调试态本地 API 现在优先使用工作区 `scripts/` 和当前源码，不再优先使用随包 `vendor.zip`。
+   - 如果你刚切过分支或改过本地 API，优先重新执行一次 `npm run tauri:dev`，不要直接复用旧桌面进程。
+
+8. **发布包和调试态为什么行为不同？**
+   - 调试态目标是“始终运行工作区最新代码”。
+   - 安装版 / 便携包目标是“脱离开发环境独立运行”，因此会使用 `src-tauri/vendor.zip` 内的随包 Node / QQ 适配器运行时。
+   - 如果你修改了本地 API 或运行时脚本，并且要同步到发布包，需要重新执行 `npm run build:vendor`。
 
 ## 安全说明
 
